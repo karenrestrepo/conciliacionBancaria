@@ -1,0 +1,39 @@
+services:
+
+  db:
+    image: mariadb:10.11
+    container_name: conciliacion_db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: conciliacion_db
+      MARIADB_USER: conciliacion_user
+      MARIADB_PASSWORD: conciliacion_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: conciliacion_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mariadb://db:3306/conciliacion_db
+      DB_USER: conciliacion_user
+      DB_PASSWORD: conciliacion_pass
+      JWT_SECRET: dev-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm
+      CONCILIACION_MODULE_ENABLED: "true"
+    ports:
+      - "8080:8080"
+
+volumes:
+  db_data:
