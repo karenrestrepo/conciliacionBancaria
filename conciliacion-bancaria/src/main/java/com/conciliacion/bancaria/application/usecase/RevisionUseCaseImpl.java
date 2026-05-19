@@ -1,0 +1,63 @@
+package com.conciliacion.bancaria.application.usecase;
+
+import com.conciliacion.bancaria.domain.model.Sugerencia;
+import com.conciliacion.bancaria.domain.port.in.RevisionUseCase;
+import com.conciliacion.bancaria.domain.port.out.EventLogPort;
+import com.conciliacion.bancaria.domain.port.out.MovimientoRepositoryPort;
+import com.conciliacion.bancaria.domain.port.out.SugerenciaRepositoryPort;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class RevisionUseCaseImpl implements RevisionUseCase {
+
+    private final SugerenciaRepositoryPort sugerenciaRepo;
+    private final MovimientoRepositoryPort movimientoRepo;
+    private final EventLogPort eventLog;
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Sugerencia> obtenerSugerencias(Long idConciliacion) {
+        return sugerenciaRepo.buscarPorConciliacion(idConciliacion);
+    }
+
+    @Override
+    @Transactional
+    public Sugerencia aceptarSugerencia(Long idSugerencia, Long idUsuario) {
+        Sugerencia sugerencia = sugerenciaRepo.buscarPorId(idSugerencia)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Sugerencia no encontrada: " + idSugerencia));
+
+        Sugerencia aceptada = sugerencia.aceptar();
+        Sugerencia guardada = sugerenciaRepo.actualizar(aceptada);
+
+        // Marcar ambos movimientos como CONCILIADO
+        movimientoRepo.actualizar(
+                sugerencia.getMovimientoBancario().marcarConciliado(),
+                sugerencia.getIdConciliacion(), "BANCARIO");
+        movimientoRepo.actualizar(
+                sugerencia.getMovimientoContable().marcarConciliado(),
+                sugerencia.getIdConciliacion(), "CONTABLE");
+
+        eventLog.actionAccept(sugerencia.getIdConciliacion(), idSugerencia, idUsuario);
+        return guardada;
+    }
+
+    @Override
+    @Transactional
+    public Sugerencia rechazarSugerencia(Long idSugerencia, Long idUsuario) {
+        Sugerencia sugerencia = sugerenciaRepo.buscarPorId(idSugerencia)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Sugerencia no encontrada: " + idSugerencia));
+
+        Sugerencia rechazada = sugerencia.rechazar();
+        Sugerencia guardada = sugerenciaRepo.actualizar(rechazada);
+
+        eventLog.actionReject(sugerencia.getIdConciliacion(), idSugerencia, idUsuario);
+        return guardada;
+    }
+}
