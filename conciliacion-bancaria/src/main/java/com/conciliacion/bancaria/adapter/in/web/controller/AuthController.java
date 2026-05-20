@@ -1,4 +1,4 @@
-package com.conciliacion.bancaria.adapter.in.web.contoller;
+package com.conciliacion.bancaria.adapter.in.web.controller;
 
 import com.conciliacion.bancaria.adapter.in.web.dto.ApiResponse;
 import com.conciliacion.bancaria.adapter.in.web.dto.LoginRequest;

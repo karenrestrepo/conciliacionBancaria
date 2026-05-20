@@ -1,4 +1,4 @@
-package com.conciliacion.bancaria.adapter.in.web.contoller;
+package com.conciliacion.bancaria.adapter.in.web.controller;
 
 import com.conciliacion.bancaria.adapter.in.web.dto.*;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
