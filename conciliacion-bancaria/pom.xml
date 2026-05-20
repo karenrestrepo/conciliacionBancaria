@@ -128,6 +128,9 @@
                 <configuration>
                     <encoding>UTF-8</encoding>
                     <propertiesEncoding>UTF-8</propertiesEncoding>
+                    <nonFilteredFileExtensions>
+                        <nonFilteredFileExtension>properties</nonFilteredFileExtension>
+                    </nonFilteredFileExtensions>
                 </configuration>
             </plugin>
 
