@@ -15,7 +15,7 @@
     <artifactId>bancaria</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>bancaria</name>
-    <description>Módulo de Conciliación Bancaria Asistida</description>
+    <description>Modulo de Conciliacion Bancaria Asistida</description>
 
     <properties>
         <java.version>21</java.version>
@@ -27,7 +27,7 @@
 
     <dependencies>
 
-        <!-- ── Web / Core ─────────────────────────────────── -->
+        <!-- Web / Core -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -43,7 +43,7 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- ── Seguridad / JWT ────────────────────────────── -->
+        <!-- Seguridad / JWT -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
@@ -66,7 +66,7 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- ── Persistencia ──────────────────────────────── -->
+        <!-- Persistencia -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -81,7 +81,7 @@
             <artifactId>flyway-mysql</artifactId>
         </dependency>
 
-        <!-- ── Utilidades ────────────────────────────────── -->
+        <!-- Utilidades -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -93,7 +93,7 @@
             <version>5.9</version>
         </dependency>
 
-        <!-- ── Tests ─────────────────────────────────────── -->
+        <!-- Tests -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -120,17 +120,55 @@
     </dependencies>
 
     <build>
+
+        <!--
+            CORRECCION: spring-boot-starter-parent activa filtering=true para
+            application*.properties en src/main/resources. Eso causa
+            MalformedInputException en application-test.properties.
+            Sobreescribimos el bloque resources para desactivar el filtering
+            en ese archivo especifico, manteniendo filtering activo solo para
+            application.properties (donde si se necesita para sustituir
+            @variable@ en build time si se usara).
+        -->
+        <resources>
+            <!-- application-test.properties: sin filtering -->
+            <resource>
+                <directory>${basedir}/src/main/resources</directory>
+                <filtering>false</filtering>
+                <includes>
+                    <include>**/application-*.properties</include>
+                    <include>**/application-*.yml</include>
+                    <include>**/application-*.yaml</include>
+                </includes>
+            </resource>
+            <!-- application.properties principal: con filtering (hereda comportamiento del parent) -->
+            <resource>
+                <directory>${basedir}/src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>**/application.properties</include>
+                    <include>**/application.yml</include>
+                    <include>**/application.yaml</include>
+                </includes>
+            </resource>
+            <!-- Todo lo demas sin filtering (db/migration, etc.) -->
+            <resource>
+                <directory>${basedir}/src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>**/application*.properties</exclude>
+                    <exclude>**/application*.yml</exclude>
+                    <exclude>**/application*.yaml</exclude>
+                </excludes>
+            </resource>
+        </resources>
+
         <plugins>
-            <!-- Lombok annotation processor para Maven -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
                 <configuration>
                     <encoding>UTF-8</encoding>
-                    <propertiesEncoding>UTF-8</propertiesEncoding>
-                    <nonFilteredFileExtensions>
-                        <nonFilteredFileExtension>properties</nonFilteredFileExtension>
-                    </nonFilteredFileExtensions>
                 </configuration>
             </plugin>
 
@@ -148,12 +186,14 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            <!-- SpotBugs: análisis estático -->
+
+            <!-- SpotBugs: analisis estatico -->
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
                 <version>4.8.6.4</version>
             </plugin>
+
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -167,7 +207,7 @@
                 </configuration>
             </plugin>
 
-            <!-- JaCoCo: reporte de cobertura (gate ≥ 80 % en dominio) -->
+            <!-- JaCoCo: reporte de cobertura (gate >= 80% en dominio) -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
