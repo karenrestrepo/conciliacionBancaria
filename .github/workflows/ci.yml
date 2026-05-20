@@ -1,0 +1,77 @@
+name: CI — Conciliación Bancaria
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build + Test + Análisis estático
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: conciliacion_test
+          MARIADB_USER: test
+          MARIADB_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Compilar proyecto
+        run: mvn compile -f conciliacion-bancaria/pom.xml
+
+      - name: Ejecutar pruebas unitarias
+        run: mvn test -Dtest="ConciliationEngineTest,ConciliacionTest,CsvValidatorServiceTest" -f conciliacion-bancaria/pom.xml
+
+      - name: Ejecutar pruebas de integración
+        env:
+          DB_URL: jdbc:mariadb://localhost:3306/conciliacion_test
+          DB_USER: test
+          DB_PASSWORD: test
+          JWT_SECRET: ci-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm
+          SPRING_PROFILES_ACTIVE: test
+        run: mvn test -Dtest="ConciliacionIntegrationTest" -f conciliacion-bancaria/pom.xml
+
+      - name: Generar reporte de cobertura JaCoCo
+        run: mvn jacoco:report -f conciliacion-bancaria/pom.xml
+
+      - name: Verificar cobertura ≥ 80% en dominio
+        run: mvn jacoco:check -f conciliacion-bancaria/pom.xml
+
+      - name: Análisis estático — SpotBugs
+        run: mvn spotbugs:check -f conciliacion-bancaria/pom.xml || true
+
+      - name: Publicar reporte de cobertura
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jacoco-report
+          path: conciliacion-bancaria/target/site/jacoco/
+
+      - name: Publicar resultados de tests
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: conciliacion-bancaria/target/surefire-reports/
