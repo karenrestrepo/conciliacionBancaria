@@ -88,11 +88,13 @@ public class ConciliationEngine {
         for (Movimiento bancario : bancarios) {
             if (bancario.getEstado() == EstadoMovimiento.SUGERIDO) continue;
 
+            // Preferir el contable con fecha más cercana cuando hay varios con mismo monto
             Optional<Movimiento> contable = contables.stream()
                     .filter(c -> c.getEstado() != EstadoMovimiento.SUGERIDO)
                     .filter(c -> c.getTipo().equals(bancario.getTipo()))
                     .filter(c -> c.getMonto().compareTo(bancario.getMonto()) == 0)
-                    .findFirst();
+                    .min(Comparator.comparingLong(c ->
+                            Math.abs(ChronoUnit.DAYS.between(bancario.getFecha(), c.getFecha()))));
 
             contable.ifPresent(c -> {
                 resultado.add(construirSugerencia(idConciliacion, bancario, c,
