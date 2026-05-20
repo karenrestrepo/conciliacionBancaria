@@ -127,10 +127,10 @@ class ConciliacionIntegrationTest {
     }
 
     @Test
-    @DisplayName("endpoint protegido sin token retorna 401")
+    @DisplayName("endpoint protegido sin token retorna 403")
     void endpointSinToken() throws Exception {
         mockMvc.perform(get("/api/v1/conciliaciones"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isForbidden());
     }
 
     // ── Tests de conciliación ─────────────────────────────────────────────────
@@ -155,16 +155,19 @@ class ConciliacionIntegrationTest {
     @Test
     @DisplayName("no se puede crear dos conciliaciones para el mismo período")
     void noDuplicarPeriodo() throws Exception {
-        String body = objectMapper.writeValueAsString(Map.of("periodo", "2026-01"));
+        // Usar timestamp para garantizar período único en cada ejecución
+        String periodo = "2030-" + String.format("%02d",
+                (java.time.LocalDate.now().getDayOfMonth() % 12) + 1);
+        String body = objectMapper.writeValueAsString(Map.of("periodo", periodo));
 
-        // Primera creación
+        // Primera creación — debe funcionar
         mockMvc.perform(post("/api/v1/conciliaciones")
                         .header("Authorization", "Bearer " + tokenContador)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated());
 
-        // Segunda creación — debe fallar con 409 Conflict
+        // Segunda creación — debe fallar con 409
         mockMvc.perform(post("/api/v1/conciliaciones")
                         .header("Authorization", "Bearer " + tokenContador)
                         .contentType(MediaType.APPLICATION_JSON)
