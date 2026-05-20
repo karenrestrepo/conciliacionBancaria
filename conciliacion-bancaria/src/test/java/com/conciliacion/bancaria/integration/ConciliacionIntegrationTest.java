@@ -1,7 +1,7 @@
 package com.conciliacion.bancaria.integration;
 
-import com.conciliacion.bancaria.adapter.out.persistence.repository.UsuarioJpaRepository;
 import com.conciliacion.bancaria.adapter.out.persistence.entity.UsuarioEntity;
+import com.conciliacion.bancaria.adapter.out.persistence.repository.UsuarioJpaRepository;
 import com.conciliacion.bancaria.shared.Rol;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,36 +12,31 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.containers.MariaDBContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+/**
+ * Tests de integración del ciclo completo de conciliación.
+ *
+ * <p>Prerequisito: el contenedor MariaDB debe estar corriendo antes de ejecutar
+ * estos tests. Levantarlo con:</p>
+ * <pre>docker-compose up -d db</pre>
+ *
+ * <p>Se eliminó la dependencia de Testcontainers para evitar problemas de
+ * conectividad con el Docker Engine en entornos de desarrollo Windows.
+ * El perfil "test" (application-test.properties) apunta al mismo contenedor
+ * que usa el equipo en desarrollo local.</p>
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
-@Testcontainers
+@ActiveProfiles("test")
 @DisplayName("Integración — ciclo completo de conciliación")
 class ConciliacionIntegrationTest {
-
-    @Container
-    static MariaDBContainer<?> mariadb = new MariaDBContainer<>("mariadb:10.11")
-            .withDatabaseName("conciliacion_test")
-            .withUsername("test")
-            .withPassword("test");
-
-    @DynamicPropertySource
-    static void properties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", mariadb::getJdbcUrl);
-        registry.add("spring.datasource.username", mariadb::getUsername);
-        registry.add("spring.datasource.password", mariadb::getPassword);
-    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -60,7 +55,7 @@ class ConciliacionIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // Crear usuario contador de prueba
+        // Crear usuario contador de prueba (idempotente)
         if (!usuarioRepo.existsByEmail("contador@test.com")) {
             usuarioRepo.save(UsuarioEntity.builder()
                     .nombre("Contador Test")
@@ -71,7 +66,7 @@ class ConciliacionIntegrationTest {
                     .build());
         }
 
-        // Crear usuario finanzas de prueba
+        // Crear usuario finanzas de prueba (idempotente)
         if (!usuarioRepo.existsByEmail("finanzas@test.com")) {
             usuarioRepo.save(UsuarioEntity.builder()
                     .nombre("Finanzas Test")
@@ -82,7 +77,6 @@ class ConciliacionIntegrationTest {
                     .build());
         }
 
-        // Obtener tokens
         tokenContador = obtenerToken("contador@test.com", "Test1234!");
         tokenFinanzas = obtenerToken("finanzas@test.com", "Test1234!");
     }
@@ -144,8 +138,9 @@ class ConciliacionIntegrationTest {
     @Test
     @DisplayName("CONTADOR puede iniciar una conciliación")
     void iniciarConciliacion() throws Exception {
-        String body = objectMapper.writeValueAsString(
-                Map.of("periodo", "2024-03"));
+        // Usar un período único para evitar conflicto con datos previos en la BD
+        String periodo = "2025-" + String.format("%02d", (int)(Math.random() * 12) + 1);
+        String body = objectMapper.writeValueAsString(Map.of("periodo", periodo));
 
         mockMvc.perform(post("/api/v1/conciliaciones")
                         .header("Authorization", "Bearer " + tokenContador)
@@ -153,15 +148,14 @@ class ConciliacionIntegrationTest {
                         .content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.periodo").value("2024-03"))
+                .andExpect(jsonPath("$.data.periodo").value(periodo))
                 .andExpect(jsonPath("$.data.estado").value("BORRADOR"));
     }
 
     @Test
     @DisplayName("no se puede crear dos conciliaciones para el mismo período")
     void noDuplicarPeriodo() throws Exception {
-        String body = objectMapper.writeValueAsString(
-                Map.of("periodo", "2024-04"));
+        String body = objectMapper.writeValueAsString(Map.of("periodo", "2026-01"));
 
         // Primera creación
         mockMvc.perform(post("/api/v1/conciliaciones")
@@ -170,7 +164,7 @@ class ConciliacionIntegrationTest {
                         .content(body))
                 .andExpect(status().isCreated());
 
-        // Segunda creación — debe fallar
+        // Segunda creación — debe fallar con 409 Conflict
         mockMvc.perform(post("/api/v1/conciliaciones")
                         .header("Authorization", "Bearer " + tokenContador)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -181,8 +175,7 @@ class ConciliacionIntegrationTest {
     @Test
     @DisplayName("período con formato inválido retorna 400")
     void periodoFormatoInvalido() throws Exception {
-        String body = objectMapper.writeValueAsString(
-                Map.of("periodo", "2024/03"));
+        String body = objectMapper.writeValueAsString(Map.of("periodo", "2024/03"));
 
         mockMvc.perform(post("/api/v1/conciliaciones")
                         .header("Authorization", "Bearer " + tokenContador)
@@ -194,8 +187,7 @@ class ConciliacionIntegrationTest {
     @Test
     @DisplayName("FINANZAS solo puede leer conciliaciones — no crearlas")
     void finanzasSoloLectura() throws Exception {
-        String body = objectMapper.writeValueAsString(
-                Map.of("periodo", "2024-05"));
+        String body = objectMapper.writeValueAsString(Map.of("periodo", "2026-02"));
 
         mockMvc.perform(post("/api/v1/conciliaciones")
                         .header("Authorization", "Bearer " + tokenFinanzas)
