@@ -58,14 +58,15 @@ jobs:
           SPRING_PROFILES_ACTIVE: test
         run: mvn test -Dtest="ConciliacionIntegrationTest" -f conciliacion-bancaria/pom.xml
 
-      - name: Generar reporte de cobertura y verificar gate >= 80%
+      - name: Ejecutar todos los tests y verificar cobertura
         env:
           DB_URL: jdbc:mariadb://localhost:3306/conciliacion_test
           DB_USER: test
           DB_PASSWORD: test
           JWT_SECRET: ci-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm
           SPRING_PROFILES_ACTIVE: test
-        run: mvn verify -DskipTests -f conciliacion-bancaria/pom.xml
+        run: mvn verify -f conciliacion-bancaria/pom.xml
+
 
       - name: Análisis estático — SpotBugs
         run: mvn spotbugs:check -f conciliacion-bancaria/pom.xml || true
