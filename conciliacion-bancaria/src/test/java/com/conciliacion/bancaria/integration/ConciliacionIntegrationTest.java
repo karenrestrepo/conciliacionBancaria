@@ -1,9 +1,11 @@
 package com.conciliacion.bancaria.integration;
 
 import com.conciliacion.bancaria.adapter.out.persistence.entity.UsuarioEntity;
+import com.conciliacion.bancaria.adapter.out.persistence.repository.ConciliacionJpaRepository;
 import com.conciliacion.bancaria.adapter.out.persistence.repository.UsuarioJpaRepository;
 import com.conciliacion.bancaria.shared.Rol;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,6 +52,9 @@ class ConciliacionIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private ConciliacionJpaRepository conciliacionRepo;
+
     private String tokenContador;
     private String tokenFinanzas;
 
@@ -95,6 +100,17 @@ class ConciliacionIntegrationTest {
 
         return objectMapper.readTree(response)
                 .path("data").path("token").asText();
+    }
+
+    private String periodoNoDuplicar;
+
+    @AfterEach
+    void tearDown() {
+        if (periodoNoDuplicar != null) {
+            conciliacionRepo.findByPeriodo(periodoNoDuplicar)
+                    .ifPresent(c -> conciliacionRepo.deleteById(c.getId()));
+            periodoNoDuplicar = null;
+        }
     }
 
     // ── Tests de autenticación ────────────────────────────────────────────────
@@ -155,19 +171,16 @@ class ConciliacionIntegrationTest {
     @Test
     @DisplayName("no se puede crear dos conciliaciones para el mismo período")
     void noDuplicarPeriodo() throws Exception {
-        // Usar timestamp para garantizar período único en cada ejecución
-        String periodo = "2030-" + String.format("%02d",
+        periodoNoDuplicar = "2030-" + String.format("%02d",
                 (java.time.LocalDate.now().getDayOfMonth() % 12) + 1);
-        String body = objectMapper.writeValueAsString(Map.of("periodo", periodo));
+        String body = objectMapper.writeValueAsString(Map.of("periodo", periodoNoDuplicar));
 
-        // Primera creación — debe funcionar
         mockMvc.perform(post("/api/v1/conciliaciones")
                         .header("Authorization", "Bearer " + tokenContador)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated());
 
-        // Segunda creación — debe fallar con 409
         mockMvc.perform(post("/api/v1/conciliaciones")
                         .header("Authorization", "Bearer " + tokenContador)
                         .contentType(MediaType.APPLICATION_JSON)
