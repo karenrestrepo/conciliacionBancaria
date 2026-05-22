@@ -17,6 +17,8 @@ public interface ConciliacionJpaRepository extends JpaRepository<ConciliacionEnt
 
     boolean existsByPeriodo(String periodo);
 
+    long countByEstado(EstadoConciliacion estado);
+
     @Query("SELECT c.estado FROM ConciliacionEntity c WHERE c.id = :id")
     Optional<EstadoConciliacion> findEstadoById(@Param("id") Long id);
 }

@@ -154,9 +154,8 @@ class ConciliacionIntegrationTest {
     @Test
     @DisplayName("CONTADOR puede iniciar una conciliación")
     void iniciarConciliacion() throws Exception {
-        // Usar un período único para evitar conflicto con datos previos en la BD
-        String periodo = "2025-" + String.format("%02d", (int)(Math.random() * 12) + 1);
-        String body = objectMapper.writeValueAsString(Map.of("periodo", periodo));
+        periodoNoDuplicar = "2088-01";
+        String body = objectMapper.writeValueAsString(Map.of("periodo", periodoNoDuplicar));
 
         mockMvc.perform(post("/api/v1/conciliaciones")
                         .header("Authorization", "Bearer " + tokenContador)
@@ -164,7 +163,7 @@ class ConciliacionIntegrationTest {
                         .content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.periodo").value(periodo))
+                .andExpect(jsonPath("$.data.periodo").value(periodoNoDuplicar))
                 .andExpect(jsonPath("$.data.estado").value("BORRADOR"));
     }
 
