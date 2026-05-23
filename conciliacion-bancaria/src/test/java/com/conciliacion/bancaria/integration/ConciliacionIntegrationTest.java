@@ -15,30 +15,37 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.testcontainers.containers.MariaDBContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/**
- * Tests de integración del ciclo completo de conciliación.
- *
- * <p>Prerequisito: el contenedor MariaDB debe estar corriendo antes de ejecutar
- * estos tests. Levantarlo con:</p>
- * <pre>docker-compose up -d db</pre>
- *
- * <p>Se eliminó la dependencia de Testcontainers para evitar problemas de
- * conectividad con el Docker Engine en entornos de desarrollo Windows.
- * El perfil "test" (application-test.properties) apunta al mismo contenedor
- * que usa el equipo en desarrollo local.</p>
- */
+@Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @DisplayName("Integración — ciclo completo de conciliación")
 class ConciliacionIntegrationTest {
+
+    @Container
+    static MariaDBContainer<?> mariadb = new MariaDBContainer<>("mariadb:10.11")
+            .withDatabaseName("conciliacion_test")
+            .withUsername("test")
+            .withPassword("test");
+
+    @DynamicPropertySource
+    static void datasourceProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", mariadb::getJdbcUrl);
+        registry.add("spring.datasource.username", mariadb::getUsername);
+        registry.add("spring.datasource.password", mariadb::getPassword);
+    }
 
     @Autowired
     private MockMvc mockMvc;

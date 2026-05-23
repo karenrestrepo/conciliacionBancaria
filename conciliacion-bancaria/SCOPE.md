@@ -20,7 +20,7 @@
 | RT-06 | RBAC: AUXILIAR, CONTADOR, FINANZAS, ADMIN con segregación de funciones | ✅ Implementado |
 | NFR-Seg | JWT con expiración 8h, refresh token 24h, BCrypt cost=12, protección IDOR | ✅ Implementado |
 | NFR-Obs | 9 eventos de log estructurado JSON + tabla metricas_conciliacion | ✅ Implementado |
-| NFR-DB | Flyway migraciones V1–V7, todas las tablas del TRD | ✅ Implementado |
+| NFR-DB | Flyway migraciones V1–V8, todas las tablas del TRD | ✅ Implementado |
 | Frontend | Angular 17+: carga CSV, revisión sugerencias, historial, dashboard | ✅ Implementado |
 
 ## Requisito adaptado — Integración con sistema contable (RT-02)
