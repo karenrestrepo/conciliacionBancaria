@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+
+  <!--
+    Lombok @With genera métodos withX() que usan == para comparar la referencia
+    antes de crear una nueva instancia. SpotBugs no entiende este patrón generado;
+    RC_REF_COMPARISON y ES_COMPARING_PARAMETER_STRING_WITH_EQ son falsos positivos.
+  -->
+  <Match>
+    <Bug pattern="RC_REF_COMPARISON,ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+    <Method name="~with.+"/>
+  </Match>
+
+  <!--
+    Lombok @Builder y @Getter en value objects del dominio exponen referencias a
+    colecciones. El dominio es de uso interno y las colecciones no se comparten
+    entre hilos. Copias defensivas romperían el patrón builder usado en todo el dominio.
+  -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    <Class name="~com\.conciliacion\.bancaria\.domain\..*"/>
+  </Match>
+
+  <!--
+    Spring inyecta dependencias por constructor. SpotBugs señala el almacenamiento
+    de la referencia, pero Spring controla el ciclo de vida: estas dependencias
+    son efectivamente inmutables después del inicio del contexto de aplicación.
+  -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+    <Class name="~com\.conciliacion\.bancaria\.(adapter|config)\..*"/>
+  </Match>
+
+</FindBugsFilter>

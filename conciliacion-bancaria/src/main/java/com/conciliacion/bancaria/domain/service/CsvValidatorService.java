@@ -6,6 +6,7 @@ import com.conciliacion.bancaria.shared.EstadoMovimiento;
 import com.opencsv.CSVReader;
 
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -26,7 +27,7 @@ public class CsvValidatorService {
 
     public List<Movimiento> parsear(byte[] contenido, Map<String, String> mapeoColumnas) {
         try (CSVReader reader = new CSVReader(
-                new InputStreamReader(new java.io.ByteArrayInputStream(contenido)))) {
+                new InputStreamReader(new java.io.ByteArrayInputStream(contenido), StandardCharsets.UTF_8))) {
 
             String[] encabezados = reader.readNext();
             if (encabezados == null) {
