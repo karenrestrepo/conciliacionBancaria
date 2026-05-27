@@ -60,4 +60,10 @@ public class CierreUseCaseImpl implements CierreUseCase {
                                                   LocalDate fecha) {
         return closureService.justificar(idPartida, justificacion, fecha);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PartidaConciliatoria> listarPartidas(Long idConciliacion) {
+        return partidaRepo.buscarPorConciliacion(idConciliacion);
+    }
 }

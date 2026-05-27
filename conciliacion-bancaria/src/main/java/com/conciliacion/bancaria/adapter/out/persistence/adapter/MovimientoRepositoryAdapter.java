@@ -53,6 +53,16 @@ public class MovimientoRepositoryAdapter implements MovimientoRepositoryPort {
     }
 
     @Override
+    public void resetEstadosBancarios(Long idConciliacion) {
+        bancarioRepo.resetEstados(idConciliacion, com.conciliacion.bancaria.shared.EstadoMovimiento.PENDIENTE);
+    }
+
+    @Override
+    public void resetEstadosContables(Long idConciliacion) {
+        contableRepo.resetEstados(idConciliacion, com.conciliacion.bancaria.shared.EstadoMovimiento.PENDIENTE);
+    }
+
+    @Override
     public Movimiento actualizar(Movimiento movimiento, Long idConciliacion,
                                  String tipo) {
         if ("BANCARIO".equals(tipo)) {

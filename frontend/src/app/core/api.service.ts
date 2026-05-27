@@ -54,6 +54,22 @@ export class ApiService {
       `${this.API}/conciliaciones/${id}/revision`, {}, { headers: this.headers() });
   }
 
+  cerrarConciliacion(id: number): Observable<ApiResponse<Conciliacion>> {
+    return this.http.post<ApiResponse<Conciliacion>>(
+      `${this.API}/conciliaciones/${id}/cerrar`, {}, { headers: this.headers() });
+  }
+
+  listarPartidas(id: number): Observable<ApiResponse<any[]>> {
+    return this.http.get<ApiResponse<any[]>>(
+      `${this.API}/conciliaciones/${id}/partidas`, { headers: this.headers() });
+  }
+
+  justificarPartida(idConciliacion: number, idPartida: number, justificacion: string, fecha: string): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(
+      `${this.API}/conciliaciones/${idConciliacion}/partidas/${idPartida}/justificar`,
+      { justificacion, fecha }, { headers: this.headers() });
+  }
+
   // Sugerencias
   obtenerSugerencias(id: number): Observable<ApiResponse<Sugerencia[]>> {
     return this.http.get<ApiResponse<Sugerencia[]>>(

@@ -1,6 +1,7 @@
 package com.conciliacion.bancaria.adapter.in.web.controller;
 
 import com.conciliacion.bancaria.adapter.in.web.dto.*;
+import com.conciliacion.bancaria.domain.model.PartidaConciliatoria;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
 import com.conciliacion.bancaria.domain.port.in.*;
 import jakarta.validation.Valid;
@@ -56,7 +57,7 @@ public class ConciliacionController {
     @PreAuthorize("hasAnyRole('AUXILIAR','CONTADOR','FINANZAS','ADMIN')")
     public ResponseEntity<ApiResponse<List<ConciliacionResponse>>> listar() {
         List<ConciliacionResponse> lista = conciliacionUseCase
-                .listarPorUsuario(1L).stream()
+                .listarTodas().stream()
                 .map(this::toResponse)
                 .toList();
         return ResponseEntity.ok(ApiResponse.ok(lista));
@@ -145,6 +146,18 @@ public class ConciliacionController {
                 toResponse(conciliacionUseCase.pasarARevision(id))));
     }
 
+    // ── Listar partidas ───────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/partidas")
+    @PreAuthorize("hasAnyRole('CONTADOR','FINANZAS','ADMIN')")
+    public ResponseEntity<ApiResponse<List<PartidaResponse>>> partidas(
+            @PathVariable Long id) {
+        List<PartidaResponse> lista = cierreUseCase.listarPartidas(id).stream()
+                .map(this::toPartidaResponse)
+                .toList();
+        return ResponseEntity.ok(ApiResponse.ok(lista));
+    }
+
     // ── Justificar partida ────────────────────────────────────────────────────
 
     @PostMapping("/{id}/partidas/{idPartida}/justificar")
@@ -182,6 +195,18 @@ public class ConciliacionController {
                 .saldoExtracto(c.getSaldoExtracto())
                 .saldoAuxiliar(c.getSaldoAuxiliar())
                 .diferenciaSaldo(c.getDiferenciaSaldo())
+                .build();
+    }
+
+    private PartidaResponse toPartidaResponse(PartidaConciliatoria p) {
+        return PartidaResponse.builder()
+                .id(p.getId())
+                .idConciliacion(p.getIdConciliacion())
+                .idMovimiento(p.getIdMovimiento())
+                .tipoOrigen(p.getTipoOrigen())
+                .estado(p.getEstado())
+                .justificacion(p.getJustificacion())
+                .fechaJustificacion(p.getFechaJustificacion())
                 .build();
     }
 

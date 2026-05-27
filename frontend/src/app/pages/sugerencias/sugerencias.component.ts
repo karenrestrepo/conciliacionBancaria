@@ -46,6 +46,18 @@ import { Conciliacion, Sugerencia } from '../../core/models';
             <mat-icon>rate_review</mat-icon>
             Pasar a Revisión
           </button>
+          <button mat-stroked-button class="partidas-btn"
+                  *ngIf="conciliacion?.estado === 'EN_REVISION'"
+                  [routerLink]="['/partidas', idConciliacion]">
+            <mat-icon>list_alt</mat-icon>
+            Ver Partidas
+          </button>
+          <button mat-flat-button class="cerrar-btn"
+                  *ngIf="conciliacion?.estado === 'EN_REVISION' && canClose()"
+                  (click)="cerrar()">
+            <mat-icon>lock</mat-icon>
+            Cerrar Conciliación
+          </button>
         </div>
       </div>
 
@@ -129,7 +141,7 @@ import { Conciliacion, Sugerencia } from '../../core/models';
                   <span class="mov-desc">{{ row.descripcionBancario }}</span>
                   <span class="mov-monto" [ngClass]="getTipoClass(row.tipoBancario)">
                     {{ row.tipoBancario === 'DEBITO' ? '-' : '+' }}
-                    {{ row.montoBancario | currency:'COP':'symbol':'1.0-0' }}
+                    {{ row.montoBancario | currency:'COP':'symbol':'1.0-2' }}
                   </span>
                 </div>
               </td>
@@ -143,7 +155,7 @@ import { Conciliacion, Sugerencia } from '../../core/models';
                   <span class="mov-desc">{{ row.descripcionContable }}</span>
                   <span class="mov-monto" [ngClass]="getTipoClass(row.tipoContable)">
                     {{ row.tipoContable === 'DEBITO' ? '-' : '+' }}
-                    {{ row.montoContable | currency:'COP':'symbol':'1.0-0' }}
+                    {{ row.montoContable | currency:'COP':'symbol':'1.0-2' }}
                   </span>
                 </div>
               </td>
@@ -204,6 +216,20 @@ import { Conciliacion, Sugerencia } from '../../core/models';
 
     .revision-btn {
       background: #1a2332 !important;
+      color: #fff !important;
+      border-radius: 8px !important;
+      height: 42px;
+      gap: 6px;
+    }
+    .partidas-btn {
+      border-color: #1a2332 !important;
+      color: #1a2332 !important;
+      border-radius: 8px !important;
+      height: 42px;
+      gap: 6px;
+    }
+    .cerrar-btn {
+      background: #c0392b !important;
       color: #fff !important;
       border-radius: 8px !important;
       height: 42px;
@@ -389,6 +415,22 @@ export class SugerenciasComponent implements OnInit {
 
   canReview(): boolean {
     return this.auth.hasRole('CONTADOR', 'ADMIN');
+  }
+
+  canClose(): boolean {
+    return this.auth.hasRole('CONTADOR');
+  }
+
+  cerrar(): void {
+    this.api.cerrarConciliacion(this.idConciliacion).subscribe({
+      next: res => {
+        this.conciliacion = res.data;
+        this.snackBar.open('Conciliación cerrada', 'Cerrar', { duration: 3000, panelClass: 'snack-success' });
+      },
+      error: err => {
+        this.snackBar.open(err.error?.message ?? 'Error al cerrar la conciliación', 'Cerrar', { duration: 4000 });
+      }
+    });
   }
 
   getPendientes(): number {

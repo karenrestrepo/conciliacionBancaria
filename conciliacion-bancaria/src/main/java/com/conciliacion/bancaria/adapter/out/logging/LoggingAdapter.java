@@ -21,17 +21,17 @@ public class LoggingAdapter implements EventLogPort {
 
     @Override
     public void csvUpload(Long idConciliacion, Long idUsuario, String nombreArchivo) {
-        log("CSV_UPLOAD", idConciliacion, Map.of(
-                "idUsuario", idUsuario,
-                "archivo", nombreArchivo
-        ));
+        Map<String, Object> datos = new LinkedHashMap<>();
+        datos.put("idUsuario", idUsuario);
+        datos.put("archivo", nombreArchivo);
+        log("CSV_UPLOAD", idConciliacion, datos);
     }
 
     @Override
     public void csvValidationFailed(Long idConciliacion, String motivo) {
-        log("CSV_VALIDATION_FAILED", idConciliacion, Map.of(
-                "motivo", motivo
-        ));
+        Map<String, Object> datos = new LinkedHashMap<>();
+        datos.put("motivo", motivo);
+        log("CSV_VALIDATION_FAILED", idConciliacion, datos);
     }
 
     @Override

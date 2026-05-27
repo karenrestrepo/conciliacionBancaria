@@ -49,6 +49,11 @@ public class PartidaRepositoryAdapter implements PartidaRepositoryPort {
         return toDomain(jpaRepository.save(toEntity(partida)));
     }
 
+    @Override
+    public void eliminarPorConciliacion(Long idConciliacion) {
+        jpaRepository.deleteByIdConciliacion(idConciliacion);
+    }
+
     private PartidaEntity toEntity(PartidaConciliatoria p) {
         return PartidaEntity.builder()
                 .id(p.getId())

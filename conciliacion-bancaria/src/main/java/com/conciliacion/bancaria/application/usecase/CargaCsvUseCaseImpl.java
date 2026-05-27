@@ -75,7 +75,16 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
             byte[] contenido = archivo.getBytes();
             List<Movimiento> contables = csvValidator.parsear(contenido, MAPEO_ESTANDAR);
             movimientoRepo.guardarContables(contables, idConciliacion);
-            return "ok";
+
+            // Limpiar resultados del motor anterior y re-ejecutar con ambos archivos
+            sugerenciaRepo.eliminarPorConciliacion(idConciliacion);
+            partidaRepo.eliminarPorConciliacion(idConciliacion);
+            movimientoRepo.resetEstadosBancarios(idConciliacion);
+            movimientoRepo.resetEstadosContables(idConciliacion);
+
+            String jobId = jobRepo.crearJob(idConciliacion);
+            ejecutarMotorAsync(jobId, idConciliacion);
+            return jobId;
         } catch (CsvValidationException e) {
             eventLog.csvValidationFailed(idConciliacion, e.getMessage());
             throw e;

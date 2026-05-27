@@ -52,6 +52,12 @@ public class IniciarConciliacionUseCase implements ConciliacionUseCase {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<Conciliacion> listarTodas() {
+        return conciliacionRepo.buscarTodas();
+    }
+
+    @Override
     @Transactional
     public Conciliacion pasarARevision(Long idConciliacion) {
         Conciliacion conciliacion = conciliacionRepo.buscarPorId(idConciliacion)

@@ -10,4 +10,6 @@ public interface CierreUseCase {
 
     PartidaConciliatoria justificarPartida(Long idPartida, String justificacion,
                                            java.time.LocalDate fecha);
+
+    java.util.List<PartidaConciliatoria> listarPartidas(Long idConciliacion);
 }

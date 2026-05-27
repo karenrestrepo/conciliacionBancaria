@@ -15,6 +15,8 @@ public interface ConciliacionRepositoryPort {
 
     List<Conciliacion> buscarPorUsuarioCreador(Long idUsuario);
 
+    List<Conciliacion> buscarTodas();
+
     boolean existePorPeriodo(String periodo);
 
     EstadoConciliacion obtenerEstado(Long id);

@@ -47,6 +47,11 @@ public class SugerenciaRepositoryAdapter implements SugerenciaRepositoryPort {
         return toDomain(jpaRepository.save(toEntity(sugerencia)));
     }
 
+    @Override
+    public void eliminarPorConciliacion(Long idConciliacion) {
+        jpaRepository.deleteByIdConciliacion(idConciliacion);
+    }
+
     private SugerenciaEntity toEntity(Sugerencia s) {
         return SugerenciaEntity.builder()
                 .id(s.getId())

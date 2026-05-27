@@ -43,6 +43,13 @@ public class ConciliacionRepositoryAdapter implements ConciliacionRepositoryPort
     }
 
     @Override
+    public List<Conciliacion> buscarTodas() {
+        return jpaRepository.findAll().stream()
+                .map(ConciliacionMapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public boolean existePorPeriodo(String periodo) {
         return jpaRepository.existsByPeriodo(periodo);
     }

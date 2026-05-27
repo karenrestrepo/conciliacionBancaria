@@ -14,4 +14,8 @@ public interface MovimientoRepositoryPort {
     List<Movimiento> buscarContablesPorConciliacion(Long idConciliacion);
 
     Movimiento actualizar(Movimiento movimiento, Long idConciliacion, String tipo);
+
+    void resetEstadosBancarios(Long idConciliacion);
+
+    void resetEstadosContables(Long idConciliacion);
 }

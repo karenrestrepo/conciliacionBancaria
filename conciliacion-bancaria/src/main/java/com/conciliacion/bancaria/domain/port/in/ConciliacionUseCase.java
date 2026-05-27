@@ -12,5 +12,7 @@ public interface ConciliacionUseCase {
 
     List<Conciliacion> listarPorUsuario(Long idUsuario);
 
+    List<Conciliacion> listarTodas();
+
     Conciliacion pasarARevision(Long idConciliacion);
 }

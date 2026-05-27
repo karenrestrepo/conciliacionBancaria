@@ -13,4 +13,6 @@ public interface SugerenciaJpaRepository extends JpaRepository<SugerenciaEntity,
     List<SugerenciaEntity> findByIdConciliacionAndEstado(Long idConciliacion,
                                                          EstadoSugerencia estado);
     long countByEstado(EstadoSugerencia estado);
+
+    void deleteByIdConciliacion(Long idConciliacion);
 }

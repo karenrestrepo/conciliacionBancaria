@@ -42,9 +42,9 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         // Swagger (para desarrollo)
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        // Solo FINANZAS y ADMIN pueden ver métricas globales
+                        // Métricas: CONTADOR, FINANZAS y ADMIN
                         .requestMatchers(HttpMethod.GET, "/api/v1/metricas/**")
-                        .hasAnyRole("FINANZAS", "ADMIN")
+                        .hasAnyRole("CONTADOR", "FINANZAS", "ADMIN")
                         // Todo lo demás requiere autenticación
                         .anyRequest().authenticated()
                 )

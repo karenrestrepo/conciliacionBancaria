@@ -18,4 +18,6 @@ public interface PartidaRepositoryPort {
     Optional<PartidaConciliatoria> buscarPorId(Long id);
 
     PartidaConciliatoria actualizar(PartidaConciliatoria partida);
+
+    void eliminarPorConciliacion(Long idConciliacion);
 }

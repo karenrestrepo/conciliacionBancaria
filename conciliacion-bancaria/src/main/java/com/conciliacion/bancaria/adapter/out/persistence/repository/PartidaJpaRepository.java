@@ -19,4 +19,6 @@ public interface PartidaJpaRepository extends JpaRepository<PartidaEntity, Long>
               AND (p.justificacion IS NULL OR p.justificacion = '')
             """)
     List<PartidaEntity> findPendientesSinJustificar(@Param("idConciliacion") Long idConciliacion);
+
+    void deleteByIdConciliacion(Long idConciliacion);
 }

@@ -14,4 +14,6 @@ public interface SugerenciaRepositoryPort {
     Optional<Sugerencia> buscarPorId(Long id);
 
     Sugerencia actualizar(Sugerencia sugerencia);
+
+    void eliminarPorConciliacion(Long idConciliacion);
 }

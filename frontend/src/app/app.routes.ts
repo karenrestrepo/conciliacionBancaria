@@ -31,6 +31,10 @@ export const routes: Routes = [
       {
         path: 'sugerencias/:id',
         loadComponent: () => import('./pages/sugerencias/sugerencias.component').then(m => m.SugerenciasComponent)
+      },
+      {
+        path: 'partidas/:id',
+        loadComponent: () => import('./pages/partidas/partidas.component').then(m => m.PartidasComponent)
       }
     ]
   },
