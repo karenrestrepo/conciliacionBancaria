@@ -15,37 +15,33 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.containers.MariaDBContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@Testcontainers
+/**
+ * Test de integración contra la BD de tests (conciliacion_test en localhost:3306).
+ *
+ * Prerequisito: el contenedor Docker 'conciliacion_db' debe estar en ejecución.
+ * La BD 'conciliacion_test' se crea con:
+ *   docker exec conciliacion_db mariadb -u root -proot -e
+ *     "CREATE DATABASE IF NOT EXISTS conciliacion_test;
+ *      CREATE USER IF NOT EXISTS 'test'@'%' IDENTIFIED BY 'test';
+ *      GRANT ALL PRIVILEGES ON conciliacion_test.* TO 'test'@'%';"
+ *
+ * Anteriormente usaba Testcontainers para levantar un MariaDB efímero, pero
+ * Docker Desktop ≥ 4.x devuelve 400 en todas las estrategias de socket
+ * (npipe y TCP) que usa la librería docker-java, bloqueando la validación
+ * del entorno. Se migró a una BD de tests persistente en el mismo contenedor.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @DisplayName("Integración — ciclo completo de conciliación")
 class ConciliacionIntegrationTest {
-
-    @Container
-    static MariaDBContainer<?> mariadb = new MariaDBContainer<>("mariadb:10.11")
-            .withDatabaseName("conciliacion_test")
-            .withUsername("test")
-            .withPassword("test");
-
-    @DynamicPropertySource
-    static void datasourceProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", mariadb::getJdbcUrl);
-        registry.add("spring.datasource.username", mariadb::getUsername);
-        registry.add("spring.datasource.password", mariadb::getPassword);
-    }
 
     @Autowired
     private MockMvc mockMvc;
