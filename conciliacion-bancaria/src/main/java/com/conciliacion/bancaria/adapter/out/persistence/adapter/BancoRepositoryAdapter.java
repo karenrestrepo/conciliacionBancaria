@@ -1,0 +1,63 @@
+package com.conciliacion.bancaria.adapter.out.persistence.adapter;
+
+import com.conciliacion.bancaria.adapter.out.persistence.entity.BancoEntity;
+import com.conciliacion.bancaria.adapter.out.persistence.repository.BancoJpaRepository;
+import com.conciliacion.bancaria.domain.model.Banco;
+import com.conciliacion.bancaria.domain.port.out.BancoRepositoryPort;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Optional;
+
+@Component
+@RequiredArgsConstructor
+public class BancoRepositoryAdapter implements BancoRepositoryPort {
+
+    private final BancoJpaRepository jpaRepository;
+
+    @Override
+    public Banco guardar(Banco banco) {
+        return toDomain(jpaRepository.save(toEntity(banco)));
+    }
+
+    @Override
+    public Optional<Banco> buscarPorId(Long id) {
+        return jpaRepository.findById(id).map(this::toDomain);
+    }
+
+    @Override
+    public List<Banco> listarActivos() {
+        return jpaRepository.findByActivoTrue().stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public List<Banco> listarTodos() {
+        return jpaRepository.findAll().stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public boolean existePorNombre(String nombre) {
+        return jpaRepository.existsByNombre(nombre);
+    }
+
+    private Banco toDomain(BancoEntity e) {
+        return Banco.builder()
+                .id(e.getId())
+                .nombre(e.getNombre())
+                .codigo(e.getCodigo())
+                .activo(e.getActivo())
+                .tsCreacion(e.getTsCreacion())
+                .build();
+    }
+
+    private BancoEntity toEntity(Banco b) {
+        return BancoEntity.builder()
+                .id(b.getId())
+                .nombre(b.getNombre())
+                .codigo(b.getCodigo())
+                .activo(b.getActivo() != null ? b.getActivo() : true)
+                .tsCreacion(b.getTsCreacion())
+                .build();
+    }
+}

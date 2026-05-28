@@ -20,8 +20,11 @@ public class ConciliacionEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 7)
+    @Column(nullable = false, length = 7)
     private String periodo;
+
+    @Column(name = "id_cuenta", nullable = false)
+    private Long idCuenta;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

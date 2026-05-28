@@ -20,14 +20,16 @@ public class IniciarConciliacionUseCase implements ConciliacionUseCase {
 
     @Override
     @Transactional
-    public Conciliacion iniciar(String periodo, Long idUsuario) {
-        if (conciliacionRepo.existePorPeriodo(periodo)) {
+    public Conciliacion iniciar(String periodo, Long idUsuario, Long idCuenta) {
+        if (conciliacionRepo.existePorPeriodoYCuenta(periodo, idCuenta)) {
             throw new IllegalStateException(
-                    "Ya existe una conciliación para el período: " + periodo);
+                    "Ya existe una conciliación para el período " + periodo
+                            + " con la cuenta indicada");
         }
 
         Conciliacion nueva = Conciliacion.builder()
                 .periodo(periodo)
+                .idCuenta(idCuenta)
                 .estado(EstadoConciliacion.BORRADOR)
                 .idUsuarioCreador(idUsuario)
                 .build();

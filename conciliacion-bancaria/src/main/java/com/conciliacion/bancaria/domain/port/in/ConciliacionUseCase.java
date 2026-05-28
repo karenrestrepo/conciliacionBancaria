@@ -6,7 +6,7 @@ import java.util.List;
 
 public interface ConciliacionUseCase {
 
-    Conciliacion iniciar(String periodo, Long idUsuario);
+    Conciliacion iniciar(String periodo, Long idUsuario, Long idCuenta);
 
     Conciliacion obtenerPorId(Long id);
 

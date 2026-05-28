@@ -110,8 +110,9 @@ class ConciliacionIntegrationTest {
     @AfterEach
     void tearDown() {
         if (periodoNoDuplicar != null) {
-            conciliacionRepo.findByPeriodo(periodoNoDuplicar)
-                    .ifPresent(c -> conciliacionRepo.deleteById(c.getId()));
+            conciliacionRepo.findAll().stream()
+                    .filter(c -> periodoNoDuplicar.equals(c.getPeriodo()))
+                    .forEach(c -> conciliacionRepo.deleteById(c.getId()));
             periodoNoDuplicar = null;
         }
     }
@@ -158,7 +159,8 @@ class ConciliacionIntegrationTest {
     @DisplayName("CONTADOR puede iniciar una conciliación")
     void iniciarConciliacion() throws Exception {
         periodoNoDuplicar = "2088-01";
-        String body = objectMapper.writeValueAsString(Map.of("periodo", periodoNoDuplicar));
+        String body = objectMapper.writeValueAsString(
+                Map.of("periodo", periodoNoDuplicar, "idCuenta", 1));
 
         mockMvc.perform(post("/api/v1/conciliaciones")
                         .header("Authorization", "Bearer " + tokenContador)
@@ -171,11 +173,12 @@ class ConciliacionIntegrationTest {
     }
 
     @Test
-    @DisplayName("no se puede crear dos conciliaciones para el mismo período")
+    @DisplayName("no se puede crear dos conciliaciones para el mismo período y banco")
     void noDuplicarPeriodo() throws Exception {
         periodoNoDuplicar = "2030-" + String.format("%02d",
                 (java.time.LocalDate.now().getDayOfMonth() % 12) + 1);
-        String body = objectMapper.writeValueAsString(Map.of("periodo", periodoNoDuplicar));
+        String body = objectMapper.writeValueAsString(
+                Map.of("periodo", periodoNoDuplicar, "idCuenta", 1));
 
         mockMvc.perform(post("/api/v1/conciliaciones")
                         .header("Authorization", "Bearer " + tokenContador)

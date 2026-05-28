@@ -54,6 +54,11 @@ import { AuthService } from '../core/auth.service';
             <mat-icon matListItemIcon>add_circle_outline</mat-icon>
             <span matListItemTitle>Nueva Conciliación</span>
           </a>
+          <a mat-list-item routerLink="/bancos" routerLinkActive="active-link"
+             *ngIf="canManageBancos()">
+            <mat-icon matListItemIcon>account_balance_wallet</mat-icon>
+            <span matListItemTitle>Bancos</span>
+          </a>
         </mat-nav-list>
 
         <div class="sidebar-footer">
@@ -213,6 +218,10 @@ export class ShellComponent {
 
   canCreate(): boolean {
     return this.auth.hasRole('CONTADOR', 'AUXILIAR', 'ADMIN');
+  }
+
+  canManageBancos(): boolean {
+    return this.auth.hasRole('CONTADOR', 'ADMIN');
   }
 
   logout(): void {

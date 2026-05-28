@@ -42,6 +42,9 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         // Swagger (para desarrollo)
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        // Bancos y cuentas: lectura abierta a todos los roles autenticados
+                        .requestMatchers(HttpMethod.GET, "/api/v1/bancos/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cuentas/**").authenticated()
                         // Métricas: CONTADOR, FINANZAS y ADMIN
                         .requestMatchers(HttpMethod.GET, "/api/v1/metricas/**")
                         .hasAnyRole("CONTADOR", "FINANZAS", "ADMIN")

@@ -35,6 +35,14 @@ export const routes: Routes = [
       {
         path: 'partidas/:id',
         loadComponent: () => import('./pages/partidas/partidas.component').then(m => m.PartidasComponent)
+      },
+      {
+        path: 'bancos',
+        loadComponent: () => import('./pages/bancos/bancos.component').then(m => m.BancosComponent)
+      },
+      {
+        path: 'bancos/:idBanco/cuentas',
+        loadComponent: () => import('./pages/cuentas/cuentas.component').then(m => m.CuentasComponent)
       }
     ]
   },

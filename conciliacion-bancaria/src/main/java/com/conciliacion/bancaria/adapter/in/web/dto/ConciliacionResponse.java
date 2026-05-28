@@ -13,6 +13,11 @@ import java.time.LocalDateTime;
 public class ConciliacionResponse {
     private Long id;
     private String periodo;
+    private Long idCuenta;
+    private String numeroCuenta;
+    private String tipoCuenta;
+    private Long idBanco;
+    private String nombreBanco;
     private String estado;
     private Long idUsuarioCreador;
     private Long idUsuarioAprobador;

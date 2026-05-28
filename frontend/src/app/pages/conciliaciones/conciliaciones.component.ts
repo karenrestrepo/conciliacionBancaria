@@ -58,6 +58,16 @@ import { Conciliacion } from '../../core/models';
             </td>
           </ng-container>
 
+          <ng-container matColumnDef="nombreBanco">
+            <th mat-header-cell *matHeaderCellDef>Banco / Cuenta</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="banco-cuenta">
+                <span class="banco-label">{{ row.nombreBanco ?? '—' }}</span>
+                <span class="cuenta-label" *ngIf="row.numeroCuenta">{{ row.numeroCuenta }}</span>
+              </span>
+            </td>
+          </ng-container>
+
           <ng-container matColumnDef="estado">
             <th mat-header-cell *matHeaderCellDef>Estado</th>
             <td mat-cell *matCellDef="let row">
@@ -219,12 +229,16 @@ import { Conciliacion } from '../../core/models';
     .diff-cero { color: #22c55e; font-weight: 600; }
     .diff-positivo { color: #f59e0b; font-weight: 600; }
     .diff-negativo { color: #e53935; font-weight: 600; }
+
+    .banco-cuenta { display: flex; flex-direction: column; gap: 2px; }
+    .banco-label { font-weight: 500; font-size: 13px; }
+    .cuenta-label { font-size: 11px; color: #6b7a8d; font-family: monospace; }
   `]
 })
 export class ConciliacionesComponent implements OnInit {
   conciliaciones: Conciliacion[] = [];
   loading = true;
-  columns = ['periodo', 'estado', 'tsCreacion', 'saldoExtracto', 'saldoAuxiliar', 'diferencia', 'acciones'];
+  columns = ['periodo', 'nombreBanco', 'estado', 'tsCreacion', 'saldoExtracto', 'saldoAuxiliar', 'diferencia', 'acciones'];
 
   constructor(private api: ApiService, public auth: AuthService) {}
 

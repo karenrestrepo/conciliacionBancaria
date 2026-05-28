@@ -15,7 +15,7 @@ public interface ConciliacionJpaRepository extends JpaRepository<ConciliacionEnt
 
     List<ConciliacionEntity> findByIdUsuarioCreador(Long idUsuario);
 
-    boolean existsByPeriodo(String periodo);
+    boolean existsByPeriodoAndIdCuenta(String periodo, Long idCuenta);
 
     long countByEstado(EstadoConciliacion estado);
 

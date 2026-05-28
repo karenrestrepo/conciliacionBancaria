@@ -17,9 +17,35 @@ export interface ApiResponse<T> {
   timestamp: string;
 }
 
+export type TipoCuenta = 'CORRIENTE' | 'AHORRO' | 'FIDUCIARIA' | 'OTRA';
+
+export interface Banco {
+  id: number;
+  nombre: string;
+  codigo: string | null;
+  activo: boolean;
+  tsCreacion: string;
+}
+
+export interface Cuenta {
+  id: number;
+  idBanco: number;
+  nombreBanco: string | null;
+  numeroCuenta: string;
+  tipo: TipoCuenta;
+  descripcion: string | null;
+  activo: boolean;
+  tsCreacion: string;
+}
+
 export interface Conciliacion {
   id: number;
   periodo: string;
+  idCuenta: number;
+  numeroCuenta: string | null;
+  tipoCuenta: string | null;
+  idBanco: number | null;
+  nombreBanco: string | null;
   estado: 'BORRADOR' | 'EN_REVISION' | 'CERRADA';
   idUsuarioCreador: number;
   idUsuarioAprobador: number | null;

@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
-import { ApiResponse, Conciliacion, Sugerencia, JobStatus, MetricasResumen } from './models';
+import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, MetricasResumen } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -20,9 +20,38 @@ export class ApiService {
       `${this.API}/conciliaciones`, { headers: this.headers() });
   }
 
-  crearConciliacion(periodo: string): Observable<ApiResponse<Conciliacion>> {
+  crearConciliacion(periodo: string, idCuenta: number): Observable<ApiResponse<Conciliacion>> {
     return this.http.post<ApiResponse<Conciliacion>>(
-      `${this.API}/conciliaciones`, { periodo }, { headers: this.headers() });
+      `${this.API}/conciliaciones`, { periodo, idCuenta }, { headers: this.headers() });
+  }
+
+  // Bancos
+  listarBancos(): Observable<ApiResponse<Banco[]>> {
+    return this.http.get<ApiResponse<Banco[]>>(
+      `${this.API}/bancos`, { headers: this.headers() });
+  }
+
+  crearBanco(nombre: string, codigo: string): Observable<ApiResponse<Banco>> {
+    return this.http.post<ApiResponse<Banco>>(
+      `${this.API}/bancos`, { nombre, codigo }, { headers: this.headers() });
+  }
+
+  // Cuentas
+  listarCuentasPorBanco(idBanco: number): Observable<ApiResponse<Cuenta[]>> {
+    return this.http.get<ApiResponse<Cuenta[]>>(
+      `${this.API}/bancos/${idBanco}/cuentas`, { headers: this.headers() });
+  }
+
+  listarTodasCuentas(): Observable<ApiResponse<Cuenta[]>> {
+    return this.http.get<ApiResponse<Cuenta[]>>(
+      `${this.API}/cuentas`, { headers: this.headers() });
+  }
+
+  crearCuenta(idBanco: number, numeroCuenta: string, tipo: TipoCuenta, descripcion: string): Observable<ApiResponse<Cuenta>> {
+    return this.http.post<ApiResponse<Cuenta>>(
+      `${this.API}/bancos/${idBanco}/cuentas`,
+      { numeroCuenta, tipo, descripcion },
+      { headers: this.headers() });
   }
 
   obtenerConciliacion(id: number): Observable<ApiResponse<Conciliacion>> {

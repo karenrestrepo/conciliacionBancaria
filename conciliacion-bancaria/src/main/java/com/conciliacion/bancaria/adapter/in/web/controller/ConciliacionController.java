@@ -36,7 +36,7 @@ public class ConciliacionController {
 
         // Por ahora usamos id=1 del admin; en siguiente paso extraemos del token
         Conciliacion conciliacion = conciliacionUseCase.iniciar(
-                request.getPeriodo(), 1L);
+                request.getPeriodo(), 1L, request.getIdCuenta());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok("Conciliación iniciada", toResponse(conciliacion)));
     }
@@ -187,6 +187,11 @@ public class ConciliacionController {
         return ConciliacionResponse.builder()
                 .id(c.getId())
                 .periodo(c.getPeriodo())
+                .idCuenta(c.getIdCuenta())
+                .numeroCuenta(c.getNumeroCuenta())
+                .tipoCuenta(c.getTipoCuenta())
+                .idBanco(c.getIdBanco())
+                .nombreBanco(c.getNombreBanco())
                 .estado(c.getEstado().name())
                 .idUsuarioCreador(c.getIdUsuarioCreador())
                 .idUsuarioAprobador(c.getIdUsuarioAprobador())

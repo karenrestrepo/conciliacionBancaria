@@ -17,7 +17,7 @@ public interface ConciliacionRepositoryPort {
 
     List<Conciliacion> buscarTodas();
 
-    boolean existePorPeriodo(String periodo);
+    boolean existePorPeriodoYCuenta(String periodo, Long idCuenta);
 
     EstadoConciliacion obtenerEstado(Long id);
 }

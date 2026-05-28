@@ -17,6 +17,11 @@ public class Conciliacion {
 
     private final Long id;
     private final String periodo;               // formato YYYY-MM
+    private final Long idCuenta;
+    private final String numeroCuenta;
+    private final String tipoCuenta;
+    private final Long idBanco;
+    private final String nombreBanco;
     private final EstadoConciliacion estado;
     private final Long idUsuarioCreador;
     private final Long idUsuarioAprobador;

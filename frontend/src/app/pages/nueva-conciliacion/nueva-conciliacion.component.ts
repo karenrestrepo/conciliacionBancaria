@@ -5,6 +5,7 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -12,7 +13,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatStepperModule } from '@angular/material/stepper';
 import { MatDividerModule } from '@angular/material/divider';
 import { ApiService } from '../../core/api.service';
-import { Conciliacion } from '../../core/models';
+import { Banco, Cuenta, Conciliacion } from '../../core/models';
 import { interval, Subscription } from 'rxjs';
 import { switchMap, takeWhile } from 'rxjs/operators';
 
@@ -21,7 +22,7 @@ import { switchMap, takeWhile } from 'rxjs/operators';
   standalone: true,
   imports: [
     CommonModule, RouterModule, ReactiveFormsModule, MatCardModule,
-    MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule,
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatIconModule,
     MatProgressBarModule, MatProgressSpinnerModule, MatStepperModule,
     MatDividerModule
   ],
@@ -45,10 +46,41 @@ import { switchMap, takeWhile } from 'rxjs/operators';
           <mat-card class="step-card">
             <mat-card-header>
               <mat-card-title>Definir período de conciliación</mat-card-title>
-              <mat-card-subtitle>Ingrese el período en formato YYYY-MM</mat-card-subtitle>
+              <mat-card-subtitle>Seleccione el banco y el período en formato YYYY-MM</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
               <form [formGroup]="periodoForm" (ngSubmit)="crearConciliacion()">
+
+                <mat-form-field appearance="outline" class="banco-field">
+                  <mat-label>Banco</mat-label>
+                  <mat-select formControlName="idBanco"
+                              [disabled]="!!conciliacion"
+                              (selectionChange)="onBancoChange($event.value)">
+                    <mat-option *ngFor="let b of bancos" [value]="b.id">
+                      {{ b.nombre }}{{ b.codigo ? ' (' + b.codigo + ')' : '' }}
+                    </mat-option>
+                  </mat-select>
+                  <mat-error *ngIf="periodoForm.get('idBanco')?.hasError('required')">
+                    Seleccione un banco
+                  </mat-error>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="cuenta-field">
+                  <mat-label>Cuenta</mat-label>
+                  <mat-select formControlName="idCuenta" [disabled]="!!conciliacion || cuentas.length === 0">
+                    <mat-option *ngIf="cuentas.length === 0" [value]="null" disabled>
+                      — Seleccione primero un banco —
+                    </mat-option>
+                    <mat-option *ngFor="let c of cuentas" [value]="c.id">
+                      {{ c.numeroCuenta }} ({{ getTipoLabel(c.tipo) }})
+                      {{ c.descripcion ? ' — ' + c.descripcion : '' }}
+                    </mat-option>
+                  </mat-select>
+                  <mat-error *ngIf="periodoForm.get('idCuenta')?.hasError('required')">
+                    Seleccione una cuenta
+                  </mat-error>
+                </mat-form-field>
+
                 <mat-form-field appearance="outline" class="periodo-field">
                   <mat-label>Período</mat-label>
                   <input matInput formControlName="periodo"
@@ -65,7 +97,8 @@ import { switchMap, takeWhile } from 'rxjs/operators';
 
                 <div class="success-info" *ngIf="conciliacion">
                   <mat-icon>check_circle</mat-icon>
-                  Conciliación {{ conciliacion.periodo }} creada con ID #{{ conciliacion.id }}
+                  Conciliación {{ conciliacion.periodo }} — {{ conciliacion.numeroCuenta }}
+                  ({{ conciliacion.nombreBanco }}) creada con ID #{{ conciliacion.id }}
                 </div>
 
                 <div class="step-actions">
@@ -247,7 +280,9 @@ import { switchMap, takeWhile } from 'rxjs/operators';
     mat-card-title { font-size: 16px !important; font-weight: 600 !important; color: #1a2332 !important; }
     mat-card-subtitle { font-size: 13px !important; color: #6b7a8d !important; }
 
-    .periodo-field { width: 280px; margin-top: 16px; }
+    .banco-field { width: 260px; margin-top: 16px; }
+    .cuenta-field { width: 340px; margin-top: 16px; }
+    .periodo-field { width: 240px; margin-top: 16px; }
 
     .csv-format-info {
       display: flex;
@@ -387,6 +422,8 @@ import { switchMap, takeWhile } from 'rxjs/operators';
 export class NuevaConciliacionComponent implements OnInit {
   periodoForm: FormGroup;
   conciliacion: Conciliacion | null = null;
+  bancos: Banco[] = [];
+  cuentas: Cuenta[] = [];
   extractoFile: File | null = null;
   auxiliarFile: File | null = null;
   extractoCargado = false;
@@ -408,12 +445,17 @@ export class NuevaConciliacionComponent implements OnInit {
     private router: Router
   ) {
     this.periodoForm = this.fb.group({
-      periodo: ['', [Validators.required,
+      idBanco:  [null, Validators.required],
+      idCuenta: [null, Validators.required],
+      periodo:  ['', [Validators.required,
         Validators.pattern(/^\d{4}-(0[1-9]|1[0-2])$/)]]
     });
   }
 
   ngOnInit(): void {
+    this.api.listarBancos().subscribe({
+      next: res => { this.bancos = res.data; }
+    });
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.api.obtenerConciliacion(+id).subscribe({
@@ -422,11 +464,21 @@ export class NuevaConciliacionComponent implements OnInit {
     }
   }
 
+  onBancoChange(idBanco: number): void {
+    this.cuentas = [];
+    this.periodoForm.patchValue({ idCuenta: null });
+    if (!idBanco) return;
+    this.api.listarCuentasPorBanco(idBanco).subscribe({
+      next: res => { this.cuentas = res.data; }
+    });
+  }
+
   crearConciliacion(): void {
     if (this.periodoForm.invalid) return;
     this.loadingPeriodo = true;
     this.errorPeriodo = '';
-    this.api.crearConciliacion(this.periodoForm.value.periodo).subscribe({
+    const { periodo, idCuenta } = this.periodoForm.value;
+    this.api.crearConciliacion(periodo, idCuenta).subscribe({
       next: res => {
         this.conciliacion = res.data;
         this.loadingPeriodo = false;
@@ -436,6 +488,13 @@ export class NuevaConciliacionComponent implements OnInit {
         this.errorPeriodo = err.error?.message ?? 'Error al crear la conciliación';
       }
     });
+  }
+
+  getTipoLabel(tipo: string): string {
+    const map: Record<string, string> = {
+      CORRIENTE: 'Cte', AHORRO: 'Aho', FIDUCIARIA: 'Fid', OTRA: 'Otra'
+    };
+    return map[tipo] ?? tipo;
   }
 
   onExtractoSelected(event: Event): void {
