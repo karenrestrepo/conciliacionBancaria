@@ -12,7 +12,7 @@ CREATE TABLE cuentas (
     descripcion   VARCHAR(200),
     activo        BOOLEAN      NOT NULL DEFAULT TRUE,
     ts_creacion   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_cuenta_banco   FOREIGN KEY (id_banco) REFERENCES bancos(id),
+    CONSTRAINT fk_cuenta_banco        FOREIGN KEY (id_banco) REFERENCES bancos(id),
     CONSTRAINT uk_cuenta_banco_numero UNIQUE (id_banco, numero_cuenta)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -29,21 +29,22 @@ ALTER TABLE conciliaciones
     ADD CONSTRAINT fk_conciliacion_cuenta
         FOREIGN KEY (id_cuenta) REFERENCES cuentas(id);
 
--- 3. Eliminar la dependencia directa de banco en conciliaciones
---    (ahora se accede vía cuenta → banco)
+-- 3. Eliminar TODOS los índices/constraints que referencian id_banco
+--    ANTES de eliminar la columna (MariaDB exige este orden)
 ALTER TABLE conciliaciones
     DROP FOREIGN KEY fk_conciliacion_banco;
 
 ALTER TABLE conciliaciones
-    DROP COLUMN id_banco;
-
--- 4. Sustituir la restricción de unicidad
-ALTER TABLE conciliaciones
     DROP INDEX uq_conciliacion_periodo_banco;
 
+DROP INDEX idx_conciliaciones_banco ON conciliaciones;
+
+-- 4. Ahora es seguro eliminar la columna
+ALTER TABLE conciliaciones
+    DROP COLUMN id_banco;
+
+-- 5. Nueva restricción de unicidad y nuevo índice
 ALTER TABLE conciliaciones
     ADD CONSTRAINT uq_conciliacion_periodo_cuenta UNIQUE (periodo, id_cuenta);
 
--- 5. Índice de consultas frecuentes
-DROP INDEX idx_conciliaciones_banco ON conciliaciones;
 CREATE INDEX idx_conciliaciones_cuenta ON conciliaciones(id_cuenta);
