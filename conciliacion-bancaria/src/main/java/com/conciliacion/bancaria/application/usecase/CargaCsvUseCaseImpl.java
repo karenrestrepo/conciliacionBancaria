@@ -8,6 +8,7 @@ import com.conciliacion.bancaria.domain.port.out.JobRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.MovimientoRepositoryPort;
 import com.conciliacion.bancaria.domain.service.ConciliationEngine;
 import com.conciliacion.bancaria.domain.service.CsvValidatorService;
+import com.conciliacion.bancaria.domain.service.SiesaXlsParserService;
 import com.conciliacion.bancaria.domain.port.out.SugerenciaRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.PartidaRepositoryPort;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import java.util.Map;
 public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
 
     private final CsvValidatorService csvValidator;
+    private final SiesaXlsParserService siesaParser;
     private final ConciliationEngine conciliationEngine;
     private final MovimientoRepositoryPort movimientoRepo;
     private final SugerenciaRepositoryPort sugerenciaRepo;
@@ -73,7 +75,12 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
         try {
             eventLog.csvUpload(idConciliacion, null, archivo.getOriginalFilename());
             byte[] contenido = archivo.getBytes();
-            List<Movimiento> contables = csvValidator.parsear(contenido, MAPEO_ESTANDAR);
+
+            // Detectar formato: XLS/XLSX (SIESA) o CSV estándar
+            List<Movimiento> contables = esArchivoXls(archivo.getOriginalFilename())
+                    ? siesaParser.parsear(contenido)
+                    : csvValidator.parsear(contenido, MAPEO_ESTANDAR);
+
             movimientoRepo.guardarContables(contables, idConciliacion);
 
             // Limpiar resultados del motor anterior y re-ejecutar con ambos archivos
@@ -93,6 +100,12 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
             throw new CsvValidationException("Error procesando el archivo: "
                     + e.getMessage());
         }
+    }
+
+    private boolean esArchivoXls(String nombre) {
+        if (nombre == null) return false;
+        String lower = nombre.toLowerCase();
+        return lower.endsWith(".xls") || lower.endsWith(".xlsx");
     }
 
     // Motor asíncrono — se ejecuta en el pool "conciliacionExecutor"

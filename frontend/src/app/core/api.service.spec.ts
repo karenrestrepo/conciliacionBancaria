@@ -38,11 +38,11 @@ describe('ApiService', () => {
   });
 
   describe('crearConciliacion()', () => {
-    it('realiza POST a /conciliaciones con el periodo en el body', () => {
-      service.crearConciliacion('2025-01').subscribe();
+    it('realiza POST a /conciliaciones con periodo e idCuenta en el body', () => {
+      service.crearConciliacion('2025-01', 1).subscribe();
       const req = httpMock.expectOne(`${BASE}/conciliaciones`);
       expect(req.request.method).toBe('POST');
-      expect(req.request.body).toEqual({ periodo: '2025-01' });
+      expect(req.request.body).toEqual({ periodo: '2025-01', idCuenta: 1 });
       req.flush({ success: true, data: {}, message: '', timestamp: '' });
     });
   });

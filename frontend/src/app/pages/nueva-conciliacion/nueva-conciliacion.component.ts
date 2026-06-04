@@ -182,21 +182,24 @@ import { switchMap, takeWhile } from 'rxjs/operators';
           <mat-card class="step-card">
             <mat-card-header>
               <mat-card-title>Cargar libro auxiliar contable</mat-card-title>
-              <mat-card-subtitle>Archivo CSV con los movimientos contables</mat-card-subtitle>
+              <mat-card-subtitle>Archivo CSV estándar o exportación SIESA (.xls/.xlsx)</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
               <div class="csv-format-info">
                 <mat-icon>info_outline</mat-icon>
-                <span>Columnas requeridas: <strong>fecha, descripcion, monto, tipo_movimiento</strong></span>
+                <span>
+                  <strong>CSV estándar:</strong> columnas fecha, descripcion, monto, tipo_movimiento &nbsp;|&nbsp;
+                  <strong>SIESA XLS:</strong> archivo exportado directamente desde SIESA (auxiliar de movimientos)
+                </span>
               </div>
 
               <div class="upload-area" (click)="auxiliarInput.click()"
                    [class.has-file]="auxiliarFile">
                 <mat-icon>{{ auxiliarFile ? 'description' : 'upload_file' }}</mat-icon>
-                <span *ngIf="!auxiliarFile">Haga clic para seleccionar el archivo CSV</span>
+                <span *ngIf="!auxiliarFile">Haga clic para seleccionar el archivo</span>
                 <span *ngIf="auxiliarFile">{{ auxiliarFile.name }}</span>
               </div>
-              <input #auxiliarInput type="file" accept=".csv"
+              <input #auxiliarInput type="file" accept=".csv,.xls,.xlsx"
                      (change)="onAuxiliarSelected($event)" hidden>
 
               <div class="success-info" *ngIf="auxiliarCargado">

@@ -5,6 +5,7 @@ import com.conciliacion.bancaria.domain.port.out.PartidaRepositoryPort;
 import com.conciliacion.bancaria.domain.service.ClosureService;
 import com.conciliacion.bancaria.domain.service.ConciliationEngine;
 import com.conciliacion.bancaria.domain.service.CsvValidatorService;
+import com.conciliacion.bancaria.domain.service.SiesaXlsParserService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -18,6 +19,11 @@ public class DomainConfig {
     @Bean
     public CsvValidatorService csvValidatorService() {
         return new CsvValidatorService();
+    }
+
+    @Bean
+    public SiesaXlsParserService siesaXlsParserService() {
+        return new SiesaXlsParserService();
     }
 
     @Bean

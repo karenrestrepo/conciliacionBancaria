@@ -31,4 +31,15 @@
     <Class name="~com\.conciliacion\.bancaria\.(adapter|config)\..*"/>
   </Match>
 
+
+  <!--
+    SiesaXlsParserService cierra el Workbook en try-with-resources.
+    SpotBugs puede marcar OBL_UNSATISFIED_OBLIGATION por el flujo de ByteArrayInputStream
+    (no necesita cierre explícito), y DLS_DEAD_LOCAL_STORE en el switch vacío.
+  -->
+  <Match>
+    <Bug pattern="OBL_UNSATISFIED_OBLIGATION,DLS_DEAD_LOCAL_STORE"/>
+    <Class name="com.conciliacion.bancaria.domain.service.SiesaXlsParserService"/>
+  </Match>
+
 </FindBugsFilter>

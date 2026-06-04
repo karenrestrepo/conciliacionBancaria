@@ -8,8 +8,8 @@ import { AuthService } from '../../core/auth.service';
 import { Conciliacion } from '../../core/models';
 
 const mockConciliaciones: Conciliacion[] = [
-  { id: 1, periodo: '2025-01', estado: 'BORRADOR', idUsuarioCreador: 1, idUsuarioAprobador: null, tsCreacion: '2025-01-01T00:00:00', tsCierre: null, saldoExtracto: null, saldoAuxiliar: null, diferenciaSaldo: null },
-  { id: 2, periodo: '2025-02', estado: 'CERRADA', idUsuarioCreador: 1, idUsuarioAprobador: 2, tsCreacion: '2025-02-01T00:00:00', tsCierre: '2025-02-28T00:00:00', saldoExtracto: 10000, saldoAuxiliar: 10000, diferenciaSaldo: 0 }
+  { id: 1, periodo: '2025-01', idCuenta: 1, numeroCuenta: 'CC-001', tipoCuenta: 'CORRIENTE', idBanco: 1, nombreBanco: 'Banco Test', estado: 'BORRADOR', idUsuarioCreador: 1, idUsuarioAprobador: null, tsCreacion: '2025-01-01T00:00:00', tsCierre: null, saldoExtracto: null, saldoAuxiliar: null, diferenciaSaldo: null },
+  { id: 2, periodo: '2025-02', idCuenta: 1, numeroCuenta: 'CC-001', tipoCuenta: 'CORRIENTE', idBanco: 1, nombreBanco: 'Banco Test', estado: 'CERRADA', idUsuarioCreador: 1, idUsuarioAprobador: 2, tsCreacion: '2025-02-01T00:00:00', tsCierre: '2025-02-28T00:00:00', saldoExtracto: 10000, saldoAuxiliar: 10000, diferenciaSaldo: 0 }
 ];
 
 describe('ConciliacionesComponent', () => {
