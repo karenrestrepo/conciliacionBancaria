@@ -208,7 +208,9 @@ class ConciliacionIntegrationTest {
     @Test
     @DisplayName("FINANZAS solo puede leer conciliaciones — no crearlas")
     void finanzasSoloLectura() throws Exception {
-        String body = objectMapper.writeValueAsString(Map.of("periodo", "2026-02"));
+        // Body válido para que llegue hasta @PreAuthorize y devuelva 403
+        // (si el body fuera inválido, Bean Validation devuelve 400 antes que Security)
+        String body = objectMapper.writeValueAsString(Map.of("periodo", "2026-02", "idCuenta", 1));
 
         mockMvc.perform(post("/api/v1/conciliaciones")
                         .header("Authorization", "Bearer " + tokenFinanzas)
