@@ -43,48 +43,45 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$SCRIPT_DIR/conciliacion-bancaria"
 FRONTEND_DIR="$SCRIPT_DIR/frontend"
 
+
 # ─── Enriquecer PATH en Windows (GitHub Desktop usa un entorno mínimo) ───────
+# Todo este bloque usa set +e para que ningún fallo de PowerShell mate el script.
 # GitHub Desktop's embedded Git Bash no hereda el PATH completo del usuario.
-# Leemos PATH y JAVA_HOME directamente del Registro de Windows (Machine+User)
-# usando PowerShell; eso funciona incluso cuando el proceso no heredó esas vars.
+set +e
 PS_EXE=""
-if command -v powershell.exe &>/dev/null; then
+if command -v powershell.exe &>/dev/null 2>&1; then
   PS_EXE="powershell.exe"
 elif [ -f "/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ]; then
   PS_EXE="/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
 fi
 if [ -n "$PS_EXE" ]; then
-  # GetEnvironmentVariable lee del Registro, no del proceso — da el PATH real.
   WIN_PATH=$("$PS_EXE" -NoProfile -NonInteractive -Command \
     "[System.Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('PATH','User')" \
     2>/dev/null | tr -d '\r' | tr ';' ':')
   if [ -n "$WIN_PATH" ]; then
     export PATH="$PATH:$WIN_PATH"
   fi
-  # Leer JAVA_HOME del registro si no está definido
   if [ -z "${JAVA_HOME:-}" ]; then
     REG_JAVA=$("$PS_EXE" -NoProfile -NonInteractive -Command \
       "[System.Environment]::GetEnvironmentVariable('JAVA_HOME','Machine')" \
       2>/dev/null | tr -d '\r')
-    [ -z "$REG_JAVA" ] && REG_JAVA=$("$PS_EXE" -NoProfile -NonInteractive -Command \
-      "[System.Environment]::GetEnvironmentVariable('JAVA_HOME','User')" \
-      2>/dev/null | tr -d '\r')
+    if [ -z "$REG_JAVA" ]; then
+      REG_JAVA=$("$PS_EXE" -NoProfile -NonInteractive -Command \
+        "[System.Environment]::GetEnvironmentVariable('JAVA_HOME','User')" \
+        2>/dev/null | tr -d '\r')
+    fi
     if [ -n "$REG_JAVA" ]; then
       export JAVA_HOME="$REG_JAVA"
-      warn "JAVA_HOME leído del registro: $JAVA_HOME"
     fi
   fi
 fi
+set -e
 
-# ─── Fallback: auto-detectar JAVA_HOME desde la JVM en PATH ─────────────────
-# Por si JAVA_HOME no está en el registro pero java sí está en PATH.
+# Fallback: detectar JAVA_HOME desde la JVM en PATH (no falla si java no está)
 if [ -z "${JAVA_HOME:-}" ] || [ ! -d "${JAVA_HOME:-}/bin" ]; then
-  if command -v java &>/dev/null; then
-    DETECTED_JAVA=$(java -XshowSettings:all -version 2>&1 | sed -n 's/.*java\.home = //p' | head -1)
-    if [ -n "$DETECTED_JAVA" ]; then
-      export JAVA_HOME="$DETECTED_JAVA"
-      warn "JAVA_HOME auto-detectado desde JVM: $JAVA_HOME"
-    fi
+  if command -v java &>/dev/null 2>&1; then
+    _jh=$(java -XshowSettings:all -version 2>&1 | sed -n 's/.*java\.home = //p' | head -1) || true
+    [ -n "$_jh" ] && export JAVA_HOME="$_jh"
   fi
 fi
 
