@@ -14,4 +14,8 @@ public interface CuentaUseCase {
     List<Cuenta> listarPorBanco(Long idBanco);
 
     List<Cuenta> listarActivas();
+
+    Cuenta cambiarEstado(Long id, boolean activo);
+
+    void eliminar(Long id);
 }

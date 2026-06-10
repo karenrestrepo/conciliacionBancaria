@@ -45,4 +45,18 @@ public class BancoUseCaseImpl implements BancoUseCase {
     public List<Banco> listarActivos() {
         return bancoRepo.listarActivos();
     }
+
+    @Override
+    @Transactional
+    public void desactivar(Long id) {
+        Banco banco = obtenerPorId(id);
+        Banco desactivado = Banco.builder()
+                .id(banco.getId())
+                .nombre(banco.getNombre())
+                .codigo(banco.getCodigo())
+                .activo(false)
+                .tsCreacion(banco.getTsCreacion())
+                .build();
+        bancoRepo.guardar(desactivado);
+    }
 }

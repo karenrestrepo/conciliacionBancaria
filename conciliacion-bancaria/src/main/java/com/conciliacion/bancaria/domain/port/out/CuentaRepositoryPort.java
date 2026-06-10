@@ -16,4 +16,6 @@ public interface CuentaRepositoryPort {
     List<Cuenta> listarActivas();
 
     boolean existePorBancoYNumero(Long idBanco, String numeroCuenta);
+
+    void eliminar(Long id);
 }

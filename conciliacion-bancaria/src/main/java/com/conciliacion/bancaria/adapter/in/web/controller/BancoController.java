@@ -39,6 +39,13 @@ public class BancoController {
                 .body(ApiResponse.ok("Banco creado", toResponse(banco)));
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('CONTADOR','ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> eliminar(@PathVariable Long id) {
+        bancoUseCase.desactivar(id);
+        return ResponseEntity.ok(ApiResponse.ok("Banco eliminado", null));
+    }
+
     private BancoResponse toResponse(Banco b) {
         return BancoResponse.builder()
                 .id(b.getId())

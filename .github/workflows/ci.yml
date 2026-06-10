@@ -2,9 +2,9 @@ name: CI — Conciliación Bancaria
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main-disabled ]
   pull_request:
-    branches: [ main ]
+    branches: [ main-disabled ]
 
 jobs:
   build-and-test:

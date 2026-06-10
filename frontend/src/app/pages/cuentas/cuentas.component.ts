@@ -126,6 +126,25 @@ import { Banco, Cuenta, TipoCuenta } from '../../core/models';
             </td>
           </ng-container>
 
+          <ng-container matColumnDef="acciones">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let row">
+              <button mat-icon-button
+                      [disabled]="accionando === row.id"
+                      (click)="toggleEstado(row)"
+                      [title]="row.activo ? 'Desactivar' : 'Activar'"
+                      [class]="row.activo ? 'btn-desactivar' : 'btn-activar'">
+                <mat-icon>{{ row.activo ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+              </button>
+              <button mat-icon-button class="btn-eliminar"
+                      [disabled]="accionando === row.id"
+                      (click)="eliminarCuenta(row)"
+                      title="Eliminar cuenta">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
           <tr mat-header-row *matHeaderRowDef="columns"></tr>
           <tr mat-row *matRowDef="let row; columns: columns;" class="data-row"></tr>
         </table>
@@ -229,6 +248,10 @@ import { Banco, Cuenta, TipoCuenta } from '../../core/models';
     .activo-chip { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
     .activo   { background: #dcfce7; color: #166534; }
     .inactivo { background: #fee2e2; color: #991b1b; }
+
+    .btn-activar   { color: #16a34a !important; }
+    .btn-desactivar { color: #d97706 !important; }
+    .btn-eliminar  { color: #dc2626 !important; }
   `]
 })
 export class CuentasComponent implements OnInit {
@@ -237,7 +260,11 @@ export class CuentasComponent implements OnInit {
   loading = true;
   saving = false;
   errorCrear = '';
-  columns = ['numeroCuenta', 'tipo', 'descripcion', 'activo'];
+  accionando: number | null = null;
+  get columns(): string[] {
+    const base = ['numeroCuenta', 'tipo', 'descripcion', 'activo'];
+    return this.canCreate() ? [...base, 'acciones'] : base;
+  }
   cuentaForm: FormGroup;
   private idBanco!: number;
 
@@ -286,6 +313,29 @@ export class CuentasComponent implements OnInit {
         this.saving = false;
         this.errorCrear = err.error?.message ?? 'Error al crear la cuenta';
       }
+    });
+  }
+
+  toggleEstado(cuenta: Cuenta): void {
+    this.accionando = cuenta.id;
+    this.api.cambiarEstadoCuenta(cuenta.id, !cuenta.activo).subscribe({
+      next: res => {
+        this.cuentas = this.cuentas.map(c => c.id === cuenta.id ? res.data : c);
+        this.accionando = null;
+      },
+      error: () => { this.accionando = null; }
+    });
+  }
+
+  eliminarCuenta(cuenta: Cuenta): void {
+    if (!confirm(`¿Eliminar la cuenta "${cuenta.numeroCuenta}"? Esta acción no se puede deshacer.`)) return;
+    this.accionando = cuenta.id;
+    this.api.eliminarCuenta(cuenta.id).subscribe({
+      next: () => {
+        this.cuentas = this.cuentas.filter(c => c.id !== cuenta.id);
+        this.accionando = null;
+      },
+      error: () => { this.accionando = null; }
     });
   }
 

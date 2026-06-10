@@ -62,4 +62,27 @@ public class CuentaUseCaseImpl implements CuentaUseCase {
     public List<Cuenta> listarActivas() {
         return cuentaRepo.listarActivas();
     }
+
+    @Override
+    @Transactional
+    public Cuenta cambiarEstado(Long id, boolean activo) {
+        Cuenta cuenta = obtenerPorId(id);
+        Cuenta actualizada = Cuenta.builder()
+                .id(cuenta.getId())
+                .idBanco(cuenta.getIdBanco())
+                .numeroCuenta(cuenta.getNumeroCuenta())
+                .tipo(cuenta.getTipo())
+                .descripcion(cuenta.getDescripcion())
+                .activo(activo)
+                .tsCreacion(cuenta.getTsCreacion())
+                .build();
+        return cuentaRepo.guardar(actualizada);
+    }
+
+    @Override
+    @Transactional
+    public void eliminar(Long id) {
+        obtenerPorId(id);
+        cuentaRepo.eliminar(id);
+    }
 }

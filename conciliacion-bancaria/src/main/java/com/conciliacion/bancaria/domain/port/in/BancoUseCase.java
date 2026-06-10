@@ -11,4 +11,6 @@ public interface BancoUseCase {
     Banco obtenerPorId(Long id);
 
     List<Banco> listarActivos();
+
+    void desactivar(Long id);
 }

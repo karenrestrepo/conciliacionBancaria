@@ -47,6 +47,11 @@ public class CuentaRepositoryAdapter implements CuentaRepositoryPort {
         return cuentaJpaRepository.existsByIdBancoAndNumeroCuenta(idBanco, numeroCuenta);
     }
 
+    @Override
+    public void eliminar(Long id) {
+        cuentaJpaRepository.deleteById(id);
+    }
+
     private Cuenta toDomain(CuentaEntity e) {
         String nombreBanco = bancoJpaRepository.findById(e.getIdBanco())
                 .map(b -> b.getNombre())

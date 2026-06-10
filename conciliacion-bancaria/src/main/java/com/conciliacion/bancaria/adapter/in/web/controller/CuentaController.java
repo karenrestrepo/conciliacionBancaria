@@ -47,6 +47,23 @@ public class CuentaController {
                 .body(ApiResponse.ok("Cuenta creada", toResponse(cuenta)));
     }
 
+    @PatchMapping("/api/v1/cuentas/{id}/estado")
+    @PreAuthorize("hasAnyRole('CONTADOR','ADMIN')")
+    public ResponseEntity<ApiResponse<CuentaResponse>> cambiarEstado(
+            @PathVariable Long id,
+            @RequestParam boolean activo) {
+        Cuenta cuenta = cuentaUseCase.cambiarEstado(id, activo);
+        return ResponseEntity.ok(ApiResponse.ok(
+                activo ? "Cuenta activada" : "Cuenta desactivada", toResponse(cuenta)));
+    }
+
+    @DeleteMapping("/api/v1/cuentas/{id}")
+    @PreAuthorize("hasAnyRole('CONTADOR','ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> eliminar(@PathVariable Long id) {
+        cuentaUseCase.eliminar(id);
+        return ResponseEntity.ok(ApiResponse.ok("Cuenta eliminada", null));
+    }
+
     // ── Todas las cuentas activas (para dropdowns) ────────────────────────
 
     @GetMapping("/api/v1/cuentas")

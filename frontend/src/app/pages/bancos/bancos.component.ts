@@ -133,6 +133,19 @@ import { Banco } from '../../core/models';
             </td>
           </ng-container>
 
+          <ng-container matColumnDef="acciones">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let row">
+              <button mat-icon-button class="delete-btn"
+                      *ngIf="canCreate()"
+                      [disabled]="eliminando === row.id"
+                      (click)="eliminarBanco(row)"
+                      title="Eliminar banco">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
           <tr mat-header-row *matHeaderRowDef="columns"></tr>
           <tr mat-row *matRowDef="let row; columns: columns;" class="data-row"></tr>
         </table>
@@ -262,6 +275,14 @@ import { Banco } from '../../core/models';
       font-size: 13px;
       gap: 4px;
     }
+
+    .delete-btn {
+      color: #dc2626 !important;
+    }
+
+    .delete-btn:disabled {
+      color: #fca5a5 !important;
+    }
   `]
 })
 export class BancosComponent implements OnInit {
@@ -269,7 +290,11 @@ export class BancosComponent implements OnInit {
   loading = true;
   saving = false;
   errorCrear = '';
-  columns = ['nombre', 'codigo', 'activo', 'tsCreacion', 'cuentas', 'configExtracto'];
+  eliminando: number | null = null;
+  get columns(): string[] {
+    const base = ['nombre', 'codigo', 'activo', 'tsCreacion', 'cuentas', 'configExtracto'];
+    return this.canCreate() ? [...base, 'acciones'] : base;
+  }
   bancoForm: FormGroup;
 
   constructor(
@@ -310,6 +335,18 @@ export class BancosComponent implements OnInit {
         this.saving = false;
         this.errorCrear = err.error?.message ?? 'Error al crear el banco';
       }
+    });
+  }
+
+  eliminarBanco(banco: Banco): void {
+    if (!confirm(`¿Eliminar el banco "${banco.nombre}"? Esta acción no se puede deshacer.`)) return;
+    this.eliminando = banco.id;
+    this.api.eliminarBanco(banco.id).subscribe({
+      next: () => {
+        this.bancos = this.bancos.filter(b => b.id !== banco.id);
+        this.eliminando = null;
+      },
+      error: () => { this.eliminando = null; }
     });
   }
 

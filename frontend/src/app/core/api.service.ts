@@ -36,6 +36,11 @@ export class ApiService {
       `${this.API}/bancos`, { nombre, codigo }, { headers: this.headers() });
   }
 
+  eliminarBanco(id: number): Observable<ApiResponse<void>> {
+    return this.http.delete<ApiResponse<void>>(
+      `${this.API}/bancos/${id}`, { headers: this.headers() });
+  }
+
   // Cuentas
   listarCuentasPorBanco(idBanco: number): Observable<ApiResponse<Cuenta[]>> {
     return this.http.get<ApiResponse<Cuenta[]>>(
@@ -52,6 +57,16 @@ export class ApiService {
       `${this.API}/bancos/${idBanco}/cuentas`,
       { numeroCuenta, tipo, descripcion },
       { headers: this.headers() });
+  }
+
+  cambiarEstadoCuenta(id: number, activo: boolean): Observable<ApiResponse<Cuenta>> {
+    return this.http.patch<ApiResponse<Cuenta>>(
+      `${this.API}/cuentas/${id}/estado?activo=${activo}`, {}, { headers: this.headers() });
+  }
+
+  eliminarCuenta(id: number): Observable<ApiResponse<void>> {
+    return this.http.delete<ApiResponse<void>>(
+      `${this.API}/cuentas/${id}`, { headers: this.headers() });
   }
 
   obtenerConciliacion(id: number): Observable<ApiResponse<Conciliacion>> {
