@@ -81,6 +81,38 @@ export interface JobStatus {
   mensajeError: string | null;
 }
 
+export type TipoArchivoExtracto = 'CSV' | 'TXT' | 'XLS' | 'XLSX' | 'PDF';
+
+export interface ConfiguracionDetalle {
+  separador?: string;
+  filasASaltar?: number;
+  tieneEncabezado?: boolean;
+  columnaFecha?: number;
+  formatoFecha?: string;
+  columnaDescripcion?: number;
+  columnaReferencia?: number;
+  columnaMonto?: number;
+  columnaDebito?: number;
+  columnaCredito?: number;
+  debitoYCreditoSeparados?: boolean;
+  encoding?: string;
+  numeroHoja?: number;
+}
+
+export interface ConfiguracionExtracto {
+  id: number;
+  idBanco: number;
+  nombreBanco: string | null;
+  nombre: string;
+  tipoArchivo: TipoArchivoExtracto;
+  aplicaParaTodasLasCuentas: boolean;
+  idsCuentas: number[];
+  configuracionDetalle: string | null;
+  activo: boolean;
+  fechaCreacion: string;
+  fechaModificacion: string | null;
+}
+
 export interface MetricasResumen {
   totalConciliaciones: number;
   enBorrador: number;

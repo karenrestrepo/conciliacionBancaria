@@ -33,6 +33,16 @@
 
 
   <!--
+    ConfiguracionExtractoEntity usa @ElementCollection con Set<Long>.
+    SpotBugs señala EI_EXPOSE_REP en el getter del Set; la colección es
+    gestionada por JPA (Hibernate) y no se expone entre hilos.
+  -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    <Class name="com.conciliacion.bancaria.adapter.out.persistence.entity.ConfiguracionExtractoEntity"/>
+  </Match>
+
+  <!--
     SiesaXlsParserService cierra el Workbook en try-with-resources.
     SpotBugs puede marcar OBL_UNSATISFIED_OBLIGATION por el flujo de ByteArrayInputStream
     (no necesita cierre explícito), y DLS_DEAD_LOCAL_STORE en el switch vacío.

@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
-import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, MetricasResumen } from './models';
+import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, MetricasResumen, ConfiguracionExtracto } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -121,5 +121,26 @@ export class ApiService {
   obtenerMetricas(): Observable<ApiResponse<MetricasResumen>> {
     return this.http.get<ApiResponse<MetricasResumen>>(
       `${this.API}/metricas/resumen`, { headers: this.headers() });
+  }
+
+  // Configuraciones de extracto
+  listarConfiguracionesPorBanco(idBanco: number): Observable<ApiResponse<ConfiguracionExtracto[]>> {
+    return this.http.get<ApiResponse<ConfiguracionExtracto[]>>(
+      `${this.API}/configuraciones-extracto/banco/${idBanco}`, { headers: this.headers() });
+  }
+
+  crearConfiguracion(req: any): Observable<ApiResponse<ConfiguracionExtracto>> {
+    return this.http.post<ApiResponse<ConfiguracionExtracto>>(
+      `${this.API}/configuraciones-extracto`, req, { headers: this.headers() });
+  }
+
+  actualizarConfiguracion(id: number, req: any): Observable<ApiResponse<ConfiguracionExtracto>> {
+    return this.http.put<ApiResponse<ConfiguracionExtracto>>(
+      `${this.API}/configuraciones-extracto/${id}`, req, { headers: this.headers() });
+  }
+
+  eliminarConfiguracion(id: number): Observable<ApiResponse<any>> {
+    return this.http.delete<ApiResponse<any>>(
+      `${this.API}/configuraciones-extracto/${id}`, { headers: this.headers() });
   }
 }

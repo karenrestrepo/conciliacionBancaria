@@ -121,6 +121,18 @@ import { Banco } from '../../core/models';
             </td>
           </ng-container>
 
+          <ng-container matColumnDef="configExtracto">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let row">
+              <button mat-stroked-button class="config-btn"
+                      [routerLink]="['/configuracion-extracto', row.id]"
+                      *ngIf="canCreate()">
+                <mat-icon>settings</mat-icon>
+                Configurar extractos
+              </button>
+            </td>
+          </ng-container>
+
           <tr mat-header-row *matHeaderRowDef="columns"></tr>
           <tr mat-row *matRowDef="let row; columns: columns;" class="data-row"></tr>
         </table>
@@ -241,6 +253,15 @@ import { Banco } from '../../core/models';
       font-size: 13px;
       gap: 4px;
     }
+
+    .config-btn {
+      border-color: #6b7a8d !important;
+      color: #6b7a8d !important;
+      border-radius: 8px !important;
+      height: 34px;
+      font-size: 13px;
+      gap: 4px;
+    }
   `]
 })
 export class BancosComponent implements OnInit {
@@ -248,7 +269,7 @@ export class BancosComponent implements OnInit {
   loading = true;
   saving = false;
   errorCrear = '';
-  columns = ['nombre', 'codigo', 'activo', 'tsCreacion', 'cuentas'];
+  columns = ['nombre', 'codigo', 'activo', 'tsCreacion', 'cuentas', 'configExtracto'];
   bancoForm: FormGroup;
 
   constructor(

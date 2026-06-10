@@ -59,6 +59,11 @@ import { AuthService } from '../core/auth.service';
             <mat-icon matListItemIcon>account_balance_wallet</mat-icon>
             <span matListItemTitle>Bancos</span>
           </a>
+          <a mat-list-item routerLink="/configuracion-extracto" routerLinkActive="active-link"
+             *ngIf="canManageBancos()">
+            <mat-icon matListItemIcon>settings</mat-icon>
+            <span matListItemTitle>Config. Extractos</span>
+          </a>
         </mat-nav-list>
 
         <div class="sidebar-footer">
