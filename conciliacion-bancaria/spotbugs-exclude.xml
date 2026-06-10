@@ -27,7 +27,7 @@
     son efectivamente inmutables después del inicio del contexto de aplicación.
   -->
   <Match>
-    <Bug pattern="EI_EXPOSE_REP2"/>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     <Class name="~com\.conciliacion\.bancaria\.(adapter|config)\..*"/>
   </Match>
 
