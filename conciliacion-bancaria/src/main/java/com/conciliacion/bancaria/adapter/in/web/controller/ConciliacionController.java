@@ -124,6 +124,18 @@ public class ConciliacionController {
                         revisionUseCase.aceptarSugerencia(idSugerencia, 1L))));
     }
 
+    // ── Aceptar sugerencias en lote ───────────────────────────────────────────
+
+    @PostMapping("/{id}/sugerencias/aceptar-lote")
+    @PreAuthorize("hasAnyRole('CONTADOR','ADMIN')")
+    public ResponseEntity<ApiResponse<java.util.List<SugerenciaResponse>>> aceptarLote(
+            @PathVariable Long id,
+            @RequestBody java.util.List<Long> ids) {
+        java.util.List<SugerenciaResponse> resultado = revisionUseCase.aceptarLote(ids, 1L)
+                .stream().map(this::toSugerenciaResponse).toList();
+        return ResponseEntity.ok(ApiResponse.ok("Sugerencias aceptadas: " + resultado.size(), resultado));
+    }
+
     // ── Rechazar sugerencia ───────────────────────────────────────────────────
 
     @PostMapping("/{id}/sugerencias/{idSugerencia}/rechazar")
@@ -171,6 +183,30 @@ public class ConciliacionController {
         return ResponseEntity.ok(ApiResponse.ok("Partida justificada", null));
     }
 
+    // ── Arrastrar partida a próximo mes ───────────────────────────────────────
+
+    @PostMapping("/{id}/partidas/{idPartida}/arrastrar")
+    @PreAuthorize("hasAnyRole('CONTADOR','ADMIN')")
+    public ResponseEntity<ApiResponse<PartidaResponse>> arrastrar(
+            @PathVariable Long id,
+            @PathVariable Long idPartida,
+            @Valid @RequestBody ArrastrarPartidaRequest request) {
+        PartidaConciliatoria arrastrada = cierreUseCase.arrastrarPartida(
+                idPartida, request.getPeriodoDestino(), 1L);
+        return ResponseEntity.ok(ApiResponse.ok("Partida marcada para próximo mes", toPartidaResponse(arrastrada)));
+    }
+
+    // ── Partidas históricas (de conciliaciones anteriores del mismo cuenta) ──
+
+    @GetMapping("/{id}/partidas-historicas")
+    @PreAuthorize("hasAnyRole('CONTADOR','FINANZAS','ADMIN')")
+    public ResponseEntity<ApiResponse<java.util.List<PartidaResponse>>> partidasHistoricas(
+            @PathVariable Long id) {
+        java.util.List<PartidaResponse> lista = cierreUseCase.listarPartidasHistoricas(id)
+                .stream().map(this::toPartidaResponse).toList();
+        return ResponseEntity.ok(ApiResponse.ok(lista));
+    }
+
     // ── Cerrar conciliación ───────────────────────────────────────────────────
 
     @PostMapping("/{id}/cerrar")
@@ -212,6 +248,12 @@ public class ConciliacionController {
                 .estado(p.getEstado())
                 .justificacion(p.getJustificacion())
                 .fechaJustificacion(p.getFechaJustificacion())
+                .periodoArrastre(p.getPeriodoArrastre())
+                .fechaMovimiento(p.getFechaMovimiento())
+                .descripcionMovimiento(p.getDescripcionMovimiento())
+                .montoMovimiento(p.getMontoMovimiento())
+                .tipoMovimiento(p.getTipoMovimiento())
+                .esHistorica(p.isEsHistorica())
                 .build();
     }
 

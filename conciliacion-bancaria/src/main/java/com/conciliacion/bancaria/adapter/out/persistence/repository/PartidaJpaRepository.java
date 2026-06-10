@@ -21,4 +21,19 @@ public interface PartidaJpaRepository extends JpaRepository<PartidaEntity, Long>
     List<PartidaEntity> findPendientesSinJustificar(@Param("idConciliacion") Long idConciliacion);
 
     void deleteByIdConciliacion(Long idConciliacion);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM PartidaEntity p WHERE p.idConciliacion = :idConciliacion AND p.estado = 'PENDIENTE'")
+    void deletePendientesByIdConciliacion(@Param("idConciliacion") Long idConciliacion);
+
+    @Query("""
+            SELECT p FROM PartidaEntity p
+            JOIN ConciliacionEntity c ON c.id = p.idConciliacion
+            WHERE c.idCuenta = :idCuenta
+              AND c.id <> :idConciliacionActual
+              AND p.estado IN ('PENDIENTE', 'ARRASTRADA')
+            """)
+    List<PartidaEntity> findPendientesDeOtrasConciliaciones(
+            @Param("idCuenta") Long idCuenta,
+            @Param("idConciliacionActual") Long idConciliacionActual);
 }

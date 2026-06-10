@@ -16,4 +16,6 @@ public interface SugerenciaRepositoryPort {
     Sugerencia actualizar(Sugerencia sugerencia);
 
     void eliminarPorConciliacion(Long idConciliacion);
+
+    void eliminarPendientesPorConciliacion(Long idConciliacion);
 }

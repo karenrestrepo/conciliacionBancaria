@@ -10,6 +10,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { SelectionModel } from '@angular/cdk/collections';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { Conciliacion, Sugerencia } from '../../core/models';
@@ -21,7 +23,7 @@ import { Conciliacion, Sugerencia } from '../../core/models';
     CommonModule, RouterModule, MatCardModule, MatTableModule,
     MatIconModule, MatButtonModule, MatChipsModule,
     MatProgressSpinnerModule, MatTooltipModule, MatDividerModule,
-    MatSnackBarModule
+    MatSnackBarModule, MatCheckboxModule
   ],
   template: `
     <div class="page-container">
@@ -52,6 +54,13 @@ import { Conciliacion, Sugerencia } from '../../core/models';
             <mat-icon>list_alt</mat-icon>
             Ver Partidas
           </button>
+          <!-- Subir nuevo auxiliar en EN_REVISION -->
+          <label *ngIf="conciliacion?.estado === 'EN_REVISION' && canReview()"
+                 class="upload-aux-btn" [class.uploading]="subiendoAuxiliar">
+            <mat-icon>upload_file</mat-icon>
+            {{ subiendoAuxiliar ? 'Procesando...' : 'Subir auxiliar' }}
+            <input type="file" accept=".csv,.xls,.xlsx" (change)="onAuxiliarChange($event)" hidden>
+          </label>
           <button mat-flat-button class="cerrar-btn"
                   *ngIf="conciliacion?.estado === 'EN_REVISION' && canClose()"
                   (click)="cerrar()">
@@ -98,6 +107,19 @@ import { Conciliacion, Sugerencia } from '../../core/models';
           </mat-card>
         </div>
 
+        <!-- Barra de acciones masivas -->
+        <div class="bulk-toolbar" *ngIf="selection.hasValue() && canReview()">
+          <span class="bulk-count">{{ selection.selected.length }} seleccionada(s)</span>
+          <button mat-flat-button class="bulk-accept-btn" (click)="aceptarSeleccionadas()" [disabled]="aceptandoLote">
+            <mat-spinner diameter="16" *ngIf="aceptandoLote"></mat-spinner>
+            <mat-icon *ngIf="!aceptandoLote">done_all</mat-icon>
+            {{ aceptandoLote ? 'Aprobando...' : 'Aprobar seleccionadas' }}
+          </button>
+          <button mat-stroked-button (click)="selection.clear()" class="bulk-clear-btn">
+            Limpiar selección
+          </button>
+        </div>
+
         <!-- Tabla -->
         <mat-card class="table-card">
           <div *ngIf="sugerencias.length === 0" class="empty-state">
@@ -108,6 +130,26 @@ import { Conciliacion, Sugerencia } from '../../core/models';
 
           <table mat-table [dataSource]="sugerencias"
                  *ngIf="sugerencias.length > 0" class="data-table">
+
+            <!-- Checkbox de selección -->
+            <ng-container matColumnDef="select">
+              <th mat-header-cell *matHeaderCellDef>
+                <mat-checkbox
+                  *ngIf="canReview()"
+                  [checked]="isAllPendientesSelected()"
+                  [indeterminate]="selection.hasValue() && !isAllPendientesSelected()"
+                  (change)="toggleAllPendientes($event.checked)"
+                  matTooltip="Seleccionar todas las pendientes">
+                </mat-checkbox>
+              </th>
+              <td mat-cell *matCellDef="let row">
+                <mat-checkbox
+                  *ngIf="row.estado === 'PENDIENTE_REVISION' && canReview()"
+                  [checked]="selection.isSelected(row)"
+                  (change)="selection.toggle(row)">
+                </mat-checkbox>
+              </td>
+            </ng-container>
 
             <ng-container matColumnDef="confianza">
               <th mat-header-cell *matHeaderCellDef>Confianza</th>
@@ -134,13 +176,13 @@ import { Conciliacion, Sugerencia } from '../../core/models';
             </ng-container>
 
             <ng-container matColumnDef="movBancario">
-              <th mat-header-cell *matHeaderCellDef>Movimiento Bancario</th>
+              <th mat-header-cell *matHeaderCellDef>Movimiento Bancario (Extracto)</th>
               <td mat-cell *matCellDef="let row">
                 <div class="mov-info">
                   <span class="mov-fecha">{{ row.fechaBancario | date:'dd/MM/yyyy' }}</span>
-                  <span class="mov-desc">{{ row.descripcionBancario }}</span>
+                  <span class="mov-desc" [title]="row.descripcionBancario">{{ row.descripcionBancario }}</span>
                   <span class="mov-monto" [ngClass]="getTipoClass(row.tipoBancario)">
-                    {{ row.tipoBancario === 'DEBITO' ? '-' : '+' }}
+                    {{ row.tipoBancario === 'DEBITO' ? '−' : '+' }}
                     {{ row.montoBancario | currency:'COP':'symbol':'1.0-2' }}
                   </span>
                 </div>
@@ -148,13 +190,13 @@ import { Conciliacion, Sugerencia } from '../../core/models';
             </ng-container>
 
             <ng-container matColumnDef="movContable">
-              <th mat-header-cell *matHeaderCellDef>Movimiento Contable</th>
+              <th mat-header-cell *matHeaderCellDef>Movimiento Contable (Auxiliar)</th>
               <td mat-cell *matCellDef="let row">
                 <div class="mov-info">
                   <span class="mov-fecha">{{ row.fechaContable | date:'dd/MM/yyyy' }}</span>
-                  <span class="mov-desc">{{ row.descripcionContable }}</span>
+                  <span class="mov-desc" [title]="row.descripcionContable">{{ row.descripcionContable }}</span>
                   <span class="mov-monto" [ngClass]="getTipoClass(row.tipoContable)">
-                    {{ row.tipoContable === 'DEBITO' ? '-' : '+' }}
+                    {{ row.tipoContable === 'DEBITO' ? '−' : '+' }}
                     {{ row.montoContable | currency:'COP':'symbol':'1.0-2' }}
                   </span>
                 </div>
@@ -210,99 +252,87 @@ import { Conciliacion, Sugerencia } from '../../core/models';
     .page-title { font-size: 26px; font-weight: 600; color: #1a2332; margin: 0 0 4px; }
     .page-subtitle { font-size: 14px; color: #6b7a8d; margin: 0; }
 
-    .header-actions { display: flex; gap: 12px; align-items: center; }
+    .header-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 
     .back-btn { color: #6b7a8d; border-color: #d1d5db !important; border-radius: 8px !important; }
 
     .revision-btn {
-      background: #1a2332 !important;
-      color: #fff !important;
-      border-radius: 8px !important;
-      height: 42px;
-      gap: 6px;
+      background: #1a2332 !important; color: #fff !important;
+      border-radius: 8px !important; height: 42px; gap: 6px;
     }
     .partidas-btn {
-      border-color: #1a2332 !important;
-      color: #1a2332 !important;
-      border-radius: 8px !important;
-      height: 42px;
-      gap: 6px;
+      border-color: #1a2332 !important; color: #1a2332 !important;
+      border-radius: 8px !important; height: 42px; gap: 6px;
     }
     .cerrar-btn {
-      background: #c0392b !important;
-      color: #fff !important;
-      border-radius: 8px !important;
-      height: 42px;
-      gap: 6px;
+      background: #c0392b !important; color: #fff !important;
+      border-radius: 8px !important; height: 42px; gap: 6px;
     }
+
+    .upload-aux-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid #3d7ebf; color: #3d7ebf;
+      border-radius: 8px; height: 42px; padding: 0 16px;
+      font-size: 14px; font-weight: 500; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .upload-aux-btn:hover { background: #eff6ff; }
+    .upload-aux-btn.uploading { opacity: 0.7; cursor: default; }
 
     .loading-container { display: flex; justify-content: center; padding: 60px; }
 
     .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      margin-bottom: 24px;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;
     }
 
     .summary-card {
-      display: flex !important;
-      flex-direction: row !important;
-      align-items: center;
-      gap: 14px;
-      padding: 16px 20px !important;
-      border-radius: 10px !important;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+      display: flex !important; flex-direction: row !important; align-items: center;
+      gap: 14px; padding: 16px 20px !important;
+      border-radius: 10px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
     }
 
     .summary-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
+      width: 40px; height: 40px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
-
     .summary-icon mat-icon { color: #fff; font-size: 20px; }
-    .blue { background: #3d7ebf; }
-    .amber { background: #f59e0b; }
-    .green { background: #22c55e; }
-    .red { background: #e53935; }
+    .blue { background: #3d7ebf; } .amber { background: #f59e0b; }
+    .green { background: #22c55e; } .red { background: #e53935; }
 
     .summary-value { display: block; font-size: 24px; font-weight: 700; color: #1a2332; }
     .summary-label { display: block; font-size: 12px; color: #6b7a8d; }
 
+    .bulk-toolbar {
+      display: flex; align-items: center; gap: 12px;
+      background: #eff6ff; border: 1px solid #bfdbfe;
+      border-radius: 10px; padding: 12px 20px; margin-bottom: 16px;
+    }
+    .bulk-count { font-size: 14px; font-weight: 600; color: #1e40af; flex: 1; }
+    .bulk-accept-btn {
+      background: #16a34a !important; color: #fff !important;
+      border-radius: 8px !important; gap: 6px; height: 38px;
+    }
+    .bulk-clear-btn { border-radius: 8px !important; }
+
     .table-card {
-      border-radius: 10px !important;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+      border-radius: 10px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
       overflow: hidden;
     }
 
     .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 60px;
-      color: #6b7a8d;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 60px; color: #6b7a8d;
     }
-
     .empty-state mat-icon { font-size: 48px; width: 48px; height: 48px; color: #b0bec5; margin-bottom: 12px; }
     .empty-hint { font-size: 13px; color: #9ca3af; margin: 4px 0 0; }
 
     .data-table { width: 100%; }
     .mat-mdc-header-row { background: #f8fafc; }
     .mat-mdc-header-cell {
-      font-size: 12px !important;
-      font-weight: 600 !important;
-      color: #6b7a8d !important;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      font-size: 12px !important; font-weight: 600 !important;
+      color: #6b7a8d !important; text-transform: uppercase; letter-spacing: 0.5px;
     }
-
     .mat-mdc-cell { padding: 12px 16px !important; vertical-align: middle; }
-
     .data-row:hover { background: #f8fafc; }
     .row-aceptada { background: #f0fdf4; }
     .row-rechazada { background: #fef2f2; }
@@ -310,37 +340,21 @@ import { Conciliacion, Sugerencia } from '../../core/models';
     .confianza-wrap { display: flex; align-items: center; gap: 8px; min-width: 100px; }
     .confianza-bar { flex: 1; height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
     .confianza-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
-    .conf-high { background: #22c55e; }
-    .conf-mid { background: #f59e0b; }
-    .conf-low { background: #e53935; }
+    .conf-high { background: #22c55e; } .conf-mid { background: #f59e0b; } .conf-low { background: #e53935; }
     .confianza-pct { font-size: 12px; font-weight: 600; color: #1a2332; white-space: nowrap; }
 
-    .criterio-badge {
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 500;
-      white-space: nowrap;
-    }
-
+    .criterio-badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
     .crit-exacto { background: #dbeafe; color: #1e40af; }
     .crit-fecha { background: #e0e7ff; color: #3730a3; }
     .crit-aprox { background: #fef3c7; color: #92400e; }
 
     .mov-info { display: flex; flex-direction: column; gap: 2px; }
     .mov-fecha { font-size: 11px; color: #9ca3af; }
-    .mov-desc { font-size: 13px; color: #1a2332; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mov-desc { font-size: 13px; color: #1a2332; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mov-monto { font-size: 13px; font-weight: 600; }
-    .tipo-debito { color: #e53935; }
-    .tipo-credito { color: #22c55e; }
+    .tipo-debito { color: #e53935; } .tipo-credito { color: #22c55e; }
 
-    .estado-chip {
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 500;
-    }
-
+    .estado-chip { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; }
     .sug-pendiente { background: #fef3c7; color: #92400e; }
     .sug-aceptada { background: #dcfce7; color: #166534; }
     .sug-rechazada { background: #fee2e2; color: #991b1b; }
@@ -361,7 +375,11 @@ export class SugerenciasComponent implements OnInit {
   conciliacion: Conciliacion | null = null;
   loading = true;
   idConciliacion = 0;
-  columns = ['confianza', 'criterio', 'movBancario', 'movContable', 'estado', 'acciones'];
+  aceptandoLote = false;
+  subiendoAuxiliar = false;
+  columns = ['select', 'confianza', 'criterio', 'movBancario', 'movContable', 'estado', 'acciones'];
+
+  selection = new SelectionModel<Sugerencia>(true, []);
 
   constructor(
     private api: ApiService,
@@ -390,6 +408,7 @@ export class SugerenciasComponent implements OnInit {
     this.api.aceptarSugerencia(this.idConciliacion, sugerencia.id).subscribe({
       next: res => {
         sugerencia.estado = res.data.estado;
+        this.selection.deselect(sugerencia);
         this.snackBar.open('Sugerencia aceptada', 'Cerrar', { duration: 3000, panelClass: 'snack-success' });
       }
     });
@@ -399,9 +418,63 @@ export class SugerenciasComponent implements OnInit {
     this.api.rechazarSugerencia(this.idConciliacion, sugerencia.id).subscribe({
       next: res => {
         sugerencia.estado = res.data.estado;
+        this.selection.deselect(sugerencia);
         this.snackBar.open('Sugerencia rechazada', 'Cerrar', { duration: 3000 });
       }
     });
+  }
+
+  aceptarSeleccionadas(): void {
+    const ids = this.selection.selected.map(s => s.id);
+    if (!ids.length) return;
+    this.aceptandoLote = true;
+    this.api.aceptarSugerenciasLote(this.idConciliacion, ids).subscribe({
+      next: res => {
+        res.data.forEach(updated => {
+          const s = this.sugerencias.find(x => x.id === updated.id);
+          if (s) s.estado = updated.estado;
+        });
+        this.selection.clear();
+        this.aceptandoLote = false;
+        this.snackBar.open(`${res.data.length} sugerencia(s) aceptadas`, 'Cerrar',
+          { duration: 3000, panelClass: 'snack-success' });
+      },
+      error: () => { this.aceptandoLote = false; }
+    });
+  }
+
+  onAuxiliarChange(event: Event): void {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file || this.subiendoAuxiliar) return;
+    this.subiendoAuxiliar = true;
+    this.api.cargarAuxiliar(this.idConciliacion, file).subscribe({
+      next: () => {
+        this.subiendoAuxiliar = false;
+        this.snackBar.open('Auxiliar cargado. Regenerando sugerencias...', 'Cerrar', { duration: 4000 });
+        setTimeout(() => this.cargarSugerencias(), 3000);
+      },
+      error: err => {
+        this.subiendoAuxiliar = false;
+        this.snackBar.open(err.error?.message ?? 'Error al cargar auxiliar', 'Cerrar', { duration: 4000 });
+      }
+    });
+  }
+
+  getPendientesRows(): Sugerencia[] {
+    return this.sugerencias.filter(s => s.estado === 'PENDIENTE_REVISION');
+  }
+
+  isAllPendientesSelected(): boolean {
+    const pendientes = this.getPendientesRows();
+    return pendientes.length > 0 && pendientes.every(s => this.selection.isSelected(s));
+  }
+
+  toggleAllPendientes(checked: boolean): void {
+    if (checked) {
+      this.getPendientesRows().forEach(s => this.selection.select(s));
+    } else {
+      this.selection.clear();
+    }
   }
 
   pasarARevision(): void {
@@ -413,13 +486,8 @@ export class SugerenciasComponent implements OnInit {
     });
   }
 
-  canReview(): boolean {
-    return this.auth.hasRole('CONTADOR', 'ADMIN');
-  }
-
-  canClose(): boolean {
-    return this.auth.hasRole('CONTADOR');
-  }
+  canReview(): boolean { return this.auth.hasRole('CONTADOR', 'ADMIN'); }
+  canClose(): boolean { return this.auth.hasRole('CONTADOR'); }
 
   cerrar(): void {
     this.api.cerrarConciliacion(this.idConciliacion).subscribe({
@@ -433,17 +501,9 @@ export class SugerenciasComponent implements OnInit {
     });
   }
 
-  getPendientes(): number {
-    return this.sugerencias.filter(s => s.estado === 'PENDIENTE_REVISION').length;
-  }
-
-  getAceptadas(): number {
-    return this.sugerencias.filter(s => s.estado === 'ACEPTADA').length;
-  }
-
-  getRechazadas(): number {
-    return this.sugerencias.filter(s => s.estado === 'RECHAZADA').length;
-  }
+  getPendientes(): number { return this.sugerencias.filter(s => s.estado === 'PENDIENTE_REVISION').length; }
+  getAceptadas(): number { return this.sugerencias.filter(s => s.estado === 'ACEPTADA').length; }
+  getRechazadas(): number { return this.sugerencias.filter(s => s.estado === 'RECHAZADA').length; }
 
   getConfianzaClass(c: number): string {
     if (c >= 0.85) return 'conf-high';
@@ -453,45 +513,35 @@ export class SugerenciasComponent implements OnInit {
 
   getCriterioClass(criterio: string): string {
     const map: Record<string, string> = {
-      'MONTO_EXACTO': 'crit-exacto',
-      'MONTO_FECHA_PROXIMA': 'crit-fecha',
-      'MONTO_APROXIMADO': 'crit-aprox'
+      'MONTO_EXACTO': 'crit-exacto', 'MONTO_FECHA_PROXIMA': 'crit-fecha', 'MONTO_APROXIMADO': 'crit-aprox'
     };
     return map[criterio] ?? '';
   }
 
   getCriterioLabel(criterio: string): string {
     const map: Record<string, string> = {
-      'MONTO_EXACTO': 'Monto Exacto',
-      'MONTO_FECHA_PROXIMA': 'Fecha Próxima',
-      'MONTO_APROXIMADO': 'Monto Aprox.'
+      'MONTO_EXACTO': 'Monto Exacto', 'MONTO_FECHA_PROXIMA': 'Fecha Próxima', 'MONTO_APROXIMADO': 'Monto Aprox.'
     };
     return map[criterio] ?? criterio;
   }
 
   getSugerenciaEstadoClass(estado: string): string {
     const map: Record<string, string> = {
-      'PENDIENTE_REVISION': 'sug-pendiente',
-      'ACEPTADA': 'sug-aceptada',
-      'RECHAZADA': 'sug-rechazada',
-      'REASIGNADA': 'sug-reasignada'
+      'PENDIENTE_REVISION': 'sug-pendiente', 'ACEPTADA': 'sug-aceptada',
+      'RECHAZADA': 'sug-rechazada', 'REASIGNADA': 'sug-reasignada'
     };
     return map[estado] ?? '';
   }
 
   getSugerenciaEstadoLabel(estado: string): string {
     const map: Record<string, string> = {
-      'PENDIENTE_REVISION': 'Pendiente',
-      'ACEPTADA': 'Aceptada',
-      'RECHAZADA': 'Rechazada',
-      'REASIGNADA': 'Reasignada'
+      'PENDIENTE_REVISION': 'Pendiente', 'ACEPTADA': 'Aceptada',
+      'RECHAZADA': 'Rechazada', 'REASIGNADA': 'Reasignada'
     };
     return map[estado] ?? estado;
   }
 
-  getTipoClass(tipo: string): string {
-    return tipo === 'DEBITO' ? 'tipo-debito' : 'tipo-credito';
-  }
+  getTipoClass(tipo: string): string { return tipo === 'DEBITO' ? 'tipo-debito' : 'tipo-credito'; }
 
   getRowClass(estado: string): string {
     if (estado === 'ACEPTADA') return 'row-aceptada';
@@ -501,18 +551,14 @@ export class SugerenciasComponent implements OnInit {
 
   getEstadoClass(estado: string): string {
     const map: Record<string, string> = {
-      'BORRADOR': 'estado-borrador',
-      'EN_REVISION': 'estado-revision',
-      'CERRADA': 'estado-cerrada'
+      'BORRADOR': 'estado-borrador', 'EN_REVISION': 'estado-revision', 'CERRADA': 'estado-cerrada'
     };
     return map[estado] ?? '';
   }
 
   getEstadoLabel(estado: string): string {
     const map: Record<string, string> = {
-      'BORRADOR': 'Borrador',
-      'EN_REVISION': 'En Revisión',
-      'CERRADA': 'Cerrada'
+      'BORRADOR': 'Borrador', 'EN_REVISION': 'En Revisión', 'CERRADA': 'Cerrada'
     };
     return map[estado] ?? estado;
   }

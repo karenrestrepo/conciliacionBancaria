@@ -18,4 +18,12 @@ public interface MovimientoRepositoryPort {
     void resetEstadosBancarios(Long idConciliacion);
 
     void resetEstadosContables(Long idConciliacion);
+
+    void resetEstadosBancariosSugeridos(Long idConciliacion);
+
+    void resetEstadosContablesSugeridos(Long idConciliacion);
+
+    List<Movimiento> buscarBancariosPendientesPorConciliacion(Long idConciliacion);
+
+    List<Movimiento> buscarBancariosPorIds(List<Long> ids);
 }

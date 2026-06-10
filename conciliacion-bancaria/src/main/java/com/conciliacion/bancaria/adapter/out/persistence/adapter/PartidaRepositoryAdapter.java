@@ -1,6 +1,8 @@
 package com.conciliacion.bancaria.adapter.out.persistence.adapter;
 
 import com.conciliacion.bancaria.adapter.out.persistence.entity.PartidaEntity;
+import com.conciliacion.bancaria.adapter.out.persistence.repository.MovimientoBancarioJpaRepository;
+import com.conciliacion.bancaria.adapter.out.persistence.repository.MovimientoContableJpaRepository;
 import com.conciliacion.bancaria.adapter.out.persistence.repository.PartidaJpaRepository;
 import com.conciliacion.bancaria.domain.model.PartidaConciliatoria;
 import com.conciliacion.bancaria.domain.port.out.PartidaRepositoryPort;
@@ -15,6 +17,8 @@ import java.util.Optional;
 public class PartidaRepositoryAdapter implements PartidaRepositoryPort {
 
     private final PartidaJpaRepository jpaRepository;
+    private final MovimientoBancarioJpaRepository bancarioRepo;
+    private final MovimientoContableJpaRepository contableRepo;
 
     @Override
     public PartidaConciliatoria guardar(PartidaConciliatoria partida) {
@@ -54,6 +58,21 @@ public class PartidaRepositoryAdapter implements PartidaRepositoryPort {
         jpaRepository.deleteByIdConciliacion(idConciliacion);
     }
 
+    @Override
+    public void eliminarPendientesPorConciliacion(Long idConciliacion) {
+        jpaRepository.deletePendientesByIdConciliacion(idConciliacion);
+    }
+
+    @Override
+    public List<PartidaConciliatoria> buscarPendientesDeOtrasConciliaciones(
+            Long idCuenta, Long idConciliacionActual) {
+        return jpaRepository
+                .findPendientesDeOtrasConciliaciones(idCuenta, idConciliacionActual)
+                .stream()
+                .map(e -> toDomainConDetalle(e, true))
+                .toList();
+    }
+
     private PartidaEntity toEntity(PartidaConciliatoria p) {
         return PartidaEntity.builder()
                 .id(p.getId())
@@ -68,7 +87,11 @@ public class PartidaRepositoryAdapter implements PartidaRepositoryPort {
     }
 
     private PartidaConciliatoria toDomain(PartidaEntity e) {
-        return PartidaConciliatoria.builder()
+        return toDomainConDetalle(e, false);
+    }
+
+    private PartidaConciliatoria toDomainConDetalle(PartidaEntity e, boolean esHistorica) {
+        var builder = PartidaConciliatoria.builder()
                 .id(e.getId())
                 .idConciliacion(e.getIdConciliacion())
                 .idMovimiento(e.getIdMovimiento())
@@ -77,6 +100,24 @@ public class PartidaRepositoryAdapter implements PartidaRepositoryPort {
                 .justificacion(e.getJustificacion())
                 .estado(e.getEstado())
                 .periodoArrastre(e.getPeriodoArrastre())
-                .build();
+                .esHistorica(esHistorica);
+
+        if ("BANCARIO".equals(e.getTipoOrigen())) {
+            bancarioRepo.findById(e.getIdMovimiento()).ifPresent(m -> {
+                builder.fechaMovimiento(m.getFecha())
+                        .descripcionMovimiento(m.getDescripcion())
+                        .montoMovimiento(m.getMonto())
+                        .tipoMovimiento(m.getTipo());
+            });
+        } else {
+            contableRepo.findById(e.getIdMovimiento()).ifPresent(m -> {
+                builder.fechaMovimiento(m.getFecha())
+                        .descripcionMovimiento(m.getDescripcion())
+                        .montoMovimiento(m.getMonto())
+                        .tipoMovimiento(m.getTipo());
+            });
+        }
+
+        return builder.build();
     }
 }

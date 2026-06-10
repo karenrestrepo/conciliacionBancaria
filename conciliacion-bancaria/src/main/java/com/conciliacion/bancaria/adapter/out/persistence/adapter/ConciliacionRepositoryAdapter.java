@@ -64,6 +64,14 @@ public class ConciliacionRepositoryAdapter implements ConciliacionRepositoryPort
                         "Conciliación no encontrada: " + id));
     }
 
+    @Override
+    public Long obtenerIdCuentaPorConciliacion(Long idConciliacion) {
+        return jpaRepository.findById(idConciliacion)
+                .map(ConciliacionEntity::getIdCuenta)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Conciliación no encontrada: " + idConciliacion));
+    }
+
     /** Resuelve cuenta → banco para construir el dominio enriquecido */
     private Conciliacion enrich(ConciliacionEntity e) {
         String numeroCuenta = null;

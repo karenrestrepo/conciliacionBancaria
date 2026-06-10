@@ -21,4 +21,6 @@ public interface ConciliacionJpaRepository extends JpaRepository<ConciliacionEnt
 
     @Query("SELECT c.estado FROM ConciliacionEntity c WHERE c.id = :id")
     Optional<EstadoConciliacion> findEstadoById(@Param("id") Long id);
+
+    List<ConciliacionEntity> findByIdCuenta(Long idCuenta);
 }

@@ -1,0 +1,13 @@
+package com.conciliacion.bancaria.adapter.in.web.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import lombok.Data;
+
+@Data
+public class ArrastrarPartidaRequest {
+
+    @NotBlank(message = "El período destino es obligatorio")
+    @Pattern(regexp = "^\\d{4}-(0[1-9]|1[0-2])$", message = "El período debe tener formato YYYY-MM")
+    private String periodoDestino;
+}

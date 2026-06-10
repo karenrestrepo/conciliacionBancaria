@@ -52,6 +52,13 @@ public class SugerenciaRepositoryAdapter implements SugerenciaRepositoryPort {
         jpaRepository.deleteByIdConciliacion(idConciliacion);
     }
 
+    @Override
+    public void eliminarPendientesPorConciliacion(Long idConciliacion) {
+        jpaRepository.deleteByIdConciliacionAndEstado(
+                idConciliacion,
+                com.conciliacion.bancaria.shared.EstadoSugerencia.PENDIENTE_REVISION);
+    }
+
     private SugerenciaEntity toEntity(Sugerencia s) {
         return SugerenciaEntity.builder()
                 .id(s.getId())

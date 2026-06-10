@@ -10,5 +10,7 @@ public interface RevisionUseCase {
 
     Sugerencia aceptarSugerencia(Long idSugerencia, Long idUsuario);
 
+    List<Sugerencia> aceptarLote(List<Long> idsSugerencias, Long idUsuario);
+
     Sugerencia rechazarSugerencia(Long idSugerencia, Long idUsuario);
 }

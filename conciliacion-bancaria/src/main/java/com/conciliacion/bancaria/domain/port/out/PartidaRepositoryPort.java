@@ -20,4 +20,8 @@ public interface PartidaRepositoryPort {
     PartidaConciliatoria actualizar(PartidaConciliatoria partida);
 
     void eliminarPorConciliacion(Long idConciliacion);
+
+    void eliminarPendientesPorConciliacion(Long idConciliacion);
+
+    List<PartidaConciliatoria> buscarPendientesDeOtrasConciliaciones(Long idCuenta, Long idConciliacionActual);
 }

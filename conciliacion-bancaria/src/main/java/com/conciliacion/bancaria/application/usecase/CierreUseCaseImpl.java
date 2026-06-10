@@ -62,8 +62,21 @@ public class CierreUseCaseImpl implements CierreUseCase {
     }
 
     @Override
+    @Transactional
+    public PartidaConciliatoria arrastrarPartida(Long idPartida, String periodoDestino, Long idUsuario) {
+        return closureService.arrastrarPartida(idPartida, periodoDestino, idUsuario);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<PartidaConciliatoria> listarPartidas(Long idConciliacion) {
         return partidaRepo.buscarPorConciliacion(idConciliacion);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PartidaConciliatoria> listarPartidasHistoricas(Long idConciliacion) {
+        Long idCuenta = conciliacionRepo.obtenerIdCuentaPorConciliacion(idConciliacion);
+        return partidaRepo.buscarPendientesDeOtrasConciliaciones(idCuenta, idConciliacion);
     }
 }

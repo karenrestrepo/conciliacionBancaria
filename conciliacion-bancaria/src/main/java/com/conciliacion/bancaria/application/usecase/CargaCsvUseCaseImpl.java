@@ -83,11 +83,12 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
 
             movimientoRepo.guardarContables(contables, idConciliacion);
 
-            // Limpiar resultados del motor anterior y re-ejecutar con ambos archivos
-            sugerenciaRepo.eliminarPorConciliacion(idConciliacion);
-            partidaRepo.eliminarPorConciliacion(idConciliacion);
-            movimientoRepo.resetEstadosBancarios(idConciliacion);
-            movimientoRepo.resetEstadosContables(idConciliacion);
+            // Conservar sugerencias ACEPTADAS y partidas JUSTIFICADAS/ARRASTRADAS;
+            // sólo resetear lo que aún no está conciliado.
+            sugerenciaRepo.eliminarPendientesPorConciliacion(idConciliacion);
+            partidaRepo.eliminarPendientesPorConciliacion(idConciliacion);
+            movimientoRepo.resetEstadosBancariosSugeridos(idConciliacion);
+            movimientoRepo.resetEstadosContablesSugeridos(idConciliacion);
 
             String jobId = jobRepo.crearJob(idConciliacion);
             ejecutarMotorAsync(jobId, idConciliacion);

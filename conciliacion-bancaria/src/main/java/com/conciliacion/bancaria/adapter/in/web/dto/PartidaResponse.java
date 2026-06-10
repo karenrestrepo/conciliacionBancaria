@@ -2,6 +2,7 @@ package com.conciliacion.bancaria.adapter.in.web.dto;
 
 import lombok.Builder;
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
@@ -14,4 +15,13 @@ public class PartidaResponse {
     private String estado;
     private String justificacion;
     private LocalDate fechaJustificacion;
+    private String periodoArrastre;
+
+    // Detalles del movimiento
+    private LocalDate fechaMovimiento;
+    private String descripcionMovimiento;
+    private BigDecimal montoMovimiento;
+    private String tipoMovimiento;
+
+    private boolean esHistorica;
 }

@@ -114,6 +114,17 @@ export class ApiService {
       { justificacion, fecha }, { headers: this.headers() });
   }
 
+  arrastrarPartida(idConciliacion: number, idPartida: number, periodoDestino: string): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(
+      `${this.API}/conciliaciones/${idConciliacion}/partidas/${idPartida}/arrastrar`,
+      { periodoDestino }, { headers: this.headers() });
+  }
+
+  listarPartidasHistoricas(idConciliacion: number): Observable<ApiResponse<any[]>> {
+    return this.http.get<ApiResponse<any[]>>(
+      `${this.API}/conciliaciones/${idConciliacion}/partidas-historicas`, { headers: this.headers() });
+  }
+
   // Sugerencias
   obtenerSugerencias(id: number): Observable<ApiResponse<Sugerencia[]>> {
     return this.http.get<ApiResponse<Sugerencia[]>>(
@@ -124,6 +135,12 @@ export class ApiService {
     return this.http.post<ApiResponse<Sugerencia>>(
       `${this.API}/conciliaciones/${idConciliacion}/sugerencias/${idSugerencia}/aceptar`,
       {}, { headers: this.headers() });
+  }
+
+  aceptarSugerenciasLote(idConciliacion: number, ids: number[]): Observable<ApiResponse<Sugerencia[]>> {
+    return this.http.post<ApiResponse<Sugerencia[]>>(
+      `${this.API}/conciliaciones/${idConciliacion}/sugerencias/aceptar-lote`,
+      ids, { headers: this.headers() });
   }
 
   rechazarSugerencia(idConciliacion: number, idSugerencia: number): Observable<ApiResponse<Sugerencia>> {

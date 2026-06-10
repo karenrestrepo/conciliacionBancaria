@@ -15,4 +15,7 @@ public interface SugerenciaJpaRepository extends JpaRepository<SugerenciaEntity,
     long countByEstado(EstadoSugerencia estado);
 
     void deleteByIdConciliacion(Long idConciliacion);
+
+    @org.springframework.data.jpa.repository.Modifying
+    void deleteByIdConciliacionAndEstado(Long idConciliacion, EstadoSugerencia estado);
 }

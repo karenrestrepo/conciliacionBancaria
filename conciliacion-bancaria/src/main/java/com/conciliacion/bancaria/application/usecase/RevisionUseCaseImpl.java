@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -45,6 +46,20 @@ public class RevisionUseCaseImpl implements RevisionUseCase {
 
         eventLog.actionAccept(sugerencia.getIdConciliacion(), idSugerencia, idUsuario);
         return guardada;
+    }
+
+    @Override
+    @Transactional
+    public List<Sugerencia> aceptarLote(List<Long> idsSugerencias, Long idUsuario) {
+        List<Sugerencia> aceptadas = new ArrayList<>();
+        for (Long id : idsSugerencias) {
+            try {
+                aceptadas.add(aceptarSugerencia(id, idUsuario));
+            } catch (Exception e) {
+                // Ignorar sugerencias que ya no están pendientes
+            }
+        }
+        return aceptadas;
     }
 
     @Override

@@ -20,4 +20,6 @@ public interface ConciliacionRepositoryPort {
     boolean existePorPeriodoYCuenta(String periodo, Long idCuenta);
 
     EstadoConciliacion obtenerEstado(Long id);
+
+    Long obtenerIdCuentaPorConciliacion(Long idConciliacion);
 }

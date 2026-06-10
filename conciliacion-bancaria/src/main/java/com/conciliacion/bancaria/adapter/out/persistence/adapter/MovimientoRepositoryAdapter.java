@@ -63,6 +63,30 @@ public class MovimientoRepositoryAdapter implements MovimientoRepositoryPort {
     }
 
     @Override
+    public void resetEstadosBancariosSugeridos(Long idConciliacion) {
+        bancarioRepo.resetSugeridos(idConciliacion);
+    }
+
+    @Override
+    public void resetEstadosContablesSugeridos(Long idConciliacion) {
+        contableRepo.resetSugeridos(idConciliacion);
+    }
+
+    @Override
+    public List<Movimiento> buscarBancariosPendientesPorConciliacion(Long idConciliacion) {
+        return bancarioRepo.findPendientesByIdConciliacion(idConciliacion).stream()
+                .map(MovimientoMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Movimiento> buscarBancariosPorIds(List<Long> ids) {
+        return bancarioRepo.findByIdIn(ids).stream()
+                .map(MovimientoMapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public Movimiento actualizar(Movimiento movimiento, Long idConciliacion,
                                  String tipo) {
         if ("BANCARIO".equals(tipo)) {
