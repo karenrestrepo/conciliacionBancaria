@@ -22,4 +22,8 @@ public interface MovimientoContableJpaRepository
     @Modifying
     @Query("UPDATE MovimientoContableEntity m SET m.estadoConciliacion = 'PENDIENTE' WHERE m.idConciliacion = :idConciliacion AND m.estadoConciliacion = 'SUGERIDO'")
     void resetSugeridos(@Param("idConciliacion") Long idConciliacion);
+
+    @Modifying
+    @Query("DELETE FROM MovimientoContableEntity m WHERE m.idConciliacion = :idConciliacion AND m.estadoConciliacion != 'CONCILIADO'")
+    void deleteNoConciliadosByIdConciliacion(@Param("idConciliacion") Long idConciliacion);
 }

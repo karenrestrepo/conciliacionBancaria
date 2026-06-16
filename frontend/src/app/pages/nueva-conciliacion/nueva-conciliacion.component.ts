@@ -13,7 +13,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatStepperModule } from '@angular/material/stepper';
 import { MatDividerModule } from '@angular/material/divider';
 import { ApiService } from '../../core/api.service';
-import { Banco, Cuenta, Conciliacion } from '../../core/models';
+import { Banco, Cuenta, Conciliacion, ConfiguracionExtracto } from '../../core/models';
 import { interval, Subscription } from 'rxjs';
 import { switchMap, takeWhile } from 'rxjs/operators';
 
@@ -123,21 +123,44 @@ import { switchMap, takeWhile } from 'rxjs/operators';
           <mat-card class="step-card">
             <mat-card-header>
               <mat-card-title>Cargar extracto bancario</mat-card-title>
-              <mat-card-subtitle>Archivo CSV con los movimientos del banco</mat-card-subtitle>
+              <mat-card-subtitle>
+                {{ configuracionExtracto
+                    ? 'Configuración: ' + configuracionExtracto.nombre + ' — ' + configuracionExtracto.tipoArchivo
+                    : 'Archivo con los movimientos del banco' }}
+              </mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
-              <div class="csv-format-info">
+              <!-- Con configuración XLSX/XLS -->
+              <div class="csv-format-info" *ngIf="configuracionExtracto">
+                <mat-icon>check_circle</mat-icon>
+                <span>
+                  Se usará la configuración <strong>{{ configuracionExtracto.nombre }}</strong>
+                  para parsear el archivo <strong>{{ configuracionExtracto.tipoArchivo }}</strong>.
+                </span>
+              </div>
+              <!-- Sin configuración: formato CSV estándar -->
+              <div class="csv-format-info csv-format-warn" *ngIf="!configuracionExtracto && conciliacion">
+                <mat-icon>warning_amber</mat-icon>
+                <span>
+                  No se encontró configuración de extracto para este banco.
+                  Se esperará un CSV con columnas: <strong>fecha, descripcion, monto, tipo_movimiento</strong>.
+                </span>
+              </div>
+              <div class="csv-format-info" *ngIf="!conciliacion">
                 <mat-icon>info_outline</mat-icon>
-                <span>Columnas requeridas: <strong>fecha, descripcion, monto, tipo_movimiento</strong></span>
+                <span>Columnas requeridas (CSV): <strong>fecha, descripcion, monto, tipo_movimiento</strong></span>
               </div>
 
               <div class="upload-area" (click)="extractoInput.click()"
                    [class.has-file]="extractoFile">
                 <mat-icon>{{ extractoFile ? 'description' : 'upload_file' }}</mat-icon>
-                <span *ngIf="!extractoFile">Haga clic para seleccionar el archivo CSV</span>
+                <span *ngIf="!extractoFile">
+                  Haga clic para seleccionar
+                  {{ configuracionExtracto ? 'el archivo ' + configuracionExtracto.tipoArchivo : 'el archivo CSV' }}
+                </span>
                 <span *ngIf="extractoFile">{{ extractoFile.name }}</span>
               </div>
-              <input #extractoInput type="file" accept=".csv"
+              <input #extractoInput type="file" [attr.accept]="acceptExtracto"
                      (change)="onExtractoSelected($event)" hidden>
 
               <div class="job-progress" *ngIf="jobProgreso > 0 || jobEstado === 'IN_PROGRESS'">
@@ -301,6 +324,8 @@ import { switchMap, takeWhile } from 'rxjs/operators';
     }
 
     .csv-format-info mat-icon { font-size: 18px; color: #3d7ebf; }
+    .csv-format-warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+    .csv-format-warn mat-icon { color: #d97706; }
 
     .upload-area {
       border: 2px dashed #d1d5db;
@@ -427,6 +452,7 @@ export class NuevaConciliacionComponent implements OnInit {
   conciliacion: Conciliacion | null = null;
   bancos: Banco[] = [];
   cuentas: Cuenta[] = [];
+  configuracionExtracto: ConfiguracionExtracto | null = null;
   extractoFile: File | null = null;
   auxiliarFile: File | null = null;
   extractoCargado = false;
@@ -440,6 +466,15 @@ export class NuevaConciliacionComponent implements OnInit {
   jobProgreso = 0;
   jobEstado = '';
   private pollSub?: Subscription;
+
+  get acceptExtracto(): string {
+    if (!this.configuracionExtracto) return '.csv';
+    const tipo = this.configuracionExtracto.tipoArchivo.toLowerCase();
+    const map: Record<string, string> = {
+      csv: '.csv', txt: '.txt', xls: '.xls', xlsx: '.xlsx', pdf: '.pdf'
+    };
+    return map[tipo] ?? '.csv,.xls,.xlsx,.txt';
+  }
 
   constructor(
     private fb: FormBuilder,
@@ -462,17 +497,40 @@ export class NuevaConciliacionComponent implements OnInit {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.api.obtenerConciliacion(+id).subscribe({
-        next: res => { this.conciliacion = res.data; }
+        next: res => {
+          this.conciliacion = res.data;
+          if (res.data.idBanco) {
+            this.cargarConfiguracionExtracto(res.data.idBanco, res.data.idCuenta);
+          }
+        }
       });
     }
   }
 
   onBancoChange(idBanco: number): void {
     this.cuentas = [];
+    this.configuracionExtracto = null;
     this.periodoForm.patchValue({ idCuenta: null });
     if (!idBanco) return;
     this.api.listarCuentasPorBanco(idBanco).subscribe({
       next: res => { this.cuentas = res.data; }
+    });
+    this.cargarConfiguracionExtracto(idBanco, null);
+  }
+
+  cargarConfiguracionExtracto(idBanco: number, idCuenta: number | null): void {
+    this.api.listarConfiguracionesPorBanco(idBanco).subscribe({
+      next: res => {
+        const activas = res.data.filter(c => c.activo);
+        // Preferir configuración específica de la cuenta; si no, la general
+        const especifica = idCuenta
+          ? activas.find(c => !c.aplicaParaTodasLasCuentas && c.idsCuentas?.includes(idCuenta))
+          : null;
+        this.configuracionExtracto = especifica
+          ?? activas.find(c => c.aplicaParaTodasLasCuentas)
+          ?? activas[0]
+          ?? null;
+      }
     });
   }
 
@@ -485,6 +543,9 @@ export class NuevaConciliacionComponent implements OnInit {
       next: res => {
         this.conciliacion = res.data;
         this.loadingPeriodo = false;
+        // Refinar la config con la cuenta ya conocida
+        const idBanco = this.periodoForm.get('idBanco')?.value;
+        if (idBanco) this.cargarConfiguracionExtracto(idBanco, idCuenta);
       },
       error: err => {
         this.loadingPeriodo = false;

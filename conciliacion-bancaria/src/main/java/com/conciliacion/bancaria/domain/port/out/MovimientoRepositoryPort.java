@@ -26,4 +26,16 @@ public interface MovimientoRepositoryPort {
     List<Movimiento> buscarBancariosPendientesPorConciliacion(Long idConciliacion);
 
     List<Movimiento> buscarBancariosPorIds(List<Long> ids);
+
+    /** Devuelve los movimientos del extracto que fueron agrupados como gastos bancarios (estado AGRUPADO). */
+    List<Movimiento> buscarBancariosAgrupadosPorConciliacion(Long idConciliacion);
+
+    /** Elimina todos los movimientos bancarios que no están CONCILIADO (para re-carga del extracto). */
+    void eliminarBancariosNoConciliadosPorConciliacion(Long idConciliacion);
+
+    /** Elimina todos los movimientos contables que no están CONCILIADO (para re-carga del auxiliar). */
+    void eliminarContablesNoConciliadosPorConciliacion(Long idConciliacion);
+
+    /** Marca un movimiento bancario con el estado dado (ej. AGRUPADO). */
+    void actualizarEstadoBancario(Long idMovimiento, com.conciliacion.bancaria.shared.EstadoMovimiento estado);
 }

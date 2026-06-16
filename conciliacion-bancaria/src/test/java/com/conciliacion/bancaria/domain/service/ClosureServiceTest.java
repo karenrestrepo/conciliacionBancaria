@@ -6,6 +6,8 @@ import com.conciliacion.bancaria.domain.exception.PartidaPendienteException;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
 import com.conciliacion.bancaria.domain.model.PartidaConciliatoria;
 import com.conciliacion.bancaria.domain.port.out.ConciliacionRepositoryPort;
+import com.conciliacion.bancaria.domain.port.out.ConfiguracionGastoBancarioRepositoryPort;
+import com.conciliacion.bancaria.domain.port.out.MovimientoRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.PartidaRepositoryPort;
 import com.conciliacion.bancaria.shared.EstadoConciliacion;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,12 +33,14 @@ class ClosureServiceTest {
 
     @Mock private ConciliacionRepositoryPort conciliacionRepo;
     @Mock private PartidaRepositoryPort partidaRepo;
+    @Mock private MovimientoRepositoryPort movimientoRepo;
+    @Mock private ConfiguracionGastoBancarioRepositoryPort gastoRepo;
 
     private ClosureService closureService;
 
     @BeforeEach
     void setUp() {
-        closureService = new ClosureService(conciliacionRepo, partidaRepo);
+        closureService = new ClosureService(conciliacionRepo, partidaRepo, movimientoRepo, gastoRepo);
     }
 
     private Conciliacion enEstado(EstadoConciliacion estado) {

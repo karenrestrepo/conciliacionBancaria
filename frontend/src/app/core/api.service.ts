@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
-import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, MetricasResumen, ConfiguracionExtracto } from './models';
+import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, MetricasResumen, ConfiguracionExtracto, GastoBancario, MovimientoAgrupado } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -93,6 +93,16 @@ export class ApiService {
       `${this.API}/conciliaciones/jobs/${jobId}/status`, { headers: this.headers() });
   }
 
+  cruzarPartidas(id: number, idOrigen: number, idsDestino: number[], tipo: string): Observable<ApiResponse<any[]>> {
+    return this.http.post<ApiResponse<any[]>>(
+      `${this.API}/conciliaciones/${id}/partidas/cruzar`, { idOrigen, idsDestino, tipo }, { headers: this.headers() });
+  }
+
+  reprocesarMotor(id: number): Observable<ApiResponse<string>> {
+    return this.http.post<ApiResponse<string>>(
+      `${this.API}/conciliaciones/${id}/reprocesar`, {}, { headers: this.headers() });
+  }
+
   pasarARevision(id: number): Observable<ApiResponse<Conciliacion>> {
     return this.http.post<ApiResponse<Conciliacion>>(
       `${this.API}/conciliaciones/${id}/revision`, {}, { headers: this.headers() });
@@ -147,6 +157,28 @@ export class ApiService {
     return this.http.post<ApiResponse<Sugerencia>>(
       `${this.API}/conciliaciones/${idConciliacion}/sugerencias/${idSugerencia}/rechazar`,
       {}, { headers: this.headers() });
+  }
+
+  listarGastosAgrupadosConciliacion(idConciliacion: number): Observable<ApiResponse<MovimientoAgrupado[]>> {
+    return this.http.get<ApiResponse<MovimientoAgrupado[]>>(
+      `${this.API}/conciliaciones/${idConciliacion}/gastos-bancarios-agrupados`, { headers: this.headers() });
+  }
+
+  // Gastos bancarios (agrupación de cargos recurrentes del extracto)
+  listarGastosBancarios(idCuenta: number): Observable<ApiResponse<GastoBancario[]>> {
+    return this.http.get<ApiResponse<GastoBancario[]>>(
+      `${this.API}/cuentas/${idCuenta}/gastos-bancarios`, { headers: this.headers() });
+  }
+
+  agregarGastoBancario(idCuenta: number, descripcion: string): Observable<ApiResponse<GastoBancario>> {
+    return this.http.post<ApiResponse<GastoBancario>>(
+      `${this.API}/cuentas/${idCuenta}/gastos-bancarios`,
+      { descripcion }, { headers: this.headers() });
+  }
+
+  eliminarGastoBancario(idCuenta: number, id: number): Observable<ApiResponse<void>> {
+    return this.http.delete<ApiResponse<void>>(
+      `${this.API}/cuentas/${idCuenta}/gastos-bancarios/${id}`, { headers: this.headers() });
   }
 
   // Métricas

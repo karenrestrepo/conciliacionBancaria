@@ -25,6 +25,7 @@ public class ConciliacionController {
     private final RevisionUseCase revisionUseCase;
     private final CierreUseCase cierreUseCase;
     private final JobStatusUseCase jobStatusUseCase;
+    private final com.conciliacion.bancaria.domain.port.out.MovimientoRepositoryPort movimientoRepo;
 
     // ── Iniciar conciliación (AUXILIAR, CONTADOR) ─────────────────────────────
 
@@ -87,6 +88,15 @@ public class ConciliacionController {
 
         cargaCsvUseCase.cargarLibroAuxiliar(id, archivo);
         return ResponseEntity.ok(ApiResponse.ok("Libro auxiliar cargado", null));
+    }
+
+    // ── Re-procesar motor (sin re-subir archivos) ─────────────────────────────
+
+    @PostMapping("/{id}/reprocesar")
+    @PreAuthorize("hasAnyRole('AUXILIAR','CONTADOR','ADMIN')")
+    public ResponseEntity<ApiResponse<String>> reprocesar(@PathVariable Long id) {
+        String jobId = cargaCsvUseCase.reprocesarMotor(id);
+        return ResponseEntity.ok(ApiResponse.ok("Motor re-iniciado", jobId));
     }
 
     // ── Polling del motor ─────────────────────────────────────────────────────
@@ -196,6 +206,20 @@ public class ConciliacionController {
         return ResponseEntity.ok(ApiResponse.ok("Partida marcada para próximo mes", toPartidaResponse(arrastrada)));
     }
 
+    // ── Cruzar partidas manualmente ───────────────────────────────────────────
+
+    @PostMapping("/{id}/partidas/cruzar")
+    @PreAuthorize("hasAnyRole('CONTADOR','ADMIN')")
+    public ResponseEntity<ApiResponse<List<PartidaResponse>>> cruzarPartidas(
+            @PathVariable Long id,
+            @Valid @RequestBody CruzarPartidasRequest request) {
+        List<PartidaResponse> resultado = cierreUseCase
+                .cruzarPartidas(id, request.getIdOrigen(), request.getIdsDestino(), request.getTipo()).stream()
+                .map(this::toPartidaResponse)
+                .toList();
+        return ResponseEntity.ok(ApiResponse.ok("Partidas cruzadas", resultado));
+    }
+
     // ── Partidas históricas (de conciliaciones anteriores del mismo cuenta) ──
 
     @GetMapping("/{id}/partidas-historicas")
@@ -204,6 +228,26 @@ public class ConciliacionController {
             @PathVariable Long id) {
         java.util.List<PartidaResponse> lista = cierreUseCase.listarPartidasHistoricas(id)
                 .stream().map(this::toPartidaResponse).toList();
+        return ResponseEntity.ok(ApiResponse.ok(lista));
+    }
+
+    // ── Gastos bancarios agrupados ────────────────────────────────────────────
+
+    @GetMapping("/{id}/gastos-bancarios-agrupados")
+    @PreAuthorize("hasAnyRole('AUXILIAR','CONTADOR','FINANZAS','ADMIN')")
+    public ResponseEntity<ApiResponse<java.util.List<MovimientoAgrupadoResponse>>> gastosAgrupados(
+            @PathVariable Long id) {
+        java.util.List<MovimientoAgrupadoResponse> lista = movimientoRepo
+                .buscarBancariosAgrupadosPorConciliacion(id)
+                .stream()
+                .map(m -> MovimientoAgrupadoResponse.builder()
+                        .id(m.getId())
+                        .descripcion(m.getDescripcion())
+                        .monto(m.getMonto())
+                        .fecha(m.getFecha())
+                        .tipo(m.getTipo())
+                        .build())
+                .toList();
         return ResponseEntity.ok(ApiResponse.ok(lista));
     }
 

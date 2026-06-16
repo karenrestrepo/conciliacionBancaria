@@ -41,6 +41,7 @@ public class MovimientoRepositoryAdapter implements MovimientoRepositoryPort {
     @Override
     public List<Movimiento> buscarBancariosPorConciliacion(Long idConciliacion) {
         return bancarioRepo.findByIdConciliacion(idConciliacion).stream()
+                .filter(e -> e.getEstadoConciliacion() != com.conciliacion.bancaria.shared.EstadoMovimiento.AGRUPADO)
                 .map(MovimientoMapper::toDomain)
                 .toList();
     }
@@ -84,6 +85,28 @@ public class MovimientoRepositoryAdapter implements MovimientoRepositoryPort {
         return bancarioRepo.findByIdIn(ids).stream()
                 .map(MovimientoMapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public List<Movimiento> buscarBancariosAgrupadosPorConciliacion(Long idConciliacion) {
+        return bancarioRepo.findAgrupadosByIdConciliacion(idConciliacion).stream()
+                .map(MovimientoMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public void eliminarBancariosNoConciliadosPorConciliacion(Long idConciliacion) {
+        bancarioRepo.deleteNoConciliadosByIdConciliacion(idConciliacion);
+    }
+
+    @Override
+    public void eliminarContablesNoConciliadosPorConciliacion(Long idConciliacion) {
+        contableRepo.deleteNoConciliadosByIdConciliacion(idConciliacion);
+    }
+
+    @Override
+    public void actualizarEstadoBancario(Long idMovimiento, com.conciliacion.bancaria.shared.EstadoMovimiento estado) {
+        bancarioRepo.actualizarEstado(idMovimiento, estado);
     }
 
     @Override

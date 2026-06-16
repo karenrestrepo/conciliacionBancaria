@@ -27,4 +27,15 @@ public interface MovimientoBancarioJpaRepository
     List<MovimientoBancarioEntity> findPendientesByIdConciliacion(@Param("idConciliacion") Long idConciliacion);
 
     List<MovimientoBancarioEntity> findByIdIn(List<Long> ids);
+
+    @Query("SELECT m FROM MovimientoBancarioEntity m WHERE m.idConciliacion = :idConciliacion AND m.estadoConciliacion = 'AGRUPADO' ORDER BY m.descripcion, m.fecha")
+    List<MovimientoBancarioEntity> findAgrupadosByIdConciliacion(@Param("idConciliacion") Long idConciliacion);
+
+    @Modifying
+    @Query("DELETE FROM MovimientoBancarioEntity m WHERE m.idConciliacion = :idConciliacion AND m.estadoConciliacion != 'CONCILIADO'")
+    void deleteNoConciliadosByIdConciliacion(@Param("idConciliacion") Long idConciliacion);
+
+    @Modifying
+    @Query("UPDATE MovimientoBancarioEntity m SET m.estadoConciliacion = :estado WHERE m.id = :id")
+    void actualizarEstado(@Param("id") Long id, @Param("estado") EstadoMovimiento estado);
 }

@@ -79,4 +79,10 @@ public class CierreUseCaseImpl implements CierreUseCase {
         Long idCuenta = conciliacionRepo.obtenerIdCuentaPorConciliacion(idConciliacion);
         return partidaRepo.buscarPendientesDeOtrasConciliaciones(idCuenta, idConciliacion);
     }
+
+    @Override
+    @Transactional
+    public List<PartidaConciliatoria> cruzarPartidas(Long idConciliacion, Long idOrigen, List<Long> idsDestino, String tipo) {
+        return closureService.cruzarPartidas(idOrigen, idsDestino, tipo, idConciliacion);
+    }
 }

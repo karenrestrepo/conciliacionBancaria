@@ -16,4 +16,6 @@ public interface CierreUseCase {
     java.util.List<PartidaConciliatoria> listarPartidas(Long idConciliacion);
 
     java.util.List<PartidaConciliatoria> listarPartidasHistoricas(Long idConciliacion);
+
+    java.util.List<PartidaConciliatoria> cruzarPartidas(Long idConciliacion, Long idOrigen, java.util.List<Long> idsDestino, String tipo);
 }

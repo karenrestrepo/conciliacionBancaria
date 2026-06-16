@@ -1,10 +1,14 @@
 package com.conciliacion.bancaria.config;
 
 import com.conciliacion.bancaria.domain.port.out.ConciliacionRepositoryPort;
+import com.conciliacion.bancaria.domain.port.out.ConfiguracionGastoBancarioRepositoryPort;
+import com.conciliacion.bancaria.domain.port.out.MovimientoRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.PartidaRepositoryPort;
 import com.conciliacion.bancaria.domain.service.ClosureService;
 import com.conciliacion.bancaria.domain.service.ConciliationEngine;
 import com.conciliacion.bancaria.domain.service.CsvValidatorService;
+import com.conciliacion.bancaria.domain.service.ExtractoBancarioTxtAnchoFijoParserService;
+import com.conciliacion.bancaria.domain.service.ExtractoBancarioXlsxParserService;
 import com.conciliacion.bancaria.domain.service.SiesaXlsParserService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,13 +31,25 @@ public class DomainConfig {
     }
 
     @Bean
+    public ExtractoBancarioXlsxParserService extractoBancarioXlsxParserService() {
+        return new ExtractoBancarioXlsxParserService();
+    }
+
+    @Bean
+    public ExtractoBancarioTxtAnchoFijoParserService extractoBancarioTxtAnchoFijoParserService() {
+        return new ExtractoBancarioTxtAnchoFijoParserService();
+    }
+
+    @Bean
     public ConciliationEngine conciliationEngine() {
         return new ConciliationEngine();
     }
 
     @Bean
     public ClosureService closureService(ConciliacionRepositoryPort conciliacionRepo,
-                                         PartidaRepositoryPort partidaRepo) {
-        return new ClosureService(conciliacionRepo, partidaRepo);
+                                         PartidaRepositoryPort partidaRepo,
+                                         MovimientoRepositoryPort movimientoRepo,
+                                         ConfiguracionGastoBancarioRepositoryPort gastoRepo) {
+        return new ClosureService(conciliacionRepo, partidaRepo, movimientoRepo, gastoRepo);
     }
 }

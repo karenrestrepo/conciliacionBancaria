@@ -126,6 +126,17 @@ import { Banco, Cuenta, TipoCuenta } from '../../core/models';
             </td>
           </ng-container>
 
+          <ng-container matColumnDef="gastos">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let row">
+              <button mat-stroked-button class="gastos-btn"
+                      [routerLink]="['/cuentas', row.id, 'gastos-bancarios']">
+                <mat-icon>account_balance</mat-icon>
+                Gastos bancarios
+              </button>
+            </td>
+          </ng-container>
+
           <ng-container matColumnDef="acciones">
             <th mat-header-cell *matHeaderCellDef></th>
             <td mat-cell *matCellDef="let row">
@@ -249,6 +260,15 @@ import { Banco, Cuenta, TipoCuenta } from '../../core/models';
     .activo   { background: #dcfce7; color: #166534; }
     .inactivo { background: #fee2e2; color: #991b1b; }
 
+    .gastos-btn {
+      border-color: #7c3aed !important;
+      color: #7c3aed !important;
+      border-radius: 8px !important;
+      height: 34px;
+      font-size: 13px;
+      gap: 4px;
+    }
+
     .btn-activar   { color: #16a34a !important; }
     .btn-desactivar { color: #d97706 !important; }
     .btn-eliminar  { color: #dc2626 !important; }
@@ -262,7 +282,7 @@ export class CuentasComponent implements OnInit {
   errorCrear = '';
   accionando: number | null = null;
   get columns(): string[] {
-    const base = ['numeroCuenta', 'tipo', 'descripcion', 'activo'];
+    const base = ['numeroCuenta', 'tipo', 'descripcion', 'activo', 'gastos'];
     return this.canCreate() ? [...base, 'acciones'] : base;
   }
   cuentaForm: FormGroup;

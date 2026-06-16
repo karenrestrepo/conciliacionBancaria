@@ -7,7 +7,6 @@ public class ConfiguracionDetalleDTO {
 
     private String separador;
     private Integer filasASaltar;
-    private Boolean tieneEncabezado;
     private Integer columnaFecha;
     private String formatoFecha;
     private Integer columnaDescripcion;
@@ -18,4 +17,10 @@ public class ConfiguracionDetalleDTO {
     private Boolean debitoYCreditoSeparados;
     private String encoding;
     private Integer numeroHoja;
+    private Double factorMonto;
+    private String separadorMiles;
+    private String separadorDecimales;
+
+    /** Solo para tipoArchivo=TXT: "DELIMITADO" (CSV genérico) o "ANCHO_FIJO" (ej. extracto Davivienda). */
+    private String formatoTxt;
 }

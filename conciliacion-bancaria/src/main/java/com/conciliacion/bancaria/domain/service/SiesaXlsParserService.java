@@ -3,6 +3,7 @@ package com.conciliacion.bancaria.domain.service;
 import com.conciliacion.bancaria.domain.exception.CsvValidationException;
 import com.conciliacion.bancaria.domain.model.Movimiento;
 import com.conciliacion.bancaria.shared.EstadoMovimiento;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.NumberToTextConverter;
 
@@ -32,6 +33,7 @@ import java.util.List;
  * Filas cuyo valor sea cero en ambas columnas de monto (totales, subtotales,
  * filas de saldo) son ignoradas.
  */
+@Slf4j
 public class SiesaXlsParserService {
 
     private static final int FILAS_ENCABEZADO = 17;
@@ -134,9 +136,8 @@ public class SiesaXlsParserService {
             }
         }
 
-        throw new CsvValidationException(
-                "Fila " + numFila + ": fecha inválida '" + texto
-                + "'. Formatos aceptados: dd/MM/yyyy, yyyy-MM-dd");
+        log.debug("Fila {}: fecha '{}' no reconocida — fila omitida", numFila, texto);
+        return null;
     }
 
     private BigDecimal leerMonto(Row fila, int col) {

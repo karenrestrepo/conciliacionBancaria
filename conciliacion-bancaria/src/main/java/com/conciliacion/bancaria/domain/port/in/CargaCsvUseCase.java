@@ -9,4 +9,6 @@ public interface CargaCsvUseCase {
                                   String nombreBanco);
 
     String cargarLibroAuxiliar(Long idConciliacion, MultipartFile archivo);
+
+    String reprocesarMotor(Long idConciliacion);
 }

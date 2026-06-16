@@ -45,6 +45,10 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/cuentas/cuentas.component').then(m => m.CuentasComponent)
       },
       {
+        path: 'cuentas/:idCuenta/gastos-bancarios',
+        loadComponent: () => import('./pages/gastos-bancarios/gastos-bancarios.component').then(m => m.GastosBancariosComponent)
+      },
+      {
         path: 'configuracion-extracto',
         loadComponent: () => import('./pages/configuracion-extracto/configuracion-extracto.component').then(m => m.ConfiguracionExtractoComponent)
       },

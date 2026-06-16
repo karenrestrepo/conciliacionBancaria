@@ -12,9 +12,10 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { SelectionModel } from '@angular/cdk/collections';
+import { CurrencyPipe } from '@angular/common';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
-import { Conciliacion, Sugerencia } from '../../core/models';
+import { Conciliacion, Sugerencia, MovimientoAgrupado, GrupoGastoBancario } from '../../core/models';
 
 @Component({
   selector: 'app-sugerencias',
@@ -23,7 +24,7 @@ import { Conciliacion, Sugerencia } from '../../core/models';
     CommonModule, RouterModule, MatCardModule, MatTableModule,
     MatIconModule, MatButtonModule, MatChipsModule,
     MatProgressSpinnerModule, MatTooltipModule, MatDividerModule,
-    MatSnackBarModule, MatCheckboxModule
+    MatSnackBarModule, MatCheckboxModule, CurrencyPipe
   ],
   template: `
     <div class="page-container">
@@ -51,8 +52,22 @@ import { Conciliacion, Sugerencia } from '../../core/models';
           <button mat-stroked-button class="partidas-btn"
                   *ngIf="conciliacion?.estado === 'EN_REVISION'"
                   [routerLink]="['/partidas', idConciliacion]">
-            <mat-icon>list_alt</mat-icon>
-            Ver Partidas
+            <mat-icon>pending_actions</mat-icon>
+            Ver Pendientes
+          </button>
+          <button mat-stroked-button class="gastos-btn"
+                  *ngIf="conciliacion"
+                  (click)="toggleGastos()">
+            <mat-icon>account_balance</mat-icon>
+            Gastos bancarios
+            <span class="gastos-badge" *ngIf="totalGastos > 0">{{ gruposGastos.length }}</span>
+          </button>
+          <!-- Reprocesar motor sin re-subir archivos -->
+          <button mat-stroked-button class="reprocesar-btn"
+                  *ngIf="conciliacion?.estado === 'EN_REVISION' && canReview()"
+                  (click)="reprocesar()" [disabled]="reprocesando">
+            <mat-icon>refresh</mat-icon>
+            {{ reprocesando ? 'Procesando...' : 'Reprocesar' }}
           </button>
           <!-- Subir nuevo auxiliar en EN_REVISION -->
           <label *ngIf="conciliacion?.estado === 'EN_REVISION' && canReview()"
@@ -119,6 +134,107 @@ import { Conciliacion, Sugerencia } from '../../core/models';
             Limpiar selección
           </button>
         </div>
+
+        <!-- Cruces manuales completados -->
+        <section *ngIf="partidasCruzadas.length > 0" class="cruces-section">
+          <div class="cruces-header">
+            <mat-icon class="cruces-icon">compare_arrows</mat-icon>
+            <div>
+              <h2 class="cruces-title">Cruces manuales ({{ partidasCruzadas.length }})</h2>
+              <p class="cruces-subtitle">Partidas cruzadas manualmente — no generadas por el motor</p>
+            </div>
+          </div>
+          <mat-card *ngFor="let p of partidasCruzadas" class="cruce-card">
+            <mat-card-content>
+              <div class="cruce-row">
+                <span class="origen-badge" [class.bancario]="p.tipoOrigen === 'BANCARIO'"
+                                            [class.contable]="p.tipoOrigen === 'CONTABLE'">
+                  <mat-icon>{{ p.tipoOrigen === 'BANCARIO' ? 'account_balance' : 'book' }}</mat-icon>
+                  {{ p.tipoOrigen === 'BANCARIO' ? 'Bancario' : 'Contable' }}
+                </span>
+                <span class="cruce-fecha">{{ p.fechaMovimiento | date:'dd/MM/yyyy' }}</span>
+                <span class="cruce-desc" [title]="p.descripcionMovimiento">{{ p.descripcionMovimiento }}</span>
+                <span class="cruce-monto"
+                      [class.debito]="p.tipoMovimiento === 'DEBITO'"
+                      [class.credito]="p.tipoMovimiento === 'CREDITO'">
+                  {{ p.tipoMovimiento === 'DEBITO' ? '−' : '+' }}{{ p.montoMovimiento | currency:'COP':'symbol':'1.0-0' }}
+                </span>
+                <span class="cruce-estado">Cruzada</span>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        </section>
+
+        <!-- Panel gastos bancarios agrupados -->
+        <section *ngIf="mostrarGastos" class="gastos-section">
+          <div class="gastos-header">
+            <div class="gastos-title-row">
+              <mat-icon class="gastos-title-icon">account_balance</mat-icon>
+              <h2 class="gastos-title">Gastos bancarios agrupados</h2>
+              <span class="gastos-hint">Movimientos del extracto agrupados antes de la conciliación</span>
+            </div>
+            <button mat-icon-button (click)="mostrarGastos = false" class="close-gastos">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          <div *ngIf="cargandoGastos" class="loading-center">
+            <mat-spinner diameter="28"></mat-spinner>
+          </div>
+
+          <div *ngIf="!cargandoGastos && gruposGastos.length === 0" class="gastos-empty">
+            <mat-icon>info_outline</mat-icon>
+            <span>No hay gastos bancarios agrupados en esta conciliación.
+              Configura las descripciones en la cuenta correspondiente antes de subir el extracto.</span>
+          </div>
+
+          <ng-container *ngIf="!cargandoGastos && gruposGastos.length > 0">
+            <mat-card *ngFor="let grupo of gruposGastos" class="grupo-card">
+              <div class="grupo-header" (click)="toggleGrupo(grupo.descripcion)">
+                <div class="grupo-left">
+                  <mat-icon class="grupo-icon">label_outline</mat-icon>
+                  <span class="grupo-desc">{{ grupo.descripcion }}</span>
+                </div>
+                <div class="grupo-right">
+                  <span class="grupo-count">{{ grupo.count }} registro{{ grupo.count !== 1 ? 's' : '' }}</span>
+                  <span class="grupo-total" [ngClass]="grupo.tipo === 'DEBITO' ? 'monto-debito' : 'monto-credito'">
+                    {{ grupo.tipo === 'DEBITO' ? '−' : '+' }}
+                    {{ grupo.total | currency:'COP':'symbol':'1.0-2' }}
+                  </span>
+                  <mat-icon class="expand-icon">{{ isGrupoExpanded(grupo.descripcion) ? 'expand_less' : 'expand_more' }}</mat-icon>
+                </div>
+              </div>
+              <div *ngIf="isGrupoExpanded(grupo.descripcion)" class="grupo-detalle">
+                <mat-divider></mat-divider>
+                <table class="detalle-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Descripción en extracto</th>
+                      <th class="th-monto">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let mov of grupo.movimientos">
+                      <td class="td-fecha">{{ mov.fecha | date:'dd/MM/yyyy' }}</td>
+                      <td class="td-desc">{{ mov.descripcion }}</td>
+                      <td class="td-monto" [ngClass]="mov.tipo === 'DEBITO' ? 'monto-debito' : 'monto-credito'">
+                        {{ mov.tipo === 'DEBITO' ? '−' : '+' }}
+                        {{ mov.monto | currency:'COP':'symbol':'1.0-2' }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </mat-card>
+            <div class="gastos-total-row">
+              <span class="gastos-total-label">Total general gastos bancarios</span>
+              <span class="gastos-total-valor monto-debito">
+                − {{ totalGastos | currency:'COP':'symbol':'1.0-2' }}
+              </span>
+            </div>
+          </ng-container>
+        </section>
 
         <!-- Tabla -->
         <mat-card class="table-card">
@@ -236,6 +352,7 @@ import { Conciliacion, Sugerencia } from '../../core/models';
                 class="data-row" [ngClass]="getRowClass(row.estado)"></tr>
           </table>
         </mat-card>
+
       </ng-container>
     </div>
   `,
@@ -262,6 +379,10 @@ import { Conciliacion, Sugerencia } from '../../core/models';
     }
     .partidas-btn {
       border-color: #1a2332 !important; color: #1a2332 !important;
+      border-radius: 8px !important; height: 42px; gap: 6px;
+    }
+    .reprocesar-btn {
+      border-color: #3d7ebf !important; color: #3d7ebf !important;
       border-radius: 8px !important; height: 42px; gap: 6px;
     }
     .cerrar-btn {
@@ -368,6 +489,117 @@ import { Conciliacion, Sugerencia } from '../../core/models';
     .estado-borrador { color: #92400e; font-weight: 500; }
     .estado-revision { color: #9a3412; font-weight: 500; }
     .estado-cerrada { color: #166534; font-weight: 500; }
+
+    /* Cruces manuales */
+    .cruces-section {
+      margin-top: 28px; border: 1.5px solid #bfdbfe;
+      border-radius: 12px; padding: 20px 24px; background: #f0f7ff;
+    }
+    .cruces-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+    .cruces-icon { color: #1d4ed8; margin-top: 2px; font-size: 22px; }
+    .cruces-title { font-size: 17px; font-weight: 600; color: #1a2332; margin: 0 0 2px; }
+    .cruces-subtitle { font-size: 12px; color: #6b7a8d; margin: 0; }
+    .cruce-card { margin-bottom: 8px !important; border-radius: 8px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.05) !important; }
+    .cruce-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .cruce-fecha { font-size: 12px; color: #6b7a8d; flex-shrink: 0; }
+    .cruce-desc { flex: 1; font-size: 13px; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cruce-monto { font-size: 13px; font-weight: 600; flex-shrink: 0; }
+    .cruce-monto.debito  { color: #dc2626; }
+    .cruce-monto.credito { color: #16a34a; }
+    .cruce-estado { background: #dbeafe; color: #1e40af; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+    .origen-badge { display: flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; flex-shrink: 0; }
+    .origen-badge mat-icon { font-size: 13px; width: 13px; height: 13px; }
+    .origen-badge.bancario { background: #dbeafe; color: #1e40af; }
+    .origen-badge.contable { background: #ede9fe; color: #5b21b6; }
+
+    .gastos-btn {
+      border-color: #7c3aed !important; color: #7c3aed !important;
+      border-radius: 8px !important; height: 42px; gap: 6px; position: relative;
+    }
+    .gastos-badge {
+      background: #7c3aed; color: #fff;
+      border-radius: 10px; font-size: 11px; font-weight: 700;
+      padding: 1px 6px; margin-left: 4px;
+    }
+
+    .gastos-section {
+      margin-top: 28px;
+      border: 1.5px solid #ede9fe;
+      border-radius: 12px;
+      padding: 20px 24px;
+      background: #faf5ff;
+    }
+
+    .gastos-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 20px;
+    }
+    .gastos-title-row {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .gastos-title-icon { color: #7c3aed; }
+    .gastos-title { font-size: 17px; font-weight: 600; color: #1a2332; margin: 0; }
+    .gastos-hint { font-size: 12px; color: #7c3aed; background: #ede9fe; padding: 2px 10px; border-radius: 20px; }
+    .close-gastos { color: #6b7a8d !important; }
+
+    .loading-center { display: flex; justify-content: center; padding: 28px; }
+
+    .gastos-empty {
+      display: flex; align-items: flex-start; gap: 10px;
+      background: #f3f4f6; border-radius: 8px; padding: 16px;
+      font-size: 13px; color: #6b7a8d;
+    }
+    .gastos-empty mat-icon { color: #9ca3af; flex-shrink: 0; }
+
+    .grupo-card {
+      border-radius: 10px !important;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
+      margin-bottom: 10px !important;
+      overflow: hidden;
+    }
+
+    .grupo-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; cursor: pointer; user-select: none;
+      transition: background 0.15s;
+    }
+    .grupo-header:hover { background: #f5f3ff; }
+
+    .grupo-left { display: flex; align-items: center; gap: 10px; }
+    .grupo-icon { font-size: 18px; width: 18px; height: 18px; color: #7c3aed; }
+    .grupo-desc { font-size: 14px; font-weight: 600; color: #1a2332; font-family: monospace; }
+
+    .grupo-right { display: flex; align-items: center; gap: 16px; }
+    .grupo-count { font-size: 13px; color: #6b7a8d; }
+    .grupo-total { font-size: 15px; font-weight: 700; }
+    .monto-debito  { color: #dc2626; }
+    .monto-credito { color: #16a34a; }
+    .expand-icon { color: #7c3aed; transition: transform 0.2s; }
+
+    .grupo-detalle { padding: 0 18px 14px; }
+
+    .detalle-table {
+      width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px;
+    }
+    .detalle-table th {
+      text-align: left; font-size: 11px; font-weight: 600; color: #6b7a8d;
+      text-transform: uppercase; letter-spacing: 0.4px;
+      padding: 6px 12px; border-bottom: 1px solid #e5e7eb;
+    }
+    .detalle-table tr:hover td { background: #faf5ff; }
+    .td-fecha  { padding: 8px 12px; color: #6b7a8d; white-space: nowrap; }
+    .td-desc   { padding: 8px 12px; color: #1a2332; }
+    .td-monto  { padding: 8px 12px; text-align: right; font-weight: 600; white-space: nowrap; }
+    .th-monto  { text-align: right; }
+
+    .gastos-total-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 18px; margin-top: 8px;
+      background: #ede9fe; border-radius: 10px;
+      font-weight: 700;
+    }
+    .gastos-total-label { font-size: 14px; color: #4c1d95; }
+    .gastos-total-valor { font-size: 17px; }
   `]
 })
 export class SugerenciasComponent implements OnInit {
@@ -377,9 +609,21 @@ export class SugerenciasComponent implements OnInit {
   idConciliacion = 0;
   aceptandoLote = false;
   subiendoAuxiliar = false;
+  reprocesando = false;
   columns = ['select', 'confianza', 'criterio', 'movBancario', 'movContable', 'estado', 'acciones'];
 
   selection = new SelectionModel<Sugerencia>(true, []);
+
+  // Cruces manuales completados
+  partidasCruzadas: any[] = [];
+
+  // Gastos bancarios agrupados
+  mostrarGastos = false;
+  cargandoGastos = false;
+  gruposGastos: GrupoGastoBancario[] = [];
+  totalGastos = 0;
+  private gastosYaCargados = false;
+  private expandedGrupos = new Set<string>();
 
   constructor(
     private api: ApiService,
@@ -394,6 +638,17 @@ export class SugerenciasComponent implements OnInit {
       next: res => { this.conciliacion = res.data; }
     });
     this.cargarSugerencias();
+    this.cargarPartidasCruzadas();
+  }
+
+  cargarPartidasCruzadas(): void {
+    this.api.listarPartidas(this.idConciliacion).subscribe({
+      next: res => {
+        this.partidasCruzadas = (res.data as any[]).filter(
+          p => p.estado === 'CRUZADA' && !p.justificacion?.startsWith('INCOMPLETO|')
+        );
+      }
+    });
   }
 
   cargarSugerencias(): void {
@@ -443,15 +698,52 @@ export class SugerenciasComponent implements OnInit {
     });
   }
 
+  reprocesar(): void {
+    if (this.reprocesando) return;
+    this.reprocesando = true;
+    this.api.reprocesarMotor(this.idConciliacion).subscribe({
+      next: res => {
+        this.snackBar.open('Motor iniciado. Cargando sugerencias...', 'Cerrar', { duration: 4000 });
+        this.pollJobAndReload(res.data);
+      },
+      error: err => {
+        this.reprocesando = false;
+        this.snackBar.open(err.error?.message ?? 'Error al reprocesar', 'Cerrar', { duration: 4000 });
+      }
+    });
+  }
+
+  private pollJobAndReload(jobId: string): void {
+    const poll = () => {
+      this.api.jobStatus(jobId).subscribe({
+        next: res => {
+          if (res.data.estado === 'COMPLETED' || res.data.estado === 'FAILED') {
+            this.reprocesando = false;
+            if (res.data.estado === 'COMPLETED') {
+              this.api.obtenerConciliacion(this.idConciliacion).subscribe(r => { this.conciliacion = r.data; });
+              this.cargarSugerencias();
+            } else {
+              this.snackBar.open('Error en el motor: ' + (res.data.mensajeError ?? ''), 'Cerrar', { duration: 5000 });
+            }
+          } else {
+            setTimeout(poll, 1500);
+          }
+        },
+        error: () => { this.reprocesando = false; }
+      });
+    };
+    setTimeout(poll, 1500);
+  }
+
   onAuxiliarChange(event: Event): void {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file || this.subiendoAuxiliar) return;
     this.subiendoAuxiliar = true;
     this.api.cargarAuxiliar(this.idConciliacion, file).subscribe({
-      next: () => {
+      next: res => {
         this.subiendoAuxiliar = false;
         this.snackBar.open('Auxiliar cargado. Regenerando sugerencias...', 'Cerrar', { duration: 4000 });
-        setTimeout(() => this.cargarSugerencias(), 3000);
+        this.pollJobAndReload(res.data);
       },
       error: err => {
         this.subiendoAuxiliar = false;
@@ -500,6 +792,57 @@ export class SugerenciasComponent implements OnInit {
       }
     });
   }
+
+  // ── Gastos bancarios agrupados ─────────────────────────────────────────────
+
+  toggleGastos(): void {
+    this.mostrarGastos = !this.mostrarGastos;
+    if (this.mostrarGastos && !this.gastosYaCargados) {
+      this.cargarGastos();
+    }
+  }
+
+  cargarGastos(): void {
+    this.cargandoGastos = true;
+    this.api.listarGastosAgrupadosConciliacion(this.idConciliacion).subscribe({
+      next: res => {
+        this.gastosYaCargados = true;
+        this.cargandoGastos = false;
+        this.gruposGastos = this.agruparPorDescripcion(res.data);
+        this.totalGastos = this.gruposGastos.reduce((acc, g) => acc + g.total, 0);
+      },
+      error: () => { this.cargandoGastos = false; }
+    });
+  }
+
+  private agruparPorDescripcion(movimientos: MovimientoAgrupado[]): GrupoGastoBancario[] {
+    const map = new Map<string, GrupoGastoBancario>();
+    for (const m of movimientos) {
+      const key = m.descripcion;
+      if (!map.has(key)) {
+        map.set(key, { descripcion: key, count: 0, total: 0, tipo: m.tipo, movimientos: [] });
+      }
+      const g = map.get(key)!;
+      g.count++;
+      g.total += m.monto;
+      g.movimientos.push(m);
+    }
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }
+
+  toggleGrupo(descripcion: string): void {
+    if (this.expandedGrupos.has(descripcion)) {
+      this.expandedGrupos.delete(descripcion);
+    } else {
+      this.expandedGrupos.add(descripcion);
+    }
+  }
+
+  isGrupoExpanded(descripcion: string): boolean {
+    return this.expandedGrupos.has(descripcion);
+  }
+
+  // ── Stats ──────────────────────────────────────────────────────────────────
 
   getPendientes(): number { return this.sugerencias.filter(s => s.estado === 'PENDIENTE_REVISION').length; }
   getAceptadas(): number { return this.sugerencias.filter(s => s.estado === 'ACEPTADA').length; }

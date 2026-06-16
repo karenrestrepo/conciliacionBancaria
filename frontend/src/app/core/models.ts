@@ -86,7 +86,6 @@ export type TipoArchivoExtracto = 'CSV' | 'TXT' | 'XLS' | 'XLSX' | 'PDF';
 export interface ConfiguracionDetalle {
   separador?: string;
   filasASaltar?: number;
-  tieneEncabezado?: boolean;
   columnaFecha?: number;
   formatoFecha?: string;
   columnaDescripcion?: number;
@@ -97,6 +96,11 @@ export interface ConfiguracionDetalle {
   debitoYCreditoSeparados?: boolean;
   encoding?: string;
   numeroHoja?: number;
+  factorMonto?: number;
+  separadorMiles?: string;
+  separadorDecimales?: string;
+  /** Solo para tipoArchivo=TXT: 'DELIMITADO' (CSV genérico) o 'ANCHO_FIJO' (ej. Davivienda). */
+  formatoTxt?: 'DELIMITADO' | 'ANCHO_FIJO';
 }
 
 export interface ConfiguracionExtracto {
@@ -111,6 +115,30 @@ export interface ConfiguracionExtracto {
   activo: boolean;
   fechaCreacion: string;
   fechaModificacion: string | null;
+}
+
+export interface MovimientoAgrupado {
+  id: number;
+  descripcion: string;
+  monto: number;
+  fecha: string;
+  tipo: string;
+}
+
+export interface GrupoGastoBancario {
+  descripcion: string;
+  count: number;
+  total: number;
+  tipo: string;
+  movimientos: MovimientoAgrupado[];
+}
+
+export interface GastoBancario {
+  id: number;
+  idCuenta: number;
+  descripcion: string;
+  activo: boolean;
+  fechaCreacion: string;
 }
 
 export interface MetricasResumen {

@@ -1,0 +1,7 @@
+ALTER TABLE movimientos_bancarios
+    MODIFY COLUMN estado_conciliacion
+        ENUM('PENDIENTE','SUGERIDO','CONCILIADO','AGRUPADO') NOT NULL DEFAULT 'PENDIENTE';
+
+ALTER TABLE movimientos_contables
+    MODIFY COLUMN estado_conciliacion
+        ENUM('PENDIENTE','SUGERIDO','CONCILIADO','AGRUPADO') NOT NULL DEFAULT 'PENDIENTE';

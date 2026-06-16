@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
@@ -9,7 +9,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatStepperModule } from '@angular/material/stepper';
+import { MatStepperModule, MatStepper } from '@angular/material/stepper';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -140,7 +140,27 @@ import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../..
                   <span>Los archivos PDF no requieren configuración de columnas.</span>
                 </div>
 
-                <ng-container *ngIf="tipoArchivo !== 'PDF'">
+                <ng-container *ngIf="tipoArchivo === 'TXT'">
+                  <mat-form-field appearance="outline" class="full-field">
+                    <mat-label>Formato del TXT</mat-label>
+                    <mat-select formControlName="formatoTxt" (selectionChange)="onFormatoTxtChange()">
+                      <mat-option value="DELIMITADO">Delimitado (columnas con separador, ej. CSV)</mat-option>
+                      <mat-option value="ANCHO_FIJO">Ancho fijo — reporte de impresión (ej. Davivienda)</mat-option>
+                    </mat-select>
+                    <mat-hint>"Ancho fijo" detecta automáticamente día, mes, descripción y valor por posición de línea</mat-hint>
+                  </mat-form-field>
+                </ng-container>
+
+                <div *ngIf="esTxtAnchoFijo()" class="pdf-notice">
+                  <mat-icon>info_outline</mat-icon>
+                  <span>
+                    Este formato detecta automáticamente las líneas de movimiento que comienzan con
+                    "DD&nbsp;&nbsp;MM" (día y mes) y terminan en dos montos con signo +/- (Valor y Saldo).
+                    Las líneas de encabezado, pie de página y continuaciones de descripción se ignoran.
+                  </span>
+                </div>
+
+                <ng-container *ngIf="tipoArchivo !== 'PDF' && !esTxtAnchoFijo()">
                   <div class="form-grid">
                     <mat-form-field appearance="outline">
                       <mat-label>Separador</mat-label>
@@ -188,12 +208,24 @@ import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../..
                       <mat-label>Columna referencia</mat-label>
                       <input matInput type="number" formControlName="columnaReferencia" min="0">
                     </mat-form-field>
-                  </div>
 
-                  <div class="checkbox-row">
-                    <mat-checkbox formControlName="tieneEncabezado">
-                      El archivo tiene fila de encabezado
-                    </mat-checkbox>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Factor de escala del monto</mat-label>
+                      <input matInput type="number" formControlName="factorMonto" min="1">
+                      <mat-hint>1 = pesos, 1000 = miles (ej. Bancolombia)</mat-hint>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Separador de miles</mat-label>
+                      <input matInput formControlName="separadorMiles" placeholder=".">
+                      <mat-hint>Ej: '.' (Colombia) o ',' (Bancolombia/EE.UU.)</mat-hint>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Separador decimal</mat-label>
+                      <input matInput formControlName="separadorDecimales" placeholder=",">
+                      <mat-hint>Ej: ',' (Colombia) o '.' (Bancolombia/EE.UU.)</mat-hint>
+                    </mat-form-field>
                   </div>
 
                   <div class="checkbox-row">
@@ -223,8 +255,39 @@ import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../..
                   </div>
                 </ng-container>
 
+                <div class="form-grid" *ngIf="esTxtAnchoFijo()">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Encoding</mat-label>
+                    <mat-select formControlName="encoding">
+                      <mat-option value="UTF-8">UTF-8</mat-option>
+                      <mat-option value="ISO-8859-1">ISO-8859-1 (Latin-1)</mat-option>
+                      <mat-option value="windows-1252">Windows-1252</mat-option>
+                    </mat-select>
+                    <mat-hint>Usa ISO-8859-1 si las tildes/ñ aparecen como "?"</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Factor de escala del monto</mat-label>
+                    <input matInput type="number" formControlName="factorMonto" min="1">
+                    <mat-hint>1 = pesos</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Separador de miles</mat-label>
+                    <input matInput formControlName="separadorMiles" placeholder=",">
+                    <mat-hint>Davivienda: ',' (ej. $2,364,110.00)</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Separador decimal</mat-label>
+                    <input matInput formControlName="separadorDecimales" placeholder=".">
+                    <mat-hint>Davivienda: '.' (ej. $2,364,110.00)</mat-hint>
+                  </mat-form-field>
+                </div>
+
                 <div class="step-actions">
-                  <button mat-button matStepperPrevious class="back-step-btn">
+                  <button mat-button matStepperPrevious class="back-step-btn"
+                          *ngIf="!editandoId">
                     <mat-icon>arrow_back</mat-icon>
                     Anterior
                   </button>
@@ -262,7 +325,8 @@ import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../..
                 </div>
 
                 <div class="step-actions">
-                  <button mat-button matStepperPrevious class="back-step-btn">
+                  <button mat-button matStepperPrevious class="back-step-btn"
+                          *ngIf="!editandoId">
                     <mat-icon>arrow_back</mat-icon>
                     Anterior
                   </button>
@@ -488,6 +552,8 @@ import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../..
 })
 export class ConfiguracionExtractoComponent implements OnInit {
 
+  @ViewChild('stepper') stepper!: MatStepper;
+
   bancos: Banco[] = [];
   cuentas: Cuenta[] = [];
   configuraciones: ConfiguracionExtracto[] = [];
@@ -528,7 +594,6 @@ export class ConfiguracionExtractoComponent implements OnInit {
     this.detalleForm = this.fb.group({
       separador: [''],
       filasASaltar: [0],
-      tieneEncabezado: [true],
       columnaFecha: [null],
       formatoFecha: ['dd/MM/yyyy'],
       columnaDescripcion: [null],
@@ -538,7 +603,11 @@ export class ConfiguracionExtractoComponent implements OnInit {
       columnaCredito: [null],
       debitoYCreditoSeparados: [false],
       encoding: ['UTF-8'],
-      numeroHoja: [0]
+      numeroHoja: [0],
+      factorMonto: [1],
+      separadorMiles: ['.'],
+      separadorDecimales: [','],
+      formatoTxt: ['DELIMITADO']
     });
     this.cuentasForm = this.fb.group({
       aplicaParaTodasLasCuentas: [true],
@@ -570,6 +639,20 @@ export class ConfiguracionExtractoComponent implements OnInit {
 
   onTipoArchivoChange(): void {
     this.tipoArchivo = this.tipoForm.get('tipoArchivo')?.value as TipoArchivoExtracto;
+    if (this.tipoArchivo !== 'TXT') {
+      this.detalleForm.patchValue({ formatoTxt: 'DELIMITADO' });
+    }
+  }
+
+  onFormatoTxtChange(): void {
+    if (this.esTxtAnchoFijo()) {
+      // Valores por defecto típicos de un extracto de impresión (ej. Davivienda)
+      this.detalleForm.patchValue({
+        encoding: this.detalleForm.get('encoding')?.value || 'ISO-8859-1',
+        separadorMiles: ',',
+        separadorDecimales: '.'
+      });
+    }
   }
 
   onDebitosCreditosSeparadosChange(): void {
@@ -582,6 +665,10 @@ export class ConfiguracionExtractoComponent implements OnInit {
 
   esExcel(): boolean {
     return this.tipoArchivo === 'XLS' || this.tipoArchivo === 'XLSX';
+  }
+
+  esTxtAnchoFijo(): boolean {
+    return this.tipoArchivo === 'TXT' && this.detalleForm.get('formatoTxt')?.value === 'ANCHO_FIJO';
   }
 
   cargarCuentas(idBanco: number): void {
@@ -602,23 +689,51 @@ export class ConfiguracionExtractoComponent implements OnInit {
     this.errorGuardar = '';
     this.saving = true;
 
-    const idBanco = this.bancoForm.get('idBanco')?.value;
-    const nombre = this.nombreForm.get('nombre')?.value;
-    const tipoArchivo = this.tipoForm.get('tipoArchivo')?.value;
+    // Cuando se edita, banco/nombre/tipo no se modifican: leer del objeto original
+    // para evitar que el stepper invalide esos formularios al no haber sido visitados.
+    let idBanco: number | null;
+    let nombre: string;
+    let tipoArchivo: string;
+    if (this.editandoId) {
+      const original = this.configuraciones.find(c => c.id === this.editandoId);
+      idBanco      = original?.idBanco      ?? this.bancoForm.get('idBanco')?.value;
+      nombre       = original?.nombre       ?? this.nombreForm.get('nombre')?.value;
+      tipoArchivo  = original?.tipoArchivo  ?? this.tipoForm.get('tipoArchivo')?.value;
+    } else {
+      idBanco     = this.bancoForm.get('idBanco')?.value;
+      nombre      = this.nombreForm.get('nombre')?.value;
+      tipoArchivo = this.tipoForm.get('tipoArchivo')?.value;
+    }
+
     const aplicaParaTodasLasCuentas = this.cuentasForm.get('aplicaParaTodasLasCuentas')?.value;
     const idsCuentas = aplicaParaTodasLasCuentas ? [] : (this.cuentasForm.get('idsCuentas')?.value ?? []);
 
     let configuracionDetalle: any = null;
     if (tipoArchivo !== 'PDF') {
       configuracionDetalle = { ...this.detalleForm.value };
-      if (!configuracionDetalle.debitoYCreditoSeparados) {
-        delete configuracionDetalle.columnaDebito;
-        delete configuracionDetalle.columnaCredito;
-      } else {
-        delete configuracionDetalle.columnaMonto;
+      if (tipoArchivo !== 'TXT') {
+        delete configuracionDetalle.formatoTxt;
       }
-      if (!this.esExcel()) {
-        delete configuracionDetalle.numeroHoja;
+      if (this.esTxtAnchoFijo()) {
+        // El formato de ancho fijo detecta fecha/descripción/monto por posición de línea;
+        // solo conserva encoding, factorMonto y separadores de número.
+        configuracionDetalle = {
+          formatoTxt: 'ANCHO_FIJO',
+          encoding: configuracionDetalle.encoding,
+          factorMonto: configuracionDetalle.factorMonto,
+          separadorMiles: configuracionDetalle.separadorMiles,
+          separadorDecimales: configuracionDetalle.separadorDecimales
+        };
+      } else {
+        if (!configuracionDetalle.debitoYCreditoSeparados) {
+          delete configuracionDetalle.columnaDebito;
+          delete configuracionDetalle.columnaCredito;
+        } else {
+          delete configuracionDetalle.columnaMonto;
+        }
+        if (!this.esExcel()) {
+          delete configuracionDetalle.numeroHoja;
+        }
       }
     }
 
@@ -671,6 +786,11 @@ export class ConfiguracionExtractoComponent implements OnInit {
         this.detalleForm.patchValue(detalle);
       } catch (_) { /* ignore */ }
     }
+
+    setTimeout(() => {
+      this.stepper.selectedIndex = 3;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 0);
   }
 
   eliminar(config: ConfiguracionExtracto): void {
@@ -690,8 +810,10 @@ export class ConfiguracionExtractoComponent implements OnInit {
     this.nombreForm.reset();
     this.tipoForm.reset();
     this.detalleForm.reset({
-      filasASaltar: 0, tieneEncabezado: true, formatoFecha: 'dd/MM/yyyy',
-      debitoYCreditoSeparados: false, encoding: 'UTF-8', numeroHoja: 0
+      filasASaltar: 0, formatoFecha: 'dd/MM/yyyy',
+      debitoYCreditoSeparados: false, encoding: 'UTF-8', numeroHoja: 0,
+      factorMonto: 1, separadorMiles: '.', separadorDecimales: ',',
+      formatoTxt: 'DELIMITADO'
     });
     this.cuentasForm.reset({ aplicaParaTodasLasCuentas: true, idsCuentas: [] });
     this.tipoArchivo = null;
