@@ -23,5 +23,7 @@ public interface PartidaRepositoryPort {
 
     void eliminarPendientesPorConciliacion(Long idConciliacion);
 
+    void eliminarPendientePorMovimiento(Long idMovimiento, String tipoOrigen);
+
     List<PartidaConciliatoria> buscarPendientesDeOtrasConciliaciones(Long idCuenta, Long idConciliacionActual);
 }

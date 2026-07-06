@@ -8,6 +8,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/login/login.component').then(m => m.LoginComponent)
   },
   {
+    path: 'registro',
+    loadComponent: () => import('./pages/registro/registro.component').then(m => m.RegistroComponent)
+  },
+  {
     path: '',
     loadComponent: () => import('./layout/shell.component').then(m => m.ShellComponent),
     canActivate: [authGuard],
@@ -55,6 +59,10 @@ export const routes: Routes = [
       {
         path: 'configuracion-extracto/:idBanco',
         loadComponent: () => import('./pages/configuracion-extracto/configuracion-extracto.component').then(m => m.ConfiguracionExtractoComponent)
+      },
+      {
+        path: 'usuarios',
+        loadComponent: () => import('./pages/usuarios/usuarios.component').then(m => m.UsuariosComponent)
       }
     ]
   },

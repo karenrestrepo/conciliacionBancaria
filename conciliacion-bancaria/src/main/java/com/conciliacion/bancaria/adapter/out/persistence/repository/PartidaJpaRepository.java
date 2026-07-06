@@ -26,6 +26,11 @@ public interface PartidaJpaRepository extends JpaRepository<PartidaEntity, Long>
     @Query("DELETE FROM PartidaEntity p WHERE p.idConciliacion = :idConciliacion AND p.estado = 'PENDIENTE'")
     void deletePendientesByIdConciliacion(@Param("idConciliacion") Long idConciliacion);
 
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM PartidaEntity p WHERE p.idMovimiento = :idMovimiento AND p.tipoOrigen = :tipoOrigen AND p.estado = 'PENDIENTE'")
+    void deletePendienteByMovimiento(@Param("idMovimiento") Long idMovimiento,
+                                     @Param("tipoOrigen") String tipoOrigen);
+
     @Query("""
             SELECT p FROM PartidaEntity p
             JOIN ConciliacionEntity c ON c.id = p.idConciliacion

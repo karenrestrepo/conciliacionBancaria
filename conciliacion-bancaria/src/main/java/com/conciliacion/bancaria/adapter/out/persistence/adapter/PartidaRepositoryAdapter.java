@@ -64,6 +64,11 @@ public class PartidaRepositoryAdapter implements PartidaRepositoryPort {
     }
 
     @Override
+    public void eliminarPendientePorMovimiento(Long idMovimiento, String tipoOrigen) {
+        jpaRepository.deletePendienteByMovimiento(idMovimiento, tipoOrigen);
+    }
+
+    @Override
     public List<PartidaConciliatoria> buscarPendientesDeOtrasConciliaciones(
             Long idCuenta, Long idConciliacionActual) {
         return jpaRepository

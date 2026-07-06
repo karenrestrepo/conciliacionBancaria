@@ -113,19 +113,27 @@ public class ClosureService {
             case "GASTO_BANCARIO" -> {
                 if ("BANCARIO".equals(origen.getTipoOrigen())) {
                     movimientoRepo.actualizarEstadoBancario(origen.getIdMovimiento(), EstadoMovimiento.AGRUPADO);
+
                     List<Movimiento> movs = movimientoRepo.buscarBancariosPorIds(List.of(origen.getIdMovimiento()));
                     if (!movs.isEmpty()) {
+                        Movimiento mov = movs.get(0);
                         Long idCuenta = conciliacionRepo.buscarPorId(idConciliacion)
                                 .map(c -> c.getIdCuenta())
                                 .orElse(null);
-                        String descripcion = movs.get(0).getDescripcion();
-                        if (idCuenta != null && descripcion != null && !descripcion.isBlank()) {
+
+                        // Guardar configuración para auto-agrupación futura
+                        if (idCuenta != null && mov.getDescripcion() != null && !mov.getDescripcion().isBlank()) {
                             gastoRepo.guardar(ConfiguracionGastoBancario.builder()
                                     .idCuenta(idCuenta)
-                                    .descripcion(descripcion.trim())
+                                    .descripcion(mov.getDescripcion().trim())
                                     .activo(true)
                                     .build());
                         }
+
+                        // Actualizar el sintético "GASTOS BANCARIOS AGRUPADOS" PENDIENTE
+                        String tipoMov = mov.getTipo() != null ? mov.getTipo() : "DEBITO";
+                        sincronizarSinteticoGastos(idConciliacion, tipoMov,
+                                mov.getFecha() != null ? mov.getFecha() : LocalDate.now());
                     }
                 }
                 yield List.of(partidaRepo.actualizar(origen
@@ -140,9 +148,12 @@ public class ClosureService {
                                 .orElseThrow(() -> new IllegalArgumentException("Partida no encontrada: " + id)))
                         .toList();
 
-                // Suma neta: CREDITO = +monto, DEBITO = -monto
-                BigDecimal neto = signedMonto(origen);
-                for (PartidaConciliatoria d : destinos) neto = neto.add(signedMonto(d));
+                // neto = |origen| - sum(|destinos|): igual signo económico se anula a 0
+                BigDecimal montoOrigen = origen.getMontoMovimiento() != null ? origen.getMontoMovimiento() : BigDecimal.ZERO;
+                BigDecimal totalDestinos = destinos.stream()
+                        .map(d -> d.getMontoMovimiento() != null ? d.getMontoMovimiento() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal neto = montoOrigen.subtract(totalDestinos);
 
                 String justificacion = neto.compareTo(BigDecimal.ZERO) == 0
                         ? "Cruzado manualmente"
@@ -152,16 +163,62 @@ public class ClosureService {
                 todas.add(origen);
                 todas.addAll(destinos);
 
-                yield todas.stream().map(p ->
+                List<PartidaConciliatoria> guardadas = todas.stream().map(p ->
                         partidaRepo.actualizar(p
                                 .withEstado("CRUZADA")
                                 .withJustificacion(justificacion)
                                 .withFechaJustificacion(LocalDate.now()))
                 ).toList();
+
+                // Marcar los movimientos subyacentes como CONCILIADO para que el
+                // motor no los vuelva a procesar en un reprocesado posterior.
+                for (PartidaConciliatoria p : todas) {
+                    if (p.getIdMovimiento() == null) continue;
+                    if ("BANCARIO".equals(p.getTipoOrigen())) {
+                        movimientoRepo.actualizarEstadoBancario(p.getIdMovimiento(), EstadoMovimiento.CONCILIADO);
+                    } else {
+                        movimientoRepo.actualizarEstadoContable(p.getIdMovimiento(), EstadoMovimiento.CONCILIADO);
+                    }
+                }
+
+                yield guardadas;
             }
 
             default -> throw new IllegalArgumentException("Tipo de cruce no válido: " + tipo);
         };
+    }
+
+    /**
+     * Recalcula el monto del sintético "GASTOS BANCARIOS AGRUPADOS" sumando todos los
+     * movimientos AGRUPADO reales del tipo dado. Si el sintético no existe, lo crea junto
+     * con su partida PENDIENTE.
+     */
+    private void sincronizarSinteticoGastos(Long idConciliacion, String tipo, LocalDate fecha) {
+        BigDecimal totalReal = movimientoRepo.sumAgrupadosPorTipo(idConciliacion, tipo);
+        if (totalReal == null) totalReal = BigDecimal.ZERO;
+
+        int actualizados = movimientoRepo.actualizarMontoSintetico(idConciliacion, tipo, totalReal);
+
+        if (actualizados == 0 && totalReal.compareTo(BigDecimal.ZERO) > 0) {
+            // Crear sintético por primera vez
+            List<Movimiento> guardados = movimientoRepo.guardarBancarios(
+                    List.of(Movimiento.builder()
+                            .fecha(fecha)
+                            .descripcion("GASTOS BANCARIOS AGRUPADOS")
+                            .monto(totalReal)
+                            .tipo(tipo)
+                            .estado(EstadoMovimiento.PENDIENTE)
+                            .build()),
+                    idConciliacion);
+            if (!guardados.isEmpty()) {
+                partidaRepo.guardar(com.conciliacion.bancaria.domain.model.PartidaConciliatoria.builder()
+                        .idConciliacion(idConciliacion)
+                        .idMovimiento(guardados.get(0).getId())
+                        .tipoOrigen("BANCARIO")
+                        .estado("PENDIENTE")
+                        .build());
+            }
+        }
     }
 
     private BigDecimal signedMonto(PartidaConciliatoria p) {

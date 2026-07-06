@@ -46,8 +46,8 @@ public class ConciliacionRepositoryAdapter implements ConciliacionRepositoryPort
     }
 
     @Override
-    public List<Conciliacion> buscarTodas() {
-        return jpaRepository.findAll().stream()
+    public List<Conciliacion> buscarPorEmpresa(Long empresaId) {
+        return jpaRepository.findByEmpresaIdOrderByTsCreacionDesc(empresaId).stream()
                 .map(this::enrich)
                 .toList();
     }
@@ -70,6 +70,14 @@ public class ConciliacionRepositoryAdapter implements ConciliacionRepositoryPort
                 .map(ConciliacionEntity::getIdCuenta)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Conciliación no encontrada: " + idConciliacion));
+    }
+
+    @Override
+    public boolean esAuxiliarConjunto(Long idConciliacion) {
+        return jpaRepository.findById(idConciliacion)
+                .flatMap(e -> cuentaJpaRepository.findById(e.getIdCuenta()))
+                .map(c -> Boolean.TRUE.equals(c.getAuxiliarConjunto()))
+                .orElse(false);
     }
 
     /** Resuelve cuenta → banco para construir el dominio enriquecido */

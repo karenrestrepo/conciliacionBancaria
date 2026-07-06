@@ -17,16 +17,17 @@ public class BancoUseCaseImpl implements BancoUseCase {
 
     @Override
     @Transactional
-    public Banco crear(String nombre, String codigo) {
+    public Banco crear(String nombre, String codigo, Long empresaId) {
         if (nombre == null || nombre.isBlank()) {
             throw new IllegalArgumentException("El nombre del banco no puede estar vacío");
         }
-        if (bancoRepo.existePorNombre(nombre.trim())) {
+        if (bancoRepo.existePorNombreYEmpresa(nombre.trim(), empresaId)) {
             throw new IllegalStateException("Ya existe un banco con el nombre: " + nombre);
         }
         Banco nuevo = Banco.builder()
                 .nombre(nombre.trim())
                 .codigo(codigo != null ? codigo.trim() : null)
+                .empresaId(empresaId)
                 .activo(true)
                 .build();
         return bancoRepo.guardar(nuevo);
@@ -42,8 +43,8 @@ public class BancoUseCaseImpl implements BancoUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Banco> listarActivos() {
-        return bancoRepo.listarActivos();
+    public List<Banco> listarActivos(Long empresaId) {
+        return bancoRepo.listarActivosPorEmpresa(empresaId);
     }
 
     @Override

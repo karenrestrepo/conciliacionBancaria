@@ -7,7 +7,68 @@ export interface LoginResponse {
   token: string;
   email: string;
   rol: string;
+  empresaId: number | null;
+  nombreEmpresa: string | null;
+  permisos: string[];
   expiresIn: number;
+}
+
+export type TipoIdentificacion = 'CEDULA' | 'NIT';
+
+export interface VerificarEmpresaRequest {
+  tipoIdentificacion: TipoIdentificacion;
+  numeroIdentificacion: string;
+  digitoVerificacion?: string;
+}
+
+export interface RegistroRequest {
+  tipoIdentificacion: TipoIdentificacion;
+  numeroIdentificacion: string;
+  digitoVerificacion?: string;
+  nombreEmpresa: string;
+  nombreAdmin: string;
+  emailAdmin: string;
+  passwordAdmin: string;
+}
+
+export type RolUsuario = 'AUXILIAR' | 'CONTADOR' | 'FINANZAS' | 'ADMIN';
+
+export type Permiso =
+  | 'VER_CONCILIACIONES'
+  | 'CREAR_CONCILIACION'
+  | 'APROBAR_CONCILIACION'
+  | 'CERRAR_CONCILIACION'
+  | 'VER_MOVIMIENTOS'
+  | 'GESTIONAR_BANCOS'
+  | 'GESTIONAR_EXTRACTOS'
+  | 'CARGAR_ARCHIVOS'
+  | 'GESTIONAR_USUARIOS';
+
+export interface UsuarioResponse {
+  id: number;
+  nombre: string;
+  email: string;
+  rol: RolUsuario;
+  activo: boolean;
+  tsCreacion: string;
+  permisos: Permiso[];
+}
+
+export interface UsuarioCreateRequest {
+  nombre: string;
+  email: string;
+  password: string;
+  rol: RolUsuario;
+  permisos: Permiso[];
+}
+
+export interface UsuarioUpdateRequest {
+  nombre: string;
+  email: string;
+  password?: string;
+  rol: RolUsuario;
+  activo: boolean;
+  permisos: Permiso[];
 }
 
 export interface ApiResponse<T> {
@@ -17,7 +78,7 @@ export interface ApiResponse<T> {
   timestamp: string;
 }
 
-export type TipoCuenta = 'CORRIENTE' | 'AHORRO' | 'FIDUCIARIA' | 'OTRA';
+export type TipoCuenta = 'CORRIENTE' | 'AHORRO' | 'FIDUCIARIA' | 'TARJETA_CREDITO' | 'OTRA';
 
 export interface Banco {
   id: number;
@@ -35,6 +96,7 @@ export interface Cuenta {
   tipo: TipoCuenta;
   descripcion: string | null;
   activo: boolean;
+  auxiliarConjunto: boolean;
   tsCreacion: string;
 }
 
@@ -54,6 +116,7 @@ export interface Conciliacion {
   saldoExtracto: number | null;
   saldoAuxiliar: number | null;
   diferenciaSaldo: number | null;
+  auxiliarConjunto: boolean | null;
 }
 
 export interface Sugerencia {

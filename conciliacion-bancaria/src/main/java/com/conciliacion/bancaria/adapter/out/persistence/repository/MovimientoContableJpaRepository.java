@@ -26,4 +26,11 @@ public interface MovimientoContableJpaRepository
     @Modifying
     @Query("DELETE FROM MovimientoContableEntity m WHERE m.idConciliacion = :idConciliacion AND m.estadoConciliacion != 'CONCILIADO'")
     void deleteNoConciliadosByIdConciliacion(@Param("idConciliacion") Long idConciliacion);
+
+    @Modifying
+    @Query("UPDATE MovimientoContableEntity m SET m.estadoConciliacion = :estado WHERE m.id = :id")
+    void actualizarEstado(@Param("id") Long id, @Param("estado") EstadoMovimiento estado);
+
+    @Query("SELECT COUNT(m) FROM MovimientoContableEntity m JOIN ConciliacionEntity c ON c.id = m.idConciliacion WHERE c.empresaId = :empresaId")
+    long countByEmpresaId(@Param("empresaId") Long empresaId);
 }

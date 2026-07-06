@@ -26,4 +26,5 @@ public class ConciliacionResponse {
     private BigDecimal saldoExtracto;
     private BigDecimal saldoAuxiliar;
     private BigDecimal diferenciaSaldo;
+    private Boolean auxiliarConjunto;
 }

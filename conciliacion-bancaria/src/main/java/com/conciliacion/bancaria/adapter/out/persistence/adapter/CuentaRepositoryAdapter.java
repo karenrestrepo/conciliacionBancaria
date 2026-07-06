@@ -36,8 +36,8 @@ public class CuentaRepositoryAdapter implements CuentaRepositoryPort {
     }
 
     @Override
-    public List<Cuenta> listarActivas() {
-        return cuentaJpaRepository.findByActivoTrue().stream()
+    public List<Cuenta> listarActivasPorEmpresa(Long empresaId) {
+        return cuentaJpaRepository.findActivasByEmpresaId(empresaId).stream()
                 .map(this::toDomain)
                 .toList();
     }
@@ -64,6 +64,7 @@ public class CuentaRepositoryAdapter implements CuentaRepositoryPort {
                 .tipo(e.getTipo())
                 .descripcion(e.getDescripcion())
                 .activo(e.getActivo())
+                .auxiliarConjunto(Boolean.TRUE.equals(e.getAuxiliarConjunto()))
                 .tsCreacion(e.getTsCreacion())
                 .build();
     }
@@ -76,6 +77,7 @@ public class CuentaRepositoryAdapter implements CuentaRepositoryPort {
                 .tipo(c.getTipo())
                 .descripcion(c.getDescripcion())
                 .activo(c.getActivo() != null ? c.getActivo() : true)
+                .auxiliarConjunto(Boolean.TRUE.equals(c.getAuxiliarConjunto()))
                 .tsCreacion(c.getTsCreacion())
                 .build();
     }

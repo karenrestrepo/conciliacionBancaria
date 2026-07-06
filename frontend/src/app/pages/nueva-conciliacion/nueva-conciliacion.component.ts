@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
@@ -16,6 +16,11 @@ import { ApiService } from '../../core/api.service';
 import { Banco, Cuenta, Conciliacion, ConfiguracionExtracto } from '../../core/models';
 import { interval, Subscription } from 'rxjs';
 import { switchMap, takeWhile } from 'rxjs/operators';
+
+interface GrupoTarjetas {
+  idRepresentante: number;
+  cuentas: Cuenta[];
+}
 
 @Component({
   selector: 'app-nueva-conciliacion',
@@ -71,15 +76,38 @@ import { switchMap, takeWhile } from 'rxjs/operators';
                     <mat-option *ngIf="cuentas.length === 0" [value]="null" disabled>
                       — Seleccione primero un banco —
                     </mat-option>
-                    <mat-option *ngFor="let c of cuentas" [value]="c.id">
+
+                    <!-- Cuentas regulares (no auxiliarConjunto) -->
+                    <mat-option *ngFor="let c of cuentasRegulares" [value]="c.id">
                       {{ c.numeroCuenta }} ({{ getTipoLabel(c.tipo) }})
                       {{ c.descripcion ? ' — ' + c.descripcion : '' }}
+                    </mat-option>
+
+                    <!-- Grupo de tarjetas con auxiliar conjunto (una sola entrada) -->
+                    <mat-option *ngIf="grupoTarjetas" [value]="grupoTarjetas.idRepresentante"
+                                class="opcion-tarjetas-conjunto">
+                      <div class="opcion-tc-inner">
+                        <mat-icon class="tc-icon">credit_card</mat-icon>
+                        <span>
+                          Tarjetas de Crédito (Auxiliar Conjunto)
+                          <span class="tc-count">{{ grupoTarjetas.cuentas.length }} tarjeta(s)</span>
+                        </span>
+                      </div>
                     </mat-option>
                   </mat-select>
                   <mat-error *ngIf="periodoForm.get('idCuenta')?.hasError('required')">
                     Seleccione una cuenta
                   </mat-error>
                 </mat-form-field>
+
+                <!-- Aviso tarjetas conjuntas seleccionadas -->
+                <div class="tc-aviso" *ngIf="esTarjetasConjuntasSeleccionado()">
+                  <mat-icon>info_outline</mat-icon>
+                  <span>
+                    Se creará una conciliación para las {{ grupoTarjetas?.cuentas?.length }} tarjetas de crédito del banco.
+                    Podrá subir un extracto por cada tarjeta.
+                  </span>
+                </div>
 
                 <mat-form-field appearance="outline" class="periodo-field">
                   <mat-label>Período</mat-label>
@@ -122,7 +150,9 @@ import { switchMap, takeWhile } from 'rxjs/operators';
         <mat-step [completed]="extractoCargado" label="Extracto Bancario">
           <mat-card class="step-card">
             <mat-card-header>
-              <mat-card-title>Cargar extracto bancario</mat-card-title>
+              <mat-card-title>
+                {{ conciliacion?.auxiliarConjunto ? 'Agregar extractos bancarios' : 'Cargar extracto bancario' }}
+              </mat-card-title>
               <mat-card-subtitle>
                 {{ configuracionExtracto
                     ? 'Configuración: ' + configuracionExtracto.nombre + ' — ' + configuracionExtracto.tipoArchivo
@@ -130,6 +160,15 @@ import { switchMap, takeWhile } from 'rxjs/operators';
               </mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
+              <!-- Aviso tarjeta de crédito con auxiliar conjunto -->
+              <div class="csv-format-info" *ngIf="conciliacion?.auxiliarConjunto">
+                <mat-icon>credit_card</mat-icon>
+                <span>
+                  Esta cuenta tiene <strong>auxiliar conjunto</strong>. Puede subir múltiples extractos
+                  (uno por tarjeta). Cada extracto se agrega sin borrar los anteriores.
+                </span>
+              </div>
+
               <!-- Con configuración XLSX/XLS -->
               <div class="csv-format-info" *ngIf="configuracionExtracto">
                 <mat-icon>check_circle</mat-icon>
@@ -152,16 +191,21 @@ import { switchMap, takeWhile } from 'rxjs/operators';
               </div>
 
               <div class="upload-area" (click)="extractoInput.click()"
-                   [class.has-file]="extractoFile">
-                <mat-icon>{{ extractoFile ? 'description' : 'upload_file' }}</mat-icon>
-                <span *ngIf="!extractoFile">
+                   [class.has-file]="extractoFile || extractoFilesPendientes.length > 0">
+                <mat-icon>{{ (extractoFile || extractoFilesPendientes.length > 0) ? 'description' : 'upload_file' }}</mat-icon>
+                <span *ngIf="!extractoFile && extractoFilesPendientes.length === 0">
                   Haga clic para seleccionar
                   {{ configuracionExtracto ? 'el archivo ' + configuracionExtracto.tipoArchivo : 'el archivo CSV' }}
+                  <ng-container *ngIf="conciliacion?.auxiliarConjunto"> (puede seleccionar varios)</ng-container>
                 </span>
-                <span *ngIf="extractoFile">{{ extractoFile.name }}</span>
+                <span *ngIf="extractoFile && !conciliacion?.auxiliarConjunto">{{ extractoFile.name }}</span>
+                <span *ngIf="conciliacion?.auxiliarConjunto && extractoFilesPendientes.length > 0">
+                  {{ extractoFilesPendientes.length }} archivo(s) seleccionado(s)
+                </span>
               </div>
               <input #extractoInput type="file" [attr.accept]="acceptExtracto"
-                     (change)="onExtractoSelected($event)" hidden>
+                     [attr.multiple]="conciliacion?.auxiliarConjunto ? true : null"
+                     (change)="onExtractoSelected($event, extractoInput)" hidden>
 
               <div class="job-progress" *ngIf="jobProgreso > 0 || jobEstado === 'IN_PROGRESS'">
                 <div class="job-header">
@@ -176,7 +220,14 @@ import { switchMap, takeWhile } from 'rxjs/operators';
 
               <div class="success-info" *ngIf="extractoCargado">
                 <mat-icon>check_circle</mat-icon>
-                Extracto bancario cargado y motor completado
+                <ng-container *ngIf="conciliacion?.auxiliarConjunto; else singleSuccess">
+                  {{ extractosAgregados }} extracto(s) procesado(s).
+                  <span *ngIf="extractoFilesPendientes.length > 0"> Procesando {{ extractoFilesPendientes.length }} restante(s)…</span>
+                  <span *ngIf="extractoFilesPendientes.length === 0"> Puede seleccionar más o continuar.</span>
+                </ng-container>
+                <ng-template #singleSuccess>
+                  Extracto bancario cargado y motor completado
+                </ng-template>
               </div>
 
               <div class="error-message" *ngIf="errorExtracto">
@@ -186,9 +237,13 @@ import { switchMap, takeWhile } from 'rxjs/operators';
               <div class="step-actions">
                 <button mat-flat-button class="primary-btn"
                         (click)="cargarExtracto()"
-                        [disabled]="!extractoFile || loadingExtracto || extractoCargado">
+                        [disabled]="(conciliacion?.auxiliarConjunto ? extractoFilesPendientes.length === 0 : !extractoFile) || loadingExtracto || (extractoCargado && !conciliacion?.auxiliarConjunto)">
                   <mat-spinner diameter="18" *ngIf="loadingExtracto"></mat-spinner>
-                  <span *ngIf="!loadingExtracto">Cargar y Procesar</span>
+                  <span *ngIf="!loadingExtracto">
+                    {{ conciliacion?.auxiliarConjunto
+                        ? (extractoFilesPendientes.length > 1 ? 'Agregar ' + extractoFilesPendientes.length + ' extractos' : 'Agregar extracto')
+                        : 'Cargar y Procesar' }}
+                  </span>
                 </button>
                 <button mat-flat-button class="next-btn"
                         *ngIf="extractoCargado" matStepperNext>
@@ -327,6 +382,23 @@ import { switchMap, takeWhile } from 'rxjs/operators';
     .csv-format-warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
     .csv-format-warn mat-icon { color: #d97706; }
 
+    .tc-aviso {
+      display: flex; align-items: flex-start; gap: 8px;
+      background: #fce7f3; border: 1px solid #fbcfe8;
+      border-radius: 8px; padding: 10px 14px;
+      font-size: 13px; color: #9d174d; margin-top: 8px;
+    }
+    .tc-aviso mat-icon { font-size: 18px; color: #be185d; flex-shrink: 0; }
+
+    .opcion-tc-inner {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .tc-icon { font-size: 18px; color: #9d174d; }
+    .tc-count {
+      margin-left: 6px; font-size: 11px; color: #9d174d;
+      background: #fce7f3; padding: 1px 6px; border-radius: 10px;
+    }
+
     .upload-area {
       border: 2px dashed #d1d5db;
       border-radius: 10px;
@@ -447,15 +519,19 @@ import { switchMap, takeWhile } from 'rxjs/operators';
     }
   `]
 })
-export class NuevaConciliacionComponent implements OnInit {
+export class NuevaConciliacionComponent implements OnInit, OnDestroy {
   periodoForm: FormGroup;
   conciliacion: Conciliacion | null = null;
   bancos: Banco[] = [];
   cuentas: Cuenta[] = [];
+  cuentasRegulares: Cuenta[] = [];
+  grupoTarjetas: GrupoTarjetas | null = null;
   configuracionExtracto: ConfiguracionExtracto | null = null;
   extractoFile: File | null = null;
+  extractoFilesPendientes: File[] = [];
   auxiliarFile: File | null = null;
   extractoCargado = false;
+  extractosAgregados = 0;
   auxiliarCargado = false;
   loadingPeriodo = false;
   loadingExtracto = false;
@@ -466,6 +542,7 @@ export class NuevaConciliacionComponent implements OnInit {
   jobProgreso = 0;
   jobEstado = '';
   private pollSub?: Subscription;
+  private extractoInputEl: HTMLInputElement | null = null;
 
   get acceptExtracto(): string {
     if (!this.configuracionExtracto) return '.csv';
@@ -509,13 +586,35 @@ export class NuevaConciliacionComponent implements OnInit {
 
   onBancoChange(idBanco: number): void {
     this.cuentas = [];
+    this.cuentasRegulares = [];
+    this.grupoTarjetas = null;
     this.configuracionExtracto = null;
     this.periodoForm.patchValue({ idCuenta: null });
     if (!idBanco) return;
     this.api.listarCuentasPorBanco(idBanco).subscribe({
-      next: res => { this.cuentas = res.data; }
+      next: res => {
+        this.cuentas = res.data;
+        this.clasificarCuentas(res.data);
+      }
     });
     this.cargarConfiguracionExtracto(idBanco, null);
+  }
+
+  private clasificarCuentas(cuentas: Cuenta[]): void {
+    const tarjetasConjuntas = cuentas.filter(
+      c => c.tipo === 'TARJETA_CREDITO' && c.auxiliarConjunto
+    );
+    this.cuentasRegulares = cuentas.filter(
+      c => !(c.tipo === 'TARJETA_CREDITO' && c.auxiliarConjunto)
+    );
+    this.grupoTarjetas = tarjetasConjuntas.length > 0
+      ? { idRepresentante: tarjetasConjuntas[0].id, cuentas: tarjetasConjuntas }
+      : null;
+  }
+
+  esTarjetasConjuntasSeleccionado(): boolean {
+    const idSeleccionado = this.periodoForm.get('idCuenta')?.value;
+    return !!idSeleccionado && idSeleccionado === this.grupoTarjetas?.idRepresentante;
   }
 
   cargarConfiguracionExtracto(idBanco: number, idCuenta: number | null): void {
@@ -561,9 +660,16 @@ export class NuevaConciliacionComponent implements OnInit {
     return map[tipo] ?? tipo;
   }
 
-  onExtractoSelected(event: Event): void {
+  onExtractoSelected(event: Event, inputEl: HTMLInputElement): void {
+    this.extractoInputEl = inputEl;
     const input = event.target as HTMLInputElement;
-    if (input.files?.length) this.extractoFile = input.files[0];
+    if (!input.files?.length) return;
+    if (this.conciliacion?.auxiliarConjunto) {
+      this.extractoFilesPendientes = Array.from(input.files);
+      this.extractoFile = null;
+    } else {
+      this.extractoFile = input.files[0];
+    }
   }
 
   onAuxiliarSelected(event: Event): void {
@@ -572,17 +678,34 @@ export class NuevaConciliacionComponent implements OnInit {
   }
 
   cargarExtracto(): void {
-    if (!this.extractoFile || !this.conciliacion) return;
+    if (!this.conciliacion) return;
+    if (this.conciliacion.auxiliarConjunto) {
+      if (!this.extractoFilesPendientes.length) return;
+      this.subirSiguienteExtracto();
+    } else {
+      if (!this.extractoFile) return;
+      this.loadingExtracto = true;
+      this.errorExtracto = '';
+      this.api.cargarExtracto(this.conciliacion.id, this.extractoFile).subscribe({
+        next: res => { this.loadingExtracto = false; this.iniciarPolling(res.data); },
+        error: err => {
+          this.loadingExtracto = false;
+          this.errorExtracto = err.error?.message ?? 'Error al cargar el extracto';
+        }
+      });
+    }
+  }
+
+  private subirSiguienteExtracto(): void {
+    if (!this.conciliacion || !this.extractoFilesPendientes.length) return;
+    const archivo = this.extractoFilesPendientes[0];
     this.loadingExtracto = true;
     this.errorExtracto = '';
-    this.api.cargarExtracto(this.conciliacion.id, this.extractoFile).subscribe({
-      next: res => {
-        this.loadingExtracto = false;
-        this.iniciarPolling(res.data);
-      },
+    this.api.cargarExtracto(this.conciliacion.id, archivo).subscribe({
+      next: res => { this.loadingExtracto = false; this.iniciarPolling(res.data); },
       error: err => {
         this.loadingExtracto = false;
-        this.errorExtracto = err.error?.message ?? 'Error al cargar el extracto';
+        this.errorExtracto = `Error en "${archivo.name}": ` + (err.error?.message ?? 'Error al cargar');
       }
     });
   }
@@ -598,7 +721,18 @@ export class NuevaConciliacionComponent implements OnInit {
         this.jobEstado = res.data.estado;
         if (res.data.estado === 'COMPLETED') {
           this.extractoCargado = true;
+          this.extractosAgregados++;
           this.pollSub?.unsubscribe();
+          if (this.conciliacion?.auxiliarConjunto) {
+            this.extractoFilesPendientes = this.extractoFilesPendientes.slice(1);
+            this.jobProgreso = 0;
+            this.jobEstado = 'PENDING';
+            if (this.extractoFilesPendientes.length > 0) {
+              this.subirSiguienteExtracto();
+            } else {
+              if (this.extractoInputEl) this.extractoInputEl.value = '';
+            }
+          }
         }
         if (res.data.estado === 'FAILED') {
           this.errorExtracto = res.data.mensajeError ?? 'Error en el motor de conciliación';

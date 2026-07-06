@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface BancoJpaRepository extends JpaRepository<BancoEntity, Long> {
 
-    List<BancoEntity> findByActivoTrue();
+    List<BancoEntity> findByActivoTrueAndEmpresaId(Long empresaId);
 
-    boolean existsByNombre(String nombre);
+    boolean existsByNombreAndEmpresaId(String nombre, Long empresaId);
 }

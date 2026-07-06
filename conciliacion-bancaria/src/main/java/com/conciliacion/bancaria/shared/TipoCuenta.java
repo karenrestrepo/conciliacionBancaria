@@ -4,5 +4,6 @@ public enum TipoCuenta {
     CORRIENTE,
     AHORRO,
     FIDUCIARIA,
+    TARJETA_CREDITO,
     OTRA
 }

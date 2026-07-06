@@ -19,5 +19,6 @@ public class Cuenta {
     private final TipoCuenta tipo;
     private final String descripcion;
     private final Boolean activo;
+    private final Boolean auxiliarConjunto;
     private final LocalDateTime tsCreacion;
 }

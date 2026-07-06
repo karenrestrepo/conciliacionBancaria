@@ -59,6 +59,11 @@ public class SugerenciaRepositoryAdapter implements SugerenciaRepositoryPort {
                 com.conciliacion.bancaria.shared.EstadoSugerencia.PENDIENTE_REVISION);
     }
 
+    @Override
+    public java.util.Set<Long> buscarBancarioIdsConSugerenciaPendiente(Long idConciliacion) {
+        return jpaRepository.findBancarioIdsConSugerenciaPendiente(idConciliacion);
+    }
+
     private SugerenciaEntity toEntity(Sugerencia s) {
         return SugerenciaEntity.builder()
                 .id(s.getId())

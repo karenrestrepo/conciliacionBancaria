@@ -18,5 +18,6 @@ public class CuentaResponse {
     private TipoCuenta tipo;
     private String descripcion;
     private Boolean activo;
+    private Boolean auxiliarConjunto;
     private LocalDateTime tsCreacion;
 }

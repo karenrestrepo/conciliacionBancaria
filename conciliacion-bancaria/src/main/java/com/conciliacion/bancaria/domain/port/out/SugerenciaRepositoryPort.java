@@ -4,6 +4,7 @@ import com.conciliacion.bancaria.domain.model.Sugerencia;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface SugerenciaRepositoryPort {
 
@@ -18,4 +19,6 @@ public interface SugerenciaRepositoryPort {
     void eliminarPorConciliacion(Long idConciliacion);
 
     void eliminarPendientesPorConciliacion(Long idConciliacion);
+
+    Set<Long> buscarBancarioIdsConSugerenciaPendiente(Long idConciliacion);
 }

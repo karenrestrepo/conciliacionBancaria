@@ -13,7 +13,7 @@ public interface CuentaRepositoryPort {
 
     List<Cuenta> listarPorBanco(Long idBanco);
 
-    List<Cuenta> listarActivas();
+    List<Cuenta> listarActivasPorEmpresa(Long empresaId);
 
     boolean existePorBancoYNumero(Long idBanco, String numeroCuenta);
 

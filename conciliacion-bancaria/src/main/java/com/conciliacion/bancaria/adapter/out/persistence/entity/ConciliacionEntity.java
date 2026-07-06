@@ -20,6 +20,9 @@ public class ConciliacionEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "empresa_id")
+    private Long empresaId;
+
     @Column(nullable = false, length = 7)
     private String periodo;
 

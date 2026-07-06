@@ -27,8 +27,8 @@ public class BancoRepositoryAdapter implements BancoRepositoryPort {
     }
 
     @Override
-    public List<Banco> listarActivos() {
-        return jpaRepository.findByActivoTrue().stream().map(this::toDomain).toList();
+    public List<Banco> listarActivosPorEmpresa(Long empresaId) {
+        return jpaRepository.findByActivoTrueAndEmpresaId(empresaId).stream().map(this::toDomain).toList();
     }
 
     @Override
@@ -37,13 +37,14 @@ public class BancoRepositoryAdapter implements BancoRepositoryPort {
     }
 
     @Override
-    public boolean existePorNombre(String nombre) {
-        return jpaRepository.existsByNombre(nombre);
+    public boolean existePorNombreYEmpresa(String nombre, Long empresaId) {
+        return jpaRepository.existsByNombreAndEmpresaId(nombre, empresaId);
     }
 
     private Banco toDomain(BancoEntity e) {
         return Banco.builder()
                 .id(e.getId())
+                .empresaId(e.getEmpresaId())
                 .nombre(e.getNombre())
                 .codigo(e.getCodigo())
                 .activo(e.getActivo())
@@ -54,6 +55,7 @@ public class BancoRepositoryAdapter implements BancoRepositoryPort {
     private BancoEntity toEntity(Banco b) {
         return BancoEntity.builder()
                 .id(b.getId())
+                .empresaId(b.getEmpresaId())
                 .nombre(b.getNombre())
                 .codigo(b.getCodigo())
                 .activo(b.getActivo() != null ? b.getActivo() : true)

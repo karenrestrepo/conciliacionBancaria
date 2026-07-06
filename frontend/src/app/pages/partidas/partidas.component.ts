@@ -47,7 +47,7 @@ import { ApiService } from '../../core/api.service';
         <div class="summary-row">
           <span class="count-badge pending">{{ getPendientes() }} pendiente(s)</span>
           <span class="count-badge incomplete" *ngIf="getIncompletos() > 0">{{ getIncompletos() }} cruce(s) incompleto(s)</span>
-          <span class="count-badge dragged" *ngIf="getArrastradas() > 0">{{ getArrastradas() }} próximo mes</span>
+<span class="count-badge dragged" *ngIf="getArrastradas() > 0">{{ getArrastradas() }} próximo mes</span>
           <span class="count-badge historical" *ngIf="partidasHistoricas.length > 0">
             {{ partidasHistoricas.length }} de meses anteriores
           </span>
@@ -293,7 +293,7 @@ import { ApiService } from '../../core/api.service';
     .count-badge { padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; }
     .count-badge.pending    { background: #fef3c7; color: #92400e; }
     .count-badge.incomplete { background: #fee2e2; color: #991b1b; }
-    .count-badge.dragged    { background: #e0e7ff; color: #3730a3; }
+.count-badge.dragged    { background: #e0e7ff; color: #3730a3; }
     .count-badge.historical { background: #f3f4f6; color: #374151; }
 
     .gastos-card { margin-bottom: 20px; border-left: 4px solid #f59e0b !important; border-radius: 10px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important; }
@@ -406,7 +406,7 @@ import { ApiService } from '../../core/api.service';
     .confirmar-btn { background: #1d4ed8 !important; color: #fff !important; border-radius: 8px !important; display: flex; align-items: center; gap: 6px; }
     .confirmar-btn mat-icon { font-size: 18px; width: 18px; height: 18px; }
 
-    .empty-state { text-align: center; padding: 60px; color: #9ca3af; }
+.empty-state { text-align: center; padding: 60px; color: #9ca3af; }
     .empty-state mat-icon { font-size: 48px; width: 48px; height: 48px; display: block; margin: 0 auto 12px; color: #22c55e; }
     .section-divider { margin: 32px 0 24px; }
     .historicas-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
@@ -429,7 +429,7 @@ export class PartidasComponent implements OnInit {
   mostrandoProximo: Record<number, boolean> = {};
   cruzarAbierto: number | null = null;
   cruzarSeleccion = new Set<number>();
-  private arrastrarForms: Record<number, FormGroup> = {};
+private arrastrarForms: Record<number, FormGroup> = {};
 
   constructor(
     private route: ActivatedRoute,
@@ -528,11 +528,11 @@ export class PartidasComponent implements OnInit {
   totalSeleccionados(idOrigen: number): number {
     return this.partidas
       .filter(p => this.cruzarSeleccion.has(p.id))
-      .reduce((s, p) => s + this.montoSignado(p), 0);
+      .reduce((s, p) => s + Math.abs(p.montoMovimiento ?? 0), 0);
   }
 
   diferenciaCruce(origen: any): number {
-    return this.montoSignado(origen) + this.totalSeleccionados(origen.id);
+    return Math.abs(origen.montoMovimiento ?? 0) - this.totalSeleccionados(origen.id);
   }
 
   // ── Acciones ──────────────────────────────────────────────────────────────

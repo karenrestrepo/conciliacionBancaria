@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -88,10 +89,14 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                 bancarios = csvValidator.parsear(contenido, MAPEO_ESTANDAR);
             }
 
-            // Limpiar bancarios anteriores (no CONCILIADO) para permitir re-carga
-            movimientoRepo.eliminarBancariosNoConciliadosPorConciliacion(idConciliacion);
-            sugerenciaRepo.eliminarPendientesPorConciliacion(idConciliacion);
-            partidaRepo.eliminarPendientesPorConciliacion(idConciliacion);
+            // Tarjetas de crédito con auxiliar conjunto: múltiples extractos se acumulan.
+            // Cuentas normales: el extracto reemplaza al anterior.
+            boolean esAuxiliarConjunto = conciliacionRepo.esAuxiliarConjunto(idConciliacion);
+            if (!esAuxiliarConjunto) {
+                movimientoRepo.eliminarBancariosNoConciliadosPorConciliacion(idConciliacion);
+                sugerenciaRepo.eliminarPendientesPorConciliacion(idConciliacion);
+                partidaRepo.eliminarPendientesPorConciliacion(idConciliacion);
+            }
 
             // Agrupar gastos bancarios configurados antes de persistir
             List<Movimiento> bancariosConAgrupacion =
@@ -205,27 +210,33 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
             eventLog.csvUpload(idConciliacion, null, archivo.getOriginalFilename());
             byte[] contenido = archivo.getBytes();
 
-            // Detectar formato: XLS/XLSX (SIESA) o CSV estándar
-            List<Movimiento> contables = esArchivoXls(archivo.getOriginalFilename())
+            List<Movimiento> delArchivo = esArchivoXls(archivo.getOriginalFilename())
                     ? siesaParser.parsear(contenido)
                     : csvValidator.parsear(contenido, MAPEO_ESTANDAR);
 
-            // Limpiar contables anteriores (no CONCILIADO) para evitar duplicados en re-carga
-            movimientoRepo.eliminarContablesNoConciliadosPorConciliacion(idConciliacion);
-            sugerenciaRepo.eliminarPendientesPorConciliacion(idConciliacion);
-            partidaRepo.eliminarPendientesPorConciliacion(idConciliacion);
+            // Huellas de TODOS los contables existentes (incluyendo CONCILIADO) para que
+            // los movimientos ya conciliados no vuelvan a insertarse como "nuevos".
+            Set<String> huellas = movimientoRepo.buscarTodosContablesPorConciliacion(idConciliacion)
+                    .stream()
+                    .map(this::huella)
+                    .collect(Collectors.toSet());
 
-            movimientoRepo.guardarContables(contables, idConciliacion);
+            List<Movimiento> soloNuevos = delArchivo.stream()
+                    .filter(m -> !huellas.contains(huella(m)))
+                    .toList();
 
-            // Conservar sugerencias ACEPTADAS y partidas JUSTIFICADAS/ARRASTRADAS;
-            // sólo resetear lo que aún no está conciliado.
-            sugerenciaRepo.eliminarPendientesPorConciliacion(idConciliacion);
-            partidaRepo.eliminarPendientesPorConciliacion(idConciliacion);
-            movimientoRepo.resetEstadosBancariosSugeridos(idConciliacion);
-            movimientoRepo.resetEstadosContablesSugeridos(idConciliacion);
+            if (soloNuevos.isEmpty()) {
+                log.info("Re-carga de auxiliar sin movimientos nuevos (conciliacion={})", idConciliacion);
+                return "sin-cambios";
+            }
+
+            log.info("Re-carga incremental de auxiliar: {} nuevos de {} en archivo (conciliacion={})",
+                    soloNuevos.size(), delArchivo.size(), idConciliacion);
+
+            List<Movimiento> persistidos = movimientoRepo.guardarContables(soloNuevos, idConciliacion);
 
             String jobId = jobRepo.crearJob(idConciliacion);
-            ejecutarMotorAsync(jobId, idConciliacion);
+            ejecutarMotorIncrementalAsync(jobId, idConciliacion, persistidos);
             return jobId;
         } catch (CsvValidationException e) {
             eventLog.csvValidationFailed(idConciliacion, e.getMessage());
@@ -235,6 +246,13 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
             throw new CsvValidationException("Error procesando el archivo: "
                     + e.getMessage());
         }
+    }
+
+    private String huella(Movimiento m) {
+        return m.getFecha()
+                + "|" + m.getMonto().stripTrailingZeros().toPlainString()
+                + "|" + m.getTipo()
+                + "|" + (m.getDescripcion() != null ? m.getDescripcion().trim().toLowerCase() : "");
     }
 
     /**
@@ -303,6 +321,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
     @Override
     @Transactional
     public String reprocesarMotor(Long idConciliacion) {
+        limpiarContablesDuplicados(idConciliacion);
         sugerenciaRepo.eliminarPendientesPorConciliacion(idConciliacion);
         partidaRepo.eliminarPendientesPorConciliacion(idConciliacion);
         movimientoRepo.resetEstadosBancariosSugeridos(idConciliacion);
@@ -312,10 +331,96 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
         return jobId;
     }
 
+    private void limpiarContablesDuplicados(Long idConciliacion) {
+        List<Movimiento> todos = movimientoRepo.buscarTodosContablesPorConciliacion(idConciliacion);
+
+        Set<String> huellasConciliados = todos.stream()
+                .filter(m -> m.getEstado() == EstadoMovimiento.CONCILIADO)
+                .map(this::huella)
+                .collect(Collectors.toSet());
+
+        if (huellasConciliados.isEmpty()) return;
+
+        List<Long> duplicados = todos.stream()
+                .filter(m -> m.getEstado() != EstadoMovimiento.CONCILIADO)
+                .filter(m -> huellasConciliados.contains(huella(m)))
+                .map(Movimiento::getId)
+                .toList();
+
+        if (!duplicados.isEmpty()) {
+            log.info("Eliminando {} contables duplicados de movimientos ya conciliados (conciliacion={})",
+                    duplicados.size(), idConciliacion);
+            movimientoRepo.eliminarContablesPorIds(duplicados);
+        }
+    }
+
     private boolean esArchivoXls(String nombre) {
         if (nombre == null) return false;
         String lower = nombre.toLowerCase();
         return lower.endsWith(".xls") || lower.endsWith(".xlsx");
+    }
+
+    // Motor incremental — sólo compara nuevos contables contra bancarios sin sugerencia activa
+    @Async("conciliacionExecutor")
+    public void ejecutarMotorIncrementalAsync(String jobId, Long idConciliacion,
+                                              List<Movimiento> nuevosContables) {
+        long inicio = System.currentTimeMillis();
+        try {
+            jobRepo.actualizarProgreso(jobId, 10);
+
+            // Bancarios disponibles: PENDIENTE y sin sugerencia activa
+            List<Movimiento> bancariosPendientes =
+                    movimientoRepo.buscarBancariosPendientesPorConciliacion(idConciliacion);
+            Set<Long> yaEmparejados =
+                    sugerenciaRepo.buscarBancarioIdsConSugerenciaPendiente(idConciliacion);
+            List<Movimiento> bancariosLibres = bancariosPendientes.stream()
+                    .filter(b -> !yaEmparejados.contains(b.getId()))
+                    .toList();
+
+            jobRepo.actualizarProgreso(jobId, 30);
+
+            if (bancariosLibres.isEmpty()) {
+                // Sin bancarios libres: los nuevos contables van directo a partidas
+                partidaRepo.guardarTodas(
+                        nuevosContables.stream()
+                                .map(c -> com.conciliacion.bancaria.domain.model.PartidaConciliatoria.builder()
+                                        .idConciliacion(idConciliacion)
+                                        .idMovimiento(c.getId())
+                                        .tipoOrigen("CONTABLE")
+                                        .estado("PENDIENTE")
+                                        .build())
+                                .toList());
+                jobRepo.completar(jobId);
+                return;
+            }
+
+            ConciliationEngine.ResultadoMotor resultado =
+                    conciliationEngine.ejecutar(idConciliacion, bancariosLibres, nuevosContables);
+            jobRepo.actualizarProgreso(jobId, 75);
+
+            sugerenciaRepo.guardarTodas(resultado.sugerencias());
+
+            // Los bancarios que obtuvieron sugerencia ya no son pendientes; eliminar su partida
+            resultado.sugerencias().stream()
+                    .map(s -> s.getMovimientoBancario().getId())
+                    .distinct()
+                    .forEach(id -> partidaRepo.eliminarPendientePorMovimiento(id, "BANCARIO"));
+
+            // Guardar sólo partidas de contables nuevos que no encontraron par
+            partidaRepo.guardarTodas(resultado.partidasContables());
+
+            jobRepo.actualizarProgreso(jobId, 90);
+
+            long duracion = System.currentTimeMillis() - inicio;
+            eventLog.engineCompleted(idConciliacion, duracion,
+                    bancariosLibres.size() + nuevosContables.size());
+
+            jobRepo.completar(jobId);
+        } catch (Exception e) {
+            log.error("Error en motor incremental job={}: {}", jobId, e.getMessage());
+            eventLog.integrationError(idConciliacion, e.getMessage());
+            jobRepo.fallar(jobId, e.getMessage());
+        }
     }
 
     // Motor asíncrono — se ejecuta en el pool "conciliacionExecutor"

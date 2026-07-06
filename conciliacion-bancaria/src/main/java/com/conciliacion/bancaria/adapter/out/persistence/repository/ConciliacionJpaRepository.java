@@ -17,6 +17,12 @@ public interface ConciliacionJpaRepository extends JpaRepository<ConciliacionEnt
 
     boolean existsByPeriodoAndIdCuenta(String periodo, Long idCuenta);
 
+    List<ConciliacionEntity> findByEmpresaIdOrderByTsCreacionDesc(Long empresaId);
+
+    long countByEmpresaId(Long empresaId);
+
+    long countByEmpresaIdAndEstado(Long empresaId, EstadoConciliacion estado);
+
     long countByEstado(EstadoConciliacion estado);
 
     @Query("SELECT c.estado FROM ConciliacionEntity c WHERE c.id = :id")

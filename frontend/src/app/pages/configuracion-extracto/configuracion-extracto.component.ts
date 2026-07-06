@@ -151,13 +151,28 @@ import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../..
                   </mat-form-field>
                 </ng-container>
 
-                <div *ngIf="esTxtAnchoFijo()" class="pdf-notice">
-                  <mat-icon>info_outline</mat-icon>
-                  <span>
-                    Este formato detecta automáticamente las líneas de movimiento que comienzan con
-                    "DD&nbsp;&nbsp;MM" (día y mes) y terminan en dos montos con signo +/- (Valor y Saldo).
-                    Las líneas de encabezado, pie de página y continuaciones de descripción se ignoran.
-                  </span>
+                <div *ngIf="esTxtAnchoFijo()" class="ancho-fijo-info">
+                  <div class="info-header">
+                    <mat-icon>info_outline</mat-icon>
+                    <strong>Formato de reporte de impresión</strong>
+                  </div>
+                  <p class="info-desc">
+                    Por defecto usa el patrón de Davivienda cuenta corriente/ahorro
+                    (<code>DD&nbsp;&nbsp;MM&nbsp;&nbsp;Descripción&nbsp;&nbsp;Valor+/-&nbsp;&nbsp;Saldo+/-</code>).
+                    Para otros formatos TXT, configure un <strong>patrón de línea personalizado</strong>
+                    con grupos nombrados (Java regex):
+                  </p>
+                  <table class="grupos-tabla">
+                    <thead><tr><th>Grupo</th><th>Significado</th><th>Ejemplo</th></tr></thead>
+                    <tbody>
+                      <tr><td><code>(?&lt;fecha&gt;...)</code></td><td>Fecha completa (usar "Formato fecha")</td><td><code>(?&lt;fecha&gt;\d&#123;2&#125;/\d&#123;2&#125;/\d&#123;4&#125;)</code></td></tr>
+                      <tr><td><code>(?&lt;dia&gt;...) + (?&lt;mes&gt;...)</code></td><td>Día y mes por separado (año del período)</td><td><code>(?&lt;dia&gt;\d&#123;2&#125;)\s+(?&lt;mes&gt;\d&#123;2&#125;)</code></td></tr>
+                      <tr><td><code>(?&lt;descripcion&gt;...)</code></td><td>Texto de la transacción</td><td><code>(?&lt;descripcion&gt;[A-Z][^\t]+?)</code></td></tr>
+                      <tr><td><code>(?&lt;monto&gt;...)</code></td><td>Valor numérico sin signo</td><td><code>(?&lt;monto&gt;[\d.,]+)</code></td></tr>
+                      <tr><td><code>(?&lt;signo&gt;...)</code></td><td>+ crédito / - débito</td><td><code>(?&lt;signo&gt;[+\-])</code></td></tr>
+                      <tr><td><code>(?&lt;tipo&gt;...)</code></td><td>CREDITO/DEBITO o C/D</td><td><code>(?&lt;tipo&gt;CREDITO|DEBITO)</code></td></tr>
+                    </tbody>
+                  </table>
                 </div>
 
                 <ng-container *ngIf="tipoArchivo !== 'PDF' && !esTxtAnchoFijo()">
@@ -283,6 +298,29 @@ import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../..
                     <input matInput formControlName="separadorDecimales" placeholder=".">
                     <mat-hint>Davivienda: '.' (ej. $2,364,110.00)</mat-hint>
                   </mat-form-field>
+
+                  <mat-form-field appearance="outline"
+                                  *ngIf="detalleForm.get('patronLinea')?.value">
+                    <mat-label>Formato fecha (grupo &lt;fecha&gt;)</mat-label>
+                    <input matInput formControlName="formatoFechaLinea" placeholder="dd/MM/yyyy">
+                    <mat-hint>Solo si usa el grupo (?&lt;fecha&gt;...)</mat-hint>
+                  </mat-form-field>
+                </div>
+
+                <mat-form-field appearance="outline" class="full-field patron-field"
+                                *ngIf="esTxtAnchoFijo()">
+                  <mat-label>Patrón de línea personalizado (opcional)</mat-label>
+                  <textarea matInput formControlName="patronLinea" rows="3"
+                            placeholder="Déjelo vacío para usar el patrón estándar de Davivienda corriente"></textarea>
+                  <mat-hint>
+                    Regex Java con grupos nombrados: (?&lt;fecha&gt;...), (?&lt;descripcion&gt;...), (?&lt;monto&gt;...), (?&lt;signo&gt;...)
+                  </mat-hint>
+                </mat-form-field>
+
+                <div class="checkbox-row" *ngIf="esTxtAnchoFijo() && detalleForm.get('patronLinea')?.value">
+                  <mat-checkbox formControlName="invertirSigno">
+                    Invertir signo (+/-) — usar para tarjetas de crédito donde "+" es cargo y "-" es pago
+                  </mat-checkbox>
                 </div>
 
                 <div class="step-actions">
@@ -548,6 +586,37 @@ import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../..
 
     .edit-btn { color: #3d7ebf; }
     .delete-btn { color: #e53935; }
+
+    .ancho-fijo-info {
+      background: #f0f4ff;
+      border: 1px solid #c7d7f5;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 18px;
+      font-size: 13px;
+      color: #1a2332;
+    }
+    .info-header {
+      display: flex; align-items: center; gap: 8px;
+      color: #1e40af; font-size: 14px; margin-bottom: 8px;
+    }
+    .info-desc { margin: 0 0 10px; color: #374151; line-height: 1.5; }
+    .grupos-tabla {
+      width: 100%; border-collapse: collapse; font-size: 12px;
+    }
+    .grupos-tabla th {
+      background: #e8edf8; padding: 6px 10px; text-align: left;
+      font-weight: 600; color: #374151; border: 1px solid #c7d7f5;
+    }
+    .grupos-tabla td {
+      padding: 5px 10px; border: 1px solid #dde3ef; vertical-align: top;
+    }
+    .grupos-tabla code {
+      background: #f1f5f9; padding: 1px 4px; border-radius: 4px;
+      font-family: monospace; font-size: 11px; white-space: nowrap;
+    }
+    .patron-field { margin-top: 12px; }
+    .patron-field textarea { font-family: monospace; font-size: 13px; }
   `]
 })
 export class ConfiguracionExtractoComponent implements OnInit {
@@ -607,7 +676,10 @@ export class ConfiguracionExtractoComponent implements OnInit {
       factorMonto: [1],
       separadorMiles: ['.'],
       separadorDecimales: [','],
-      formatoTxt: ['DELIMITADO']
+      formatoTxt: ['DELIMITADO'],
+      patronLinea: [''],
+      formatoFechaLinea: ['dd/MM/yyyy'],
+      invertirSigno: [false]
     });
     this.cuentasForm = this.fb.group({
       aplicaParaTodasLasCuentas: [true],
@@ -715,14 +787,18 @@ export class ConfiguracionExtractoComponent implements OnInit {
         delete configuracionDetalle.formatoTxt;
       }
       if (this.esTxtAnchoFijo()) {
-        // El formato de ancho fijo detecta fecha/descripción/monto por posición de línea;
-        // solo conserva encoding, factorMonto y separadores de número.
+        const patron = (configuracionDetalle.patronLinea || '').trim();
         configuracionDetalle = {
           formatoTxt: 'ANCHO_FIJO',
           encoding: configuracionDetalle.encoding,
           factorMonto: configuracionDetalle.factorMonto,
           separadorMiles: configuracionDetalle.separadorMiles,
-          separadorDecimales: configuracionDetalle.separadorDecimales
+          separadorDecimales: configuracionDetalle.separadorDecimales,
+          ...(patron ? { patronLinea: patron } : {}),
+          ...(patron && configuracionDetalle.formatoFechaLinea
+              ? { formatoFechaLinea: configuracionDetalle.formatoFechaLinea } : {}),
+          ...(patron && configuracionDetalle.invertirSigno
+              ? { invertirSigno: true } : {})
         };
       } else {
         if (!configuracionDetalle.debitoYCreditoSeparados) {
@@ -813,7 +889,7 @@ export class ConfiguracionExtractoComponent implements OnInit {
       filasASaltar: 0, formatoFecha: 'dd/MM/yyyy',
       debitoYCreditoSeparados: false, encoding: 'UTF-8', numeroHoja: 0,
       factorMonto: 1, separadorMiles: '.', separadorDecimales: ',',
-      formatoTxt: 'DELIMITADO'
+      formatoTxt: 'DELIMITADO', patronLinea: '', formatoFechaLinea: 'dd/MM/yyyy', invertirSigno: false
     });
     this.cuentasForm.reset({ aplicaParaTodasLasCuentas: true, idsCuentas: [] });
     this.tipoArchivo = null;

@@ -64,6 +64,11 @@ import { AuthService } from '../core/auth.service';
             <mat-icon matListItemIcon>settings</mat-icon>
             <span matListItemTitle>Config. Extractos</span>
           </a>
+          <a mat-list-item routerLink="/usuarios" routerLinkActive="active-link"
+             *ngIf="auth.isAdmin()">
+            <mat-icon matListItemIcon>manage_accounts</mat-icon>
+            <span matListItemTitle>Usuarios</span>
+          </a>
         </mat-nav-list>
 
         <div class="sidebar-footer">

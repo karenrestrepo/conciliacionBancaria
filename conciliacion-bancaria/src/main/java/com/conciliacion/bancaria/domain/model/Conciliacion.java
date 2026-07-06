@@ -16,6 +16,7 @@ import java.util.List;
 public class Conciliacion {
 
     private final Long id;
+    private final Long empresaId;
     private final String periodo;               // formato YYYY-MM
     private final Long idCuenta;
     private final String numeroCuenta;

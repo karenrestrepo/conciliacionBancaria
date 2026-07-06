@@ -77,6 +77,11 @@ import { AuthService } from '../../core/auth.service';
                 <mat-spinner diameter="20" *ngIf="loading"></mat-spinner>
                 <span *ngIf="!loading">Ingresar</span>
               </button>
+
+              <div class="register-link">
+                ¿Es la primera vez?
+                <a (click)="irRegistro()" class="link-registro">Registre su empresa aquí</a>
+              </div>
             </form>
           </mat-card-content>
         </mat-card>
@@ -198,6 +203,22 @@ import { AuthService } from '../../core/auth.service';
     }
 
     .submit-btn:hover { background: #3d7ebf !important; }
+
+    .register-link {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+      color: #6b7a8d;
+    }
+
+    .link-registro {
+      color: #3d7ebf;
+      cursor: pointer;
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    .link-registro:hover { text-decoration: underline; }
   `]
 })
 export class LoginComponent {
@@ -215,6 +236,10 @@ export class LoginComponent {
       email: ['', [Validators.required, Validators.email]],
       password: ['', Validators.required]
     });
+  }
+
+  irRegistro(): void {
+    this.router.navigate(['/registro']);
   }
 
   onSubmit(): void {

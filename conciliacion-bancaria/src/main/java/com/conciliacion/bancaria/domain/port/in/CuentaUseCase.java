@@ -7,13 +7,14 @@ import java.util.List;
 
 public interface CuentaUseCase {
 
-    Cuenta crear(Long idBanco, String numeroCuenta, TipoCuenta tipo, String descripcion);
+    Cuenta crear(Long idBanco, String numeroCuenta, TipoCuenta tipo, String descripcion,
+                 boolean auxiliarConjunto);
 
     Cuenta obtenerPorId(Long id);
 
     List<Cuenta> listarPorBanco(Long idBanco);
 
-    List<Cuenta> listarActivas();
+    List<Cuenta> listarActivasPorEmpresa(Long empresaId);
 
     Cuenta cambiarEstado(Long id, boolean activo);
 

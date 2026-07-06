@@ -36,6 +36,24 @@ public interface MovimientoRepositoryPort {
     /** Elimina todos los movimientos contables que no están CONCILIADO (para re-carga del auxiliar). */
     void eliminarContablesNoConciliadosPorConciliacion(Long idConciliacion);
 
-    /** Marca un movimiento bancario con el estado dado (ej. AGRUPADO). */
+    /** Todos los contables incluyendo CONCILIADO — usado para detectar duplicados en re-carga. */
+    List<Movimiento> buscarTodosContablesPorConciliacion(Long idConciliacion);
+
+    /** Suma de todos los movimientos AGRUPADO reales (excluye el sintético) para un tipo dado. */
+    java.math.BigDecimal sumAgrupadosPorTipo(Long idConciliacion, String tipo);
+
+    /**
+     * Actualiza el monto del sintético "GASTOS BANCARIOS AGRUPADOS" PENDIENTE.
+     * Retorna el número de filas afectadas (0 si el sintético no existe aún).
+     */
+    int actualizarMontoSintetico(Long idConciliacion, String tipo, java.math.BigDecimal monto);
+
+    /** Elimina contables por sus IDs (para limpiar duplicados). */
+    void eliminarContablesPorIds(List<Long> ids);
+
+    /** Marca un movimiento bancario con el estado dado (ej. AGRUPADO, CONCILIADO). */
     void actualizarEstadoBancario(Long idMovimiento, com.conciliacion.bancaria.shared.EstadoMovimiento estado);
+
+    /** Marca un movimiento contable con el estado dado (ej. CONCILIADO). */
+    void actualizarEstadoContable(Long idMovimiento, com.conciliacion.bancaria.shared.EstadoMovimiento estado);
 }

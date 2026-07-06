@@ -28,6 +28,9 @@ public interface MovimientoBancarioJpaRepository
 
     List<MovimientoBancarioEntity> findByIdIn(List<Long> ids);
 
+    @Query("SELECT COUNT(m) FROM MovimientoBancarioEntity m JOIN ConciliacionEntity c ON c.id = m.idConciliacion WHERE c.empresaId = :empresaId")
+    long countByEmpresaId(@Param("empresaId") Long empresaId);
+
     @Query("SELECT m FROM MovimientoBancarioEntity m WHERE m.idConciliacion = :idConciliacion AND m.estadoConciliacion = 'AGRUPADO' ORDER BY m.descripcion, m.fecha")
     List<MovimientoBancarioEntity> findAgrupadosByIdConciliacion(@Param("idConciliacion") Long idConciliacion);
 
@@ -38,4 +41,14 @@ public interface MovimientoBancarioJpaRepository
     @Modifying
     @Query("UPDATE MovimientoBancarioEntity m SET m.estadoConciliacion = :estado WHERE m.id = :id")
     void actualizarEstado(@Param("id") Long id, @Param("estado") EstadoMovimiento estado);
+
+    @Query("SELECT COALESCE(SUM(m.monto), 0) FROM MovimientoBancarioEntity m WHERE m.idConciliacion = :idConciliacion AND m.estadoConciliacion = 'AGRUPADO' AND m.descripcion <> 'GASTOS BANCARIOS AGRUPADOS' AND m.tipo = :tipo")
+    java.math.BigDecimal sumAgrupadosPorTipo(@Param("idConciliacion") Long idConciliacion,
+                                             @Param("tipo") String tipo);
+
+    @Modifying
+    @Query("UPDATE MovimientoBancarioEntity m SET m.monto = :monto WHERE m.idConciliacion = :idConciliacion AND m.descripcion = 'GASTOS BANCARIOS AGRUPADOS' AND m.tipo = :tipo AND m.estadoConciliacion = 'PENDIENTE'")
+    int actualizarMontoSintetico(@Param("idConciliacion") Long idConciliacion,
+                                 @Param("tipo") String tipo,
+                                 @Param("monto") java.math.BigDecimal monto);
 }

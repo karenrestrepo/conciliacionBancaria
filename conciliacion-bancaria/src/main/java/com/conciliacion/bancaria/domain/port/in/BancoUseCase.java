@@ -6,11 +6,11 @@ import java.util.List;
 
 public interface BancoUseCase {
 
-    Banco crear(String nombre, String codigo);
+    Banco crear(String nombre, String codigo, Long empresaId);
 
     Banco obtenerPorId(Long id);
 
-    List<Banco> listarActivos();
+    List<Banco> listarActivos(Long empresaId);
 
     void desactivar(Long id);
 }

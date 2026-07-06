@@ -41,7 +41,8 @@ public class MovimientoRepositoryAdapter implements MovimientoRepositoryPort {
     @Override
     public List<Movimiento> buscarBancariosPorConciliacion(Long idConciliacion) {
         return bancarioRepo.findByIdConciliacion(idConciliacion).stream()
-                .filter(e -> e.getEstadoConciliacion() != com.conciliacion.bancaria.shared.EstadoMovimiento.AGRUPADO)
+                .filter(e -> e.getEstadoConciliacion() != com.conciliacion.bancaria.shared.EstadoMovimiento.AGRUPADO
+                          && e.getEstadoConciliacion() != com.conciliacion.bancaria.shared.EstadoMovimiento.CONCILIADO)
                 .map(MovimientoMapper::toDomain)
                 .toList();
     }
@@ -49,8 +50,32 @@ public class MovimientoRepositoryAdapter implements MovimientoRepositoryPort {
     @Override
     public List<Movimiento> buscarContablesPorConciliacion(Long idConciliacion) {
         return contableRepo.findByIdConciliacion(idConciliacion).stream()
+                .filter(e -> e.getEstadoConciliacion() != com.conciliacion.bancaria.shared.EstadoMovimiento.CONCILIADO)
                 .map(MovimientoMapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public List<Movimiento> buscarTodosContablesPorConciliacion(Long idConciliacion) {
+        return contableRepo.findByIdConciliacion(idConciliacion).stream()
+                .map(MovimientoMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public void eliminarContablesPorIds(List<Long> ids) {
+        contableRepo.deleteAllById(ids);
+    }
+
+    @Override
+    public java.math.BigDecimal sumAgrupadosPorTipo(Long idConciliacion, String tipo) {
+        return bancarioRepo.sumAgrupadosPorTipo(idConciliacion, tipo);
+    }
+
+    @Override
+    public int actualizarMontoSintetico(Long idConciliacion, String tipo,
+                                        java.math.BigDecimal monto) {
+        return bancarioRepo.actualizarMontoSintetico(idConciliacion, tipo, monto);
     }
 
     @Override
@@ -107,6 +132,11 @@ public class MovimientoRepositoryAdapter implements MovimientoRepositoryPort {
     @Override
     public void actualizarEstadoBancario(Long idMovimiento, com.conciliacion.bancaria.shared.EstadoMovimiento estado) {
         bancarioRepo.actualizarEstado(idMovimiento, estado);
+    }
+
+    @Override
+    public void actualizarEstadoContable(Long idMovimiento, com.conciliacion.bancaria.shared.EstadoMovimiento estado) {
+        contableRepo.actualizarEstado(idMovimiento, estado);
     }
 
     @Override

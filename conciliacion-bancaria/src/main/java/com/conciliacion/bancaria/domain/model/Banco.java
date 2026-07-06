@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class Banco {
 
     private final Long id;
+    private final Long empresaId;
     private final String nombre;
     private final String codigo;
     private final Boolean activo;

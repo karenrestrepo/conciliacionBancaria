@@ -20,8 +20,8 @@ public class CuentaUseCaseImpl implements CuentaUseCase {
 
     @Override
     @Transactional
-    public Cuenta crear(Long idBanco, String numeroCuenta, TipoCuenta tipo, String descripcion) {
-        // Verifica que el banco exista (lanza excepción si no)
+    public Cuenta crear(Long idBanco, String numeroCuenta, TipoCuenta tipo, String descripcion,
+                        boolean auxiliarConjunto) {
         bancoUseCase.obtenerPorId(idBanco);
 
         if (numeroCuenta == null || numeroCuenta.isBlank()) {
@@ -32,12 +32,17 @@ public class CuentaUseCaseImpl implements CuentaUseCase {
                     "Ya existe una cuenta con el número " + numeroCuenta + " para ese banco");
         }
 
+        TipoCuenta tipoCuenta = tipo != null ? tipo : TipoCuenta.CORRIENTE;
+        boolean esAuxiliarConjunto = auxiliarConjunto
+                && tipoCuenta == TipoCuenta.TARJETA_CREDITO;
+
         Cuenta nueva = Cuenta.builder()
                 .idBanco(idBanco)
                 .numeroCuenta(numeroCuenta.trim())
-                .tipo(tipo != null ? tipo : TipoCuenta.CORRIENTE)
+                .tipo(tipoCuenta)
                 .descripcion(descripcion)
                 .activo(true)
+                .auxiliarConjunto(esAuxiliarConjunto)
                 .build();
 
         return cuentaRepo.guardar(nueva);
@@ -59,8 +64,8 @@ public class CuentaUseCaseImpl implements CuentaUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Cuenta> listarActivas() {
-        return cuentaRepo.listarActivas();
+    public List<Cuenta> listarActivasPorEmpresa(Long empresaId) {
+        return cuentaRepo.listarActivasPorEmpresa(empresaId);
     }
 
     @Override

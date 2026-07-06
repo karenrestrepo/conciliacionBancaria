@@ -135,35 +135,39 @@ import { Conciliacion, Sugerencia, MovimientoAgrupado, GrupoGastoBancario } from
           </button>
         </div>
 
-        <!-- Cruces manuales completados -->
-        <section *ngIf="partidasCruzadas.length > 0" class="cruces-section">
-          <div class="cruces-header">
-            <mat-icon class="cruces-icon">compare_arrows</mat-icon>
-            <div>
-              <h2 class="cruces-title">Cruces manuales ({{ partidasCruzadas.length }})</h2>
-              <p class="cruces-subtitle">Partidas cruzadas manualmente — no generadas por el motor</p>
+        <!-- Cruces manuales completados (plegable) -->
+        <div *ngIf="partidasCruzadas.length > 0" class="cruces-toggle-wrap">
+          <button class="cruces-toggle-btn" (click)="mostrarCruces = !mostrarCruces">
+            <div class="cruces-toggle-left">
+              <mat-icon class="cruces-toggle-icon">compare_arrows</mat-icon>
+              <span class="cruces-toggle-label">Cruces manuales</span>
+              <span class="cruces-toggle-count">{{ partidasCruzadas.length }}</span>
             </div>
-          </div>
-          <mat-card *ngFor="let p of partidasCruzadas" class="cruce-card">
-            <mat-card-content>
-              <div class="cruce-row">
-                <span class="origen-badge" [class.bancario]="p.tipoOrigen === 'BANCARIO'"
-                                            [class.contable]="p.tipoOrigen === 'CONTABLE'">
-                  <mat-icon>{{ p.tipoOrigen === 'BANCARIO' ? 'account_balance' : 'book' }}</mat-icon>
-                  {{ p.tipoOrigen === 'BANCARIO' ? 'Bancario' : 'Contable' }}
-                </span>
-                <span class="cruce-fecha">{{ p.fechaMovimiento | date:'dd/MM/yyyy' }}</span>
-                <span class="cruce-desc" [title]="p.descripcionMovimiento">{{ p.descripcionMovimiento }}</span>
-                <span class="cruce-monto"
-                      [class.debito]="p.tipoMovimiento === 'DEBITO'"
-                      [class.credito]="p.tipoMovimiento === 'CREDITO'">
-                  {{ p.tipoMovimiento === 'DEBITO' ? '−' : '+' }}{{ p.montoMovimiento | currency:'COP':'symbol':'1.0-0' }}
-                </span>
-                <span class="cruce-estado">Cruzada</span>
-              </div>
-            </mat-card-content>
-          </mat-card>
-        </section>
+            <mat-icon class="cruces-toggle-arrow">{{ mostrarCruces ? 'expand_less' : 'expand_more' }}</mat-icon>
+          </button>
+
+          <section *ngIf="mostrarCruces" class="cruces-section">
+            <mat-card *ngFor="let p of partidasCruzadas" class="cruce-card">
+              <mat-card-content>
+                <div class="cruce-row">
+                  <span class="origen-badge" [class.bancario]="p.tipoOrigen === 'BANCARIO'"
+                                              [class.contable]="p.tipoOrigen === 'CONTABLE'">
+                    <mat-icon>{{ p.tipoOrigen === 'BANCARIO' ? 'account_balance' : 'book' }}</mat-icon>
+                    {{ p.tipoOrigen === 'BANCARIO' ? 'Bancario' : 'Contable' }}
+                  </span>
+                  <span class="cruce-fecha">{{ p.fechaMovimiento | date:'dd/MM/yyyy' }}</span>
+                  <span class="cruce-desc" [title]="p.descripcionMovimiento">{{ p.descripcionMovimiento }}</span>
+                  <span class="cruce-monto"
+                        [class.debito]="p.tipoMovimiento === 'DEBITO'"
+                        [class.credito]="p.tipoMovimiento === 'CREDITO'">
+                    {{ p.tipoMovimiento === 'DEBITO' ? '−' : '+' }}{{ p.montoMovimiento | currency:'COP':'symbol':'1.0-0' }}
+                  </span>
+                  <span class="cruce-estado">Cruzada</span>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </section>
+        </div>
 
         <!-- Panel gastos bancarios agrupados -->
         <section *ngIf="mostrarGastos" class="gastos-section">
@@ -491,14 +495,27 @@ import { Conciliacion, Sugerencia, MovimientoAgrupado, GrupoGastoBancario } from
     .estado-cerrada { color: #166534; font-weight: 500; }
 
     /* Cruces manuales */
-    .cruces-section {
-      margin-top: 28px; border: 1.5px solid #bfdbfe;
-      border-radius: 12px; padding: 20px 24px; background: #f0f7ff;
+    .cruces-toggle-wrap { margin-bottom: 16px; }
+    .cruces-toggle-btn {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; background: #eff6ff; border: 1.5px solid #bfdbfe;
+      border-radius: 10px; padding: 12px 16px;
+      cursor: pointer; font-size: 14px; color: #1e40af;
+      transition: all 0.15s;
     }
-    .cruces-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
-    .cruces-icon { color: #1d4ed8; margin-top: 2px; font-size: 22px; }
-    .cruces-title { font-size: 17px; font-weight: 600; color: #1a2332; margin: 0 0 2px; }
-    .cruces-subtitle { font-size: 12px; color: #6b7a8d; margin: 0; }
+    .cruces-toggle-btn:hover { background: #dbeafe; border-color: #93c5fd; }
+    .cruces-toggle-left { display: flex; align-items: center; gap: 10px; }
+    .cruces-toggle-icon { font-size: 20px; width: 20px; height: 20px; color: #1d4ed8; }
+    .cruces-toggle-label { font-weight: 600; }
+    .cruces-toggle-count {
+      background: #1d4ed8; color: #fff;
+      padding: 1px 8px; border-radius: 12px; font-size: 12px; font-weight: 600;
+    }
+    .cruces-toggle-arrow { color: #1d4ed8; }
+    .cruces-section {
+      margin-top: 8px; border: 1.5px solid #bfdbfe;
+      border-radius: 10px; padding: 16px 20px; background: #f0f7ff;
+    }
     .cruce-card { margin-bottom: 8px !important; border-radius: 8px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.05) !important; }
     .cruce-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .cruce-fecha { font-size: 12px; color: #6b7a8d; flex-shrink: 0; }
@@ -616,6 +633,7 @@ export class SugerenciasComponent implements OnInit {
 
   // Cruces manuales completados
   partidasCruzadas: any[] = [];
+  mostrarCruces = false;
 
   // Gastos bancarios agrupados
   mostrarGastos = false;

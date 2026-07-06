@@ -42,13 +42,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String email = jwtService.extraerEmail(token);
         String rol = jwtService.extraerRol(token);
+        Long empresaId = jwtService.extraerEmpresaId(token);
 
-        // Spring Security necesita el rol con prefijo ROLE_
         var auth = new UsernamePasswordAuthenticationToken(
                 email,
                 null,
                 List.of(new SimpleGrantedAuthority("ROLE_" + rol))
         );
+        // Almacenar empresaId en los detalles para acceso en controladores
+        auth.setDetails(empresaId);
 
         SecurityContextHolder.getContext().setAuthentication(auth);
         filterChain.doFilter(request, response);

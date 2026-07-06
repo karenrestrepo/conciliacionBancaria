@@ -15,11 +15,14 @@ public interface ConciliacionRepositoryPort {
 
     List<Conciliacion> buscarPorUsuarioCreador(Long idUsuario);
 
-    List<Conciliacion> buscarTodas();
+    List<Conciliacion> buscarPorEmpresa(Long empresaId);
 
     boolean existePorPeriodoYCuenta(String periodo, Long idCuenta);
 
     EstadoConciliacion obtenerEstado(Long id);
 
     Long obtenerIdCuentaPorConciliacion(Long idConciliacion);
+
+    /** Indica si la cuenta de esta conciliación tiene auxiliar_conjunto = true. */
+    boolean esAuxiliarConjunto(Long idConciliacion);
 }

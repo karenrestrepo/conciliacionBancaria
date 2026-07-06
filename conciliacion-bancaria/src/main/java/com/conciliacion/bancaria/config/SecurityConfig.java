@@ -46,9 +46,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/bancos/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/cuentas/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/configuraciones-extracto/**").authenticated()
-                        // Métricas: CONTADOR, FINANZAS y ADMIN
-                        .requestMatchers(HttpMethod.GET, "/api/v1/metricas/**")
-                        .hasAnyRole("CONTADOR", "FINANZAS", "ADMIN")
+                        // Métricas: todos los roles autenticados
+                        .requestMatchers(HttpMethod.GET, "/api/v1/metricas/**").authenticated()
                         // Todo lo demás requiere autenticación
                         .anyRequest().authenticated()
                 )

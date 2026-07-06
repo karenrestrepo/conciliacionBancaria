@@ -35,6 +35,9 @@ public class CuentaEntity {
     @Column(nullable = false)
     private Boolean activo;
 
+    @Column(name = "auxiliar_conjunto", nullable = false)
+    private Boolean auxiliarConjunto;
+
     @Column(name = "ts_creacion", nullable = false)
     private LocalDateTime tsCreacion;
 
@@ -43,5 +46,6 @@ public class CuentaEntity {
         if (tsCreacion == null) tsCreacion = LocalDateTime.now();
         if (activo == null) activo = true;
         if (tipo == null) tipo = TipoCuenta.CORRIENTE;
+        if (auxiliarConjunto == null) auxiliarConjunto = false;
     }
 }

@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -42,7 +43,8 @@ public class CuentaController {
                 idBanco,
                 request.getNumeroCuenta(),
                 request.getTipo(),
-                request.getDescripcion());
+                request.getDescripcion(),
+                Boolean.TRUE.equals(request.getAuxiliarConjunto()));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok("Cuenta creada", toResponse(cuenta)));
     }
@@ -69,10 +71,17 @@ public class CuentaController {
     @GetMapping("/api/v1/cuentas")
     @PreAuthorize("hasAnyRole('AUXILIAR','CONTADOR','FINANZAS','ADMIN')")
     public ResponseEntity<ApiResponse<List<CuentaResponse>>> listarTodas() {
-        List<CuentaResponse> lista = cuentaUseCase.listarActivas().stream()
+        Long empresaId = empresaIdActual();
+        List<CuentaResponse> lista = cuentaUseCase.listarActivasPorEmpresa(empresaId).stream()
                 .map(this::toResponse)
                 .toList();
         return ResponseEntity.ok(ApiResponse.ok(lista));
+    }
+
+    private Long empresaIdActual() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getDetails() instanceof Long id) return id;
+        return null;
     }
 
     // ── Mapper ────────────────────────────────────────────────────────────
@@ -86,6 +95,7 @@ public class CuentaController {
                 .tipo(c.getTipo())
                 .descripcion(c.getDescripcion())
                 .activo(c.getActivo())
+                .auxiliarConjunto(Boolean.TRUE.equals(c.getAuxiliarConjunto()))
                 .tsCreacion(c.getTsCreacion())
                 .build();
     }

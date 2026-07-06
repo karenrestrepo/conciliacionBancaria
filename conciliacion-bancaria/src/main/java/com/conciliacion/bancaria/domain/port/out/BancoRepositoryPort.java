@@ -11,9 +11,9 @@ public interface BancoRepositoryPort {
 
     Optional<Banco> buscarPorId(Long id);
 
-    List<Banco> listarActivos();
+    List<Banco> listarActivosPorEmpresa(Long empresaId);
 
     List<Banco> listarTodos();
 
-    boolean existePorNombre(String nombre);
+    boolean existePorNombreYEmpresa(String nombre, Long empresaId);
 }

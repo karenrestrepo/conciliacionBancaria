@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,6 +27,7 @@ public class ConciliacionController {
     private final CierreUseCase cierreUseCase;
     private final JobStatusUseCase jobStatusUseCase;
     private final com.conciliacion.bancaria.domain.port.out.MovimientoRepositoryPort movimientoRepo;
+    private final com.conciliacion.bancaria.domain.port.out.ConciliacionRepositoryPort conciliacionRepo;
 
     // ── Iniciar conciliación (AUXILIAR, CONTADOR) ─────────────────────────────
 
@@ -35,9 +37,8 @@ public class ConciliacionController {
             @Valid @RequestBody ConciliacionRequest request,
             @AuthenticationPrincipal String email) {
 
-        // Por ahora usamos id=1 del admin; en siguiente paso extraemos del token
         Conciliacion conciliacion = conciliacionUseCase.iniciar(
-                request.getPeriodo(), 1L, request.getIdCuenta());
+                request.getPeriodo(), 1L, request.getIdCuenta(), empresaIdActual());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok("Conciliación iniciada", toResponse(conciliacion)));
     }
@@ -58,7 +59,7 @@ public class ConciliacionController {
     @PreAuthorize("hasAnyRole('AUXILIAR','CONTADOR','FINANZAS','ADMIN')")
     public ResponseEntity<ApiResponse<List<ConciliacionResponse>>> listar() {
         List<ConciliacionResponse> lista = conciliacionUseCase
-                .listarTodas().stream()
+                .listarPorEmpresa(empresaIdActual()).stream()
                 .map(this::toResponse)
                 .toList();
         return ResponseEntity.ok(ApiResponse.ok(lista));
@@ -261,6 +262,14 @@ public class ConciliacionController {
                 toResponse(cierreUseCase.cerrar(id, 1L))));
     }
 
+    // ── Helper de seguridad ───────────────────────────────────────────────────
+
+    private Long empresaIdActual() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getDetails() instanceof Long id) return id;
+        return null;
+    }
+
     // ── Mappers locales ───────────────────────────────────────────────────────
 
     private ConciliacionResponse toResponse(Conciliacion c) {
@@ -280,6 +289,7 @@ public class ConciliacionController {
                 .saldoExtracto(c.getSaldoExtracto())
                 .saldoAuxiliar(c.getSaldoAuxiliar())
                 .diferenciaSaldo(c.getDiferenciaSaldo())
+                .auxiliarConjunto(c.getId() != null ? conciliacionRepo.esAuxiliarConjunto(c.getId()) : false)
                 .build();
     }
 

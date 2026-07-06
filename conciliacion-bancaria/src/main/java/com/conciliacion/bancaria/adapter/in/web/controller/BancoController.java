@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,7 +25,7 @@ public class BancoController {
     @GetMapping
     @PreAuthorize("hasAnyRole('AUXILIAR','CONTADOR','FINANZAS','ADMIN')")
     public ResponseEntity<ApiResponse<List<BancoResponse>>> listar() {
-        List<BancoResponse> lista = bancoUseCase.listarActivos().stream()
+        List<BancoResponse> lista = bancoUseCase.listarActivos(empresaIdActual()).stream()
                 .map(this::toResponse)
                 .toList();
         return ResponseEntity.ok(ApiResponse.ok(lista));
@@ -34,7 +35,7 @@ public class BancoController {
     @PreAuthorize("hasAnyRole('CONTADOR','ADMIN')")
     public ResponseEntity<ApiResponse<BancoResponse>> crear(
             @Valid @RequestBody BancoRequest request) {
-        Banco banco = bancoUseCase.crear(request.getNombre(), request.getCodigo());
+        Banco banco = bancoUseCase.crear(request.getNombre(), request.getCodigo(), empresaIdActual());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok("Banco creado", toResponse(banco)));
     }
@@ -44,6 +45,12 @@ public class BancoController {
     public ResponseEntity<ApiResponse<Void>> eliminar(@PathVariable Long id) {
         bancoUseCase.desactivar(id);
         return ResponseEntity.ok(ApiResponse.ok("Banco eliminado", null));
+    }
+
+    private Long empresaIdActual() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getDetails() instanceof Long id) return id;
+        return null;
     }
 
     private BancoResponse toResponse(Banco b) {

@@ -24,6 +24,7 @@ public class ConciliacionMapper {
                                         String nombreBanco) {
         return Conciliacion.builder()
                 .id(e.getId())
+                .empresaId(e.getEmpresaId())
                 .periodo(e.getPeriodo())
                 .idCuenta(e.getIdCuenta())
                 .numeroCuenta(numeroCuenta)
@@ -44,6 +45,7 @@ public class ConciliacionMapper {
     public static ConciliacionEntity toEntity(Conciliacion c) {
         return ConciliacionEntity.builder()
                 .id(c.getId())
+                .empresaId(c.getEmpresaId())
                 .periodo(c.getPeriodo())
                 .idCuenta(c.getIdCuenta() != null ? c.getIdCuenta() : 1L)
                 .estado(c.getEstado())

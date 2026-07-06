@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
-import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, MetricasResumen, ConfiguracionExtracto, GastoBancario, MovimientoAgrupado } from './models';
+import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, MetricasResumen, ConfiguracionExtracto, GastoBancario, MovimientoAgrupado, UsuarioResponse, UsuarioCreateRequest, UsuarioUpdateRequest, Permiso, RolUsuario } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -52,10 +52,10 @@ export class ApiService {
       `${this.API}/cuentas`, { headers: this.headers() });
   }
 
-  crearCuenta(idBanco: number, numeroCuenta: string, tipo: TipoCuenta, descripcion: string): Observable<ApiResponse<Cuenta>> {
+  crearCuenta(idBanco: number, numeroCuenta: string, tipo: TipoCuenta, descripcion: string, auxiliarConjunto: boolean = false): Observable<ApiResponse<Cuenta>> {
     return this.http.post<ApiResponse<Cuenta>>(
       `${this.API}/bancos/${idBanco}/cuentas`,
-      { numeroCuenta, tipo, descripcion },
+      { numeroCuenta, tipo, descripcion, auxiliarConjunto },
       { headers: this.headers() });
   }
 
@@ -206,5 +206,26 @@ export class ApiService {
   eliminarConfiguracion(id: number): Observable<ApiResponse<any>> {
     return this.http.delete<ApiResponse<any>>(
       `${this.API}/configuraciones-extracto/${id}`, { headers: this.headers() });
+  }
+
+  // Usuarios (solo ADMIN)
+  listarUsuarios(): Observable<ApiResponse<UsuarioResponse[]>> {
+    return this.http.get<ApiResponse<UsuarioResponse[]>>(
+      `${this.API}/usuarios`, { headers: this.headers() });
+  }
+
+  permisosDefaultsRol(rol: RolUsuario): Observable<ApiResponse<Permiso[]>> {
+    return this.http.get<ApiResponse<Permiso[]>>(
+      `${this.API}/usuarios/permisos-defaults/${rol}`, { headers: this.headers() });
+  }
+
+  crearUsuario(req: UsuarioCreateRequest): Observable<ApiResponse<UsuarioResponse>> {
+    return this.http.post<ApiResponse<UsuarioResponse>>(
+      `${this.API}/usuarios`, req, { headers: this.headers() });
+  }
+
+  actualizarUsuario(id: number, req: UsuarioUpdateRequest): Observable<ApiResponse<UsuarioResponse>> {
+    return this.http.put<ApiResponse<UsuarioResponse>>(
+      `${this.API}/usuarios/${id}`, req, { headers: this.headers() });
   }
 }

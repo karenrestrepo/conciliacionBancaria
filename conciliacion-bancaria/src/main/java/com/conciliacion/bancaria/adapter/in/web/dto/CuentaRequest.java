@@ -16,4 +16,6 @@ public class CuentaRequest {
 
     @Size(max = 200, message = "La descripción no puede superar 200 caracteres")
     private String descripcion;
+
+    private Boolean auxiliarConjunto;
 }

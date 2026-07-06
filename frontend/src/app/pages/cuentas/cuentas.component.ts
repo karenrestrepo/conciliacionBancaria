@@ -10,6 +10,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { Banco, Cuenta, TipoCuenta } from '../../core/models';
@@ -20,7 +21,7 @@ import { Banco, Cuenta, TipoCuenta } from '../../core/models';
   imports: [
     CommonModule, RouterModule, ReactiveFormsModule, MatCardModule, MatTableModule,
     MatIconModule, MatButtonModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatProgressSpinnerModule
+    MatSelectModule, MatProgressSpinnerModule, MatCheckboxModule
   ],
   template: `
     <div class="page-container">
@@ -59,6 +60,7 @@ import { Banco, Cuenta, TipoCuenta } from '../../core/models';
                 <mat-option value="CORRIENTE">Corriente</mat-option>
                 <mat-option value="AHORRO">Ahorro</mat-option>
                 <mat-option value="FIDUCIARIA">Fiduciaria</mat-option>
+                <mat-option value="TARJETA_CREDITO">Tarjeta de Crédito</mat-option>
                 <mat-option value="OTRA">Otra</mat-option>
               </mat-select>
             </mat-form-field>
@@ -67,6 +69,13 @@ import { Banco, Cuenta, TipoCuenta } from '../../core/models';
               <mat-label>Descripción (opcional)</mat-label>
               <input matInput formControlName="descripcion" placeholder="Cuenta principal pagos">
             </mat-form-field>
+
+            <div class="auxiliar-conjunto-field" *ngIf="cuentaForm.get('tipo')?.value === 'TARJETA_CREDITO'">
+              <mat-checkbox formControlName="auxiliarConjunto" color="primary">
+                Auxiliar conjunto con otras tarjetas
+              </mat-checkbox>
+              <p class="auxiliar-hint">Las tarjetas del mismo banco comparten un único auxiliar contable</p>
+            </div>
 
             <button mat-flat-button class="save-btn" type="submit"
                     [disabled]="cuentaForm.invalid || saving">
@@ -251,10 +260,17 @@ import { Banco, Cuenta, TipoCuenta } from '../../core/models';
       padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500;
     }
 
-    .tipo-corriente  { background: #dbeafe; color: #1e40af; }
-    .tipo-ahorro     { background: #dcfce7; color: #166534; }
-    .tipo-fiduciaria { background: #fef3c7; color: #92400e; }
-    .tipo-otra       { background: #f3f4f6; color: #374151; }
+    .tipo-corriente       { background: #dbeafe; color: #1e40af; }
+    .tipo-ahorro          { background: #dcfce7; color: #166534; }
+    .tipo-fiduciaria      { background: #fef3c7; color: #92400e; }
+    .tipo-tarjeta_credito { background: #fce7f3; color: #9d174d; }
+    .tipo-otra            { background: #f3f4f6; color: #374151; }
+
+    .auxiliar-conjunto-field {
+      display: flex; flex-direction: column; gap: 2px;
+      justify-content: center; padding-top: 8px;
+    }
+    .auxiliar-hint { font-size: 11px; color: #6b7a8d; margin: 0; }
 
     .activo-chip { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
     .activo   { background: #dcfce7; color: #166534; }
@@ -297,7 +313,8 @@ export class CuentasComponent implements OnInit {
     this.cuentaForm = this.fb.group({
       numeroCuenta: ['', [Validators.required, Validators.maxLength(50)]],
       tipo: ['CORRIENTE', Validators.required],
-      descripcion: ['', Validators.maxLength(200)]
+      descripcion: ['', Validators.maxLength(200)],
+      auxiliarConjunto: [false]
     });
   }
 
@@ -322,11 +339,11 @@ export class CuentasComponent implements OnInit {
     if (this.cuentaForm.invalid) return;
     this.saving = true;
     this.errorCrear = '';
-    const { numeroCuenta, tipo, descripcion } = this.cuentaForm.value;
-    this.api.crearCuenta(this.idBanco, numeroCuenta, tipo as TipoCuenta, descripcion ?? '').subscribe({
+    const { numeroCuenta, tipo, descripcion, auxiliarConjunto } = this.cuentaForm.value;
+    this.api.crearCuenta(this.idBanco, numeroCuenta, tipo as TipoCuenta, descripcion ?? '', !!auxiliarConjunto).subscribe({
       next: res => {
         this.cuentas = [...this.cuentas, res.data];
-        this.cuentaForm.reset({ tipo: 'CORRIENTE' });
+        this.cuentaForm.reset({ tipo: 'CORRIENTE', auxiliarConjunto: false });
         this.saving = false;
       },
       error: err => {
@@ -362,7 +379,7 @@ export class CuentasComponent implements OnInit {
   getTipoLabel(tipo: TipoCuenta): string {
     const map: Record<TipoCuenta, string> = {
       CORRIENTE: 'Corriente', AHORRO: 'Ahorro',
-      FIDUCIARIA: 'Fiduciaria', OTRA: 'Otra'
+      FIDUCIARIA: 'Fiduciaria', TARJETA_CREDITO: 'T. Crédito', OTRA: 'Otra'
     };
     return map[tipo] ?? tipo;
   }

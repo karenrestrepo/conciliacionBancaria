@@ -20,7 +20,7 @@ public class IniciarConciliacionUseCase implements ConciliacionUseCase {
 
     @Override
     @Transactional
-    public Conciliacion iniciar(String periodo, Long idUsuario, Long idCuenta) {
+    public Conciliacion iniciar(String periodo, Long idUsuario, Long idCuenta, Long empresaId) {
         if (conciliacionRepo.existePorPeriodoYCuenta(periodo, idCuenta)) {
             throw new IllegalStateException(
                     "Ya existe una conciliación para el período " + periodo
@@ -30,6 +30,7 @@ public class IniciarConciliacionUseCase implements ConciliacionUseCase {
         Conciliacion nueva = Conciliacion.builder()
                 .periodo(periodo)
                 .idCuenta(idCuenta)
+                .empresaId(empresaId)
                 .estado(EstadoConciliacion.BORRADOR)
                 .idUsuarioCreador(idUsuario)
                 .build();
@@ -55,8 +56,8 @@ public class IniciarConciliacionUseCase implements ConciliacionUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Conciliacion> listarTodas() {
-        return conciliacionRepo.buscarTodas();
+    public List<Conciliacion> listarPorEmpresa(Long empresaId) {
+        return conciliacionRepo.buscarPorEmpresa(empresaId);
     }
 
     @Override

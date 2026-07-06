@@ -7,9 +7,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(InvalidStateTransitionException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidState(
@@ -49,7 +54,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(
             IllegalArgumentException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(e.getMessage()));
     }
 
@@ -58,6 +63,16 @@ public class GlobalExceptionHandler {
             IllegalStateException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMessageNotReadable(
+            HttpMessageNotReadableException e) {
+        String msg = e.getMessage() != null && e.getMessage().contains("Cannot deserialize value")
+                ? "Valor inválido en el cuerpo de la solicitud"
+                : "Cuerpo de la solicitud inválido o mal formado";
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(msg));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -80,8 +95,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneral(Exception e) {
+        log.error("Error interno no manejado: {}", e.getMessage(), e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Error interno del servidor"));
+                .body(ApiResponse.error("Error interno: " + e.getMessage()));
     }
 
 }
