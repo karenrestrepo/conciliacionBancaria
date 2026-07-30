@@ -64,6 +64,16 @@ public class SugerenciaRepositoryAdapter implements SugerenciaRepositoryPort {
         return jpaRepository.findBancarioIdsConSugerenciaPendiente(idConciliacion);
     }
 
+    @Override
+    public Optional<Sugerencia> buscarActivaPorMovimientoContable(Long idMovContable) {
+        return jpaRepository.findActivaByIdMovContable(idMovContable).map(this::toDomain);
+    }
+
+    @Override
+    public void eliminarPorId(Long id) {
+        jpaRepository.deleteById(id);
+    }
+
     private SugerenciaEntity toEntity(Sugerencia s) {
         return SugerenciaEntity.builder()
                 .id(s.getId())

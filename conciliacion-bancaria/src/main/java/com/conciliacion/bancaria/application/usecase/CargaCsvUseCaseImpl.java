@@ -4,6 +4,8 @@ import com.conciliacion.bancaria.domain.exception.CsvValidationException;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
 import com.conciliacion.bancaria.domain.model.ConfiguracionExtracto;
 import com.conciliacion.bancaria.domain.model.Movimiento;
+import com.conciliacion.bancaria.domain.model.ResumenCargaAuxiliar;
+import com.conciliacion.bancaria.domain.model.Sugerencia;
 import com.conciliacion.bancaria.domain.model.extractoconfig.ConfiguracionExtractoDetalle;
 import com.conciliacion.bancaria.domain.port.in.CargaCsvUseCase;
 import com.conciliacion.bancaria.domain.port.out.BankStatementParserPort;
@@ -16,6 +18,7 @@ import com.conciliacion.bancaria.domain.port.out.JobRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.MovimientoRepositoryPort;
 import com.conciliacion.bancaria.domain.service.ConciliationEngine;
 import com.conciliacion.bancaria.domain.service.CsvValidatorService;
+import com.conciliacion.bancaria.domain.service.MovimientoReversionService;
 import com.conciliacion.bancaria.domain.service.SiesaXlsParserService;
 import com.conciliacion.bancaria.domain.port.out.SugerenciaRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.PartidaRepositoryPort;
@@ -33,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -54,6 +58,23 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
     private final ConciliacionRepositoryPort conciliacionRepo;
     private final ConfiguracionGastoBancarioRepositoryPort gastoRepo;
     private final ConfiguracionExtractoRepositoryPort configuracionExtractoRepo;
+    private final MovimientoReversionService reversionService;
+
+    /**
+     * Auto-referencia al proxy Spring de este mismo bean. Los métodos {@code @Async}
+     * de esta clase se invocaban antes como {@code this.metodo(...)} desde otros
+     * métodos de la MISMA clase — el proxy AOP de Spring no intercepta llamadas
+     * internas, así que {@code @Async} nunca surtía efecto (corría síncrono, dentro
+     * de la misma transacción). Se llama a través de {@code self} en vez de
+     * directo para que sí pase por el proxy. No es {@code final} ni participa del
+     * constructor (Lombok @RequiredArgsConstructor solo incluye campos {@code final})
+     * porque no puede auto-inyectarse durante su propia construcción; @Lazy difiere
+     * la resolución al primer uso real. En tests unitarios (fuera de un contenedor
+     * Spring) se asigna manualmente a la misma instancia tras construirla.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    CargaCsvUseCaseImpl self;
 
     // Mapeo estándar — columnas genéricas. Solo usado por cargarLibroAuxiliar (auxiliar
     // contable), que no pasa por ConfiguracionExtracto ni por el motor de extractos bancarios.
@@ -92,7 +113,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
 
             // Lanzar motor asíncrono y retornar job_id (TRD RT-03)
             String jobId = jobRepo.crearJob(idConciliacion);
-            ejecutarMotorAsync(jobId, idConciliacion);
+            self.ejecutarMotorAsync(jobId, idConciliacion);
             return jobId;
 
         } catch (CsvValidationException e) {
@@ -152,7 +173,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
 
     @Override
     @Transactional
-    public String cargarLibroAuxiliar(Long idConciliacion, MultipartFile archivo) {
+    public ResumenCargaAuxiliar cargarLibroAuxiliar(Long idConciliacion, MultipartFile archivo) {
         try {
             eventLog.csvUpload(idConciliacion, null, archivo.getOriginalFilename());
             byte[] contenido = archivo.getBytes();
@@ -161,30 +182,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                     ? siesaParser.parsear(contenido)
                     : csvValidator.parsear(contenido, MAPEO_ESTANDAR);
 
-            // Huellas de TODOS los contables existentes (incluyendo CONCILIADO) para que
-            // los movimientos ya conciliados no vuelvan a insertarse como "nuevos".
-            Set<String> huellas = movimientoRepo.buscarTodosContablesPorConciliacion(idConciliacion)
-                    .stream()
-                    .map(this::huella)
-                    .collect(Collectors.toSet());
-
-            List<Movimiento> soloNuevos = delArchivo.stream()
-                    .filter(m -> !huellas.contains(huella(m)))
-                    .toList();
-
-            if (soloNuevos.isEmpty()) {
-                log.info("Re-carga de auxiliar sin movimientos nuevos (conciliacion={})", idConciliacion);
-                return "sin-cambios";
-            }
-
-            log.info("Re-carga incremental de auxiliar: {} nuevos de {} en archivo (conciliacion={})",
-                    soloNuevos.size(), delArchivo.size(), idConciliacion);
-
-            List<Movimiento> persistidos = movimientoRepo.guardarContables(soloNuevos, idConciliacion);
-
-            String jobId = jobRepo.crearJob(idConciliacion);
-            ejecutarMotorIncrementalAsync(jobId, idConciliacion, persistidos);
-            return jobId;
+            return procesarRecargaAuxiliar(idConciliacion, delArchivo);
         } catch (CsvValidationException e) {
             eventLog.csvValidationFailed(idConciliacion, e.getMessage());
             throw e;
@@ -195,11 +193,143 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
         }
     }
 
+    /**
+     * Diff + reversión + persistencia de una recarga del auxiliar, separado del parseo
+     * del archivo para poder testearse con listas de {@link Movimiento} construidas a
+     * mano (ver {@code CargaCsvUseCaseImplTest}).
+     *
+     * Compara por multiconjunto (cuenta ocurrencias de cada huella en vez de solo
+     * verificar membresía) para no descartar en silencio duplicados legítimos —dos
+     * movimientos reales con la misma huella— como si fueran el mismo renglón.
+     */
+    ResumenCargaAuxiliar procesarRecargaAuxiliar(Long idConciliacion, List<Movimiento> delArchivo) {
+        List<Movimiento> todosContables = movimientoRepo.buscarTodosContablesPorConciliacion(idConciliacion);
+
+        Map<String, List<Movimiento>> existentesPorHuella = todosContables.stream()
+                .collect(Collectors.groupingBy(this::huella));
+        Map<String, Long> conteoArchivoNuevo = delArchivo.stream()
+                .collect(Collectors.groupingBy(this::huella, Collectors.counting()));
+
+        // Nuevos: cada fila del archivo consume, si existe, un "cupo" de una fila
+        // existente con la misma huella. Lo que sobra sin cupo es genuinamente nuevo.
+        Map<String, Integer> disponibles = existentesPorHuella.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+        List<Movimiento> nuevos = new ArrayList<>();
+        for (Movimiento m : delArchivo) {
+            String h = huella(m);
+            int cupo = disponibles.getOrDefault(h, 0);
+            if (cupo > 0) {
+                disponibles.put(h, cupo - 1);
+            } else {
+                nuevos.add(m);
+            }
+        }
+
+        // Desaparecidos: por cada huella existente, lo que sobra sobre lo que trae el
+        // archivo nuevo. Ante ambigüedad (varios existentes, misma huella) se prioriza
+        // dar de baja el que no tiene sugerencia activa, para no revertir sin necesidad
+        // un cruce ya resuelto cuando basta con quitar el duplicado no tocado.
+        List<Movimiento> desaparecidos = new ArrayList<>();
+        for (Map.Entry<String, List<Movimiento>> entry : existentesPorHuella.entrySet()) {
+            List<Movimiento> grupo = new ArrayList<>(entry.getValue());
+            long enArchivoNuevo = conteoArchivoNuevo.getOrDefault(entry.getKey(), 0L);
+            long sobran = grupo.size() - enArchivoNuevo;
+            if (sobran <= 0) continue;
+
+            if (grupo.size() > 1) {
+                log.warn("Huella '{}' repetida en conciliacion={}: {} existentes, {} en archivo nuevo, "
+                                + "{} se dan de baja",
+                        entry.getKey(), idConciliacion, grupo.size(), enArchivoNuevo, sobran);
+            }
+            grupo.sort(Comparator.comparing(mv ->
+                    sugerenciaRepo.buscarActivaPorMovimientoContable(mv.getId()).isPresent() ? 1 : 0));
+            desaparecidos.addAll(grupo.subList(0, (int) sobran));
+        }
+
+        int revertidos = 0;
+        for (Movimiento m : desaparecidos) {
+            if (procesarAnulado(idConciliacion, m)) revertidos++;
+        }
+
+        log.info("Re-carga de auxiliar (conciliacion={}): {} nuevos, {} anulados ({} revertidos)",
+                idConciliacion, nuevos.size(), desaparecidos.size(), revertidos);
+
+        String jobId = null;
+        if (!nuevos.isEmpty()) {
+            List<Movimiento> persistidos = movimientoRepo.guardarContables(nuevos, idConciliacion);
+            jobId = jobRepo.crearJob(idConciliacion);
+            self.ejecutarMotorIncrementalAsync(jobId, idConciliacion, persistidos);
+        }
+
+        return ResumenCargaAuxiliar.builder()
+                .jobId(jobId)
+                .nuevos(nuevos.size())
+                .anulados(desaparecidos.size())
+                .revertidos(revertidos)
+                .build();
+    }
+
+    /**
+     * Da de baja un contable que desapareció del archivo re-subido. Si tiene una
+     * sugerencia activa (PENDIENTE_REVISION o ACEPTADA) — sin importar que el propio
+     * contable siga figurando como PENDIENTE en base de datos, ya que SUGERIDO nunca
+     * se persiste (ver {@link com.conciliacion.bancaria.domain.service.ConciliationEngine})—
+     * hay que revertir esa sugerencia primero: si no, borrar el contable directo viola
+     * la FK de {@code sugerencias_conciliacion} (no tiene ON DELETE CASCADE).
+     *
+     * @return true si hubo una reversión real (sugerencia activa revertida), false si
+     *         fue una baja simple sin ningún emparejamiento que deshacer.
+     */
+    private boolean procesarAnulado(Long idConciliacion, Movimiento contable) {
+        Optional<Sugerencia> activa = sugerenciaRepo.buscarActivaPorMovimientoContable(contable.getId());
+        if (activa.isEmpty()) {
+            movimientoRepo.eliminarContablesPorIds(List.of(contable.getId()));
+            return false;
+        }
+
+        Sugerencia sugerencia = activa.get();
+        Long idBancario = sugerencia.getMovimientoBancario().getId();
+
+        sugerenciaRepo.eliminarPorId(sugerencia.getId());
+        reversionService.revertirAPendiente(idConciliacion, idBancario, "BANCARIO");
+        movimientoRepo.eliminarContablesPorIds(List.of(contable.getId()));
+
+        eventLog.contableRevertido(idConciliacion, contable.getId(), contable.getFecha(), contable.getMonto(),
+                contable.getTipo(), contable.getDescripcion(), idBancario, sugerencia.getEstado().name());
+
+        return true;
+    }
+
+    /**
+     * Identidad de un movimiento contable entre recargas del auxiliar. Cuando el archivo
+     * trae número de comprobante (ej. auxiliar SIESA, columna "Documento") se usa junto
+     * con monto y tipo — nunca el comprobante solo. Un mismo número de comprobante puede
+     * reaparecer en una recarga real con un monto distinto (anulación + reingreso por otro
+     * valor, reutilizando el mismo Documento en SIESA); si la huella ignorara el monto, ese
+     * caso colapsaría con el registro viejo en el diff por multiconjunto y la reversión
+     * nunca se dispararía (bug real encontrado en producción). El monto de
+     * {@link SiesaXlsParserService} siempre es positivo — la dirección va en {@code tipo},
+     * no en el signo — así que no hace falta un monto con signo aparte, basta con incluir
+     * ambos. El caso feliz (mismo comprobante + mismo monto + mismo tipo en una
+     * re-exportación sin cambios) sigue tratándose como "ya existe", no como nuevo.
+     *
+     * Sin comprobante (auxiliar CSV genérico) se cae a un hash de texto normalizado
+     * agresivamente (sin tildes, sin espacios múltiples, mayúsculas) para reducir falsos
+     * "nuevos" causados por variaciones triviales de formato.
+     */
     private String huella(Movimiento m) {
-        return m.getFecha()
-                + "|" + m.getMonto().stripTrailingZeros().toPlainString()
-                + "|" + m.getTipo()
-                + "|" + (m.getDescripcion() != null ? m.getDescripcion().trim().toLowerCase() : "");
+        String montoTipo = m.getMonto().stripTrailingZeros().toPlainString() + "|" + m.getTipo();
+        if (m.getNumeroComprobante() != null && !m.getNumeroComprobante().isBlank()) {
+            return "NC:" + m.getNumeroComprobante().trim() + "|" + montoTipo;
+        }
+        return "TXT:" + m.getFecha() + "|" + montoTipo + "|" + normalizarDescripcion(m.getDescripcion());
+    }
+
+    private String normalizarDescripcion(String descripcion) {
+        if (descripcion == null) return "";
+        String sinTildes = java.text.Normalizer.normalize(descripcion, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return sinTildes.trim().replaceAll("\\s+", " ").toUpperCase();
     }
 
     /**
@@ -274,7 +404,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
         movimientoRepo.resetEstadosBancariosSugeridos(idConciliacion);
         movimientoRepo.resetEstadosContablesSugeridos(idConciliacion);
         String jobId = jobRepo.crearJob(idConciliacion);
-        ejecutarMotorAsync(jobId, idConciliacion);
+        self.ejecutarMotorAsync(jobId, idConciliacion);
         return jobId;
     }
 

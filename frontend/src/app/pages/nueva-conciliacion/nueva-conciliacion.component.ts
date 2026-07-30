@@ -13,7 +13,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatStepperModule } from '@angular/material/stepper';
 import { MatDividerModule } from '@angular/material/divider';
 import { ApiService } from '../../core/api.service';
-import { Banco, Cuenta, Conciliacion, ConfiguracionExtracto } from '../../core/models';
+import { Banco, Cuenta, Conciliacion, ConfiguracionExtracto, ResumenCargaAuxiliar } from '../../core/models';
 import { interval, Subscription } from 'rxjs';
 import { switchMap, takeWhile } from 'rxjs/operators';
 
@@ -282,7 +282,8 @@ interface GrupoTarjetas {
 
               <div class="success-info" *ngIf="auxiliarCargado">
                 <mat-icon>check_circle</mat-icon>
-                Libro auxiliar cargado correctamente
+                <span *ngIf="!resumenAuxiliar">Libro auxiliar cargado correctamente</span>
+                <span *ngIf="resumenAuxiliar">{{ resumenAuxiliarTexto() }}</span>
               </div>
 
               <div class="error-message" *ngIf="errorAuxiliar">
@@ -533,6 +534,7 @@ export class NuevaConciliacionComponent implements OnInit, OnDestroy {
   extractoCargado = false;
   extractosAgregados = 0;
   auxiliarCargado = false;
+  resumenAuxiliar: ResumenCargaAuxiliar | null = null;
   loadingPeriodo = false;
   loadingExtracto = false;
   loadingAuxiliar = false;
@@ -747,15 +749,26 @@ export class NuevaConciliacionComponent implements OnInit, OnDestroy {
     this.loadingAuxiliar = true;
     this.errorAuxiliar = '';
     this.api.cargarAuxiliar(this.conciliacion.id, this.auxiliarFile).subscribe({
-      next: () => {
+      next: res => {
         this.loadingAuxiliar = false;
         this.auxiliarCargado = true;
+        this.resumenAuxiliar = res.data;
       },
       error: err => {
         this.loadingAuxiliar = false;
         this.errorAuxiliar = err.error?.message ?? 'Error al cargar el libro auxiliar';
       }
     });
+  }
+
+  resumenAuxiliarTexto(): string {
+    const r = this.resumenAuxiliar;
+    if (!r) return 'Libro auxiliar cargado correctamente';
+    const partes = [`${r.nuevos} movimiento(s) nuevo(s)`];
+    if (r.anulados > 0) {
+      partes.push(`${r.anulados} anulado(s)` + (r.revertidos > 0 ? ` (${r.revertidos} conciliación(es) revertida(s))` : ''));
+    }
+    return partes.join(', ');
   }
 
   getJobClass(): string {

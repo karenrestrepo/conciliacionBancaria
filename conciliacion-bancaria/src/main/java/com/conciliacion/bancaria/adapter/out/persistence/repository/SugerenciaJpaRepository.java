@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public interface SugerenciaJpaRepository extends JpaRepository<SugerenciaEntity, Long> {
@@ -24,6 +25,10 @@ public interface SugerenciaJpaRepository extends JpaRepository<SugerenciaEntity,
 
     @Query("SELECT s.idMovBancario FROM SugerenciaEntity s WHERE s.idConciliacion = :idConciliacion AND s.estado = 'PENDIENTE_REVISION'")
     Set<Long> findBancarioIdsConSugerenciaPendiente(@Param("idConciliacion") Long idConciliacion);
+
+    @Query("SELECT s FROM SugerenciaEntity s WHERE s.idMovContable = :idMovContable "
+            + "AND s.estado IN ('PENDIENTE_REVISION', 'ACEPTADA')")
+    Optional<SugerenciaEntity> findActivaByIdMovContable(@Param("idMovContable") Long idMovContable);
 
     @Query("SELECT COUNT(s) FROM SugerenciaEntity s JOIN ConciliacionEntity c ON c.id = s.idConciliacion WHERE c.empresaId = :empresaId")
     long countByEmpresaId(@Param("empresaId") Long empresaId);

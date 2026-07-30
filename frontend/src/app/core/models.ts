@@ -144,6 +144,14 @@ export interface JobStatus {
   mensajeError: string | null;
 }
 
+/** Resultado de recargar el libro auxiliar: nuevos renglones, bajas por anulación, y cuántas de esas requirieron revertir una conciliación. */
+export interface ResumenCargaAuxiliar {
+  jobId: string | null;
+  nuevos: number;
+  anulados: number;
+  revertidos: number;
+}
+
 export type TipoArchivoExtracto = 'CSV' | 'TXT' | 'XLS' | 'XLSX' | 'PDF';
 
 /** Layout estructural del extracto — determina qué estrategia de parseo usa el motor genérico. */

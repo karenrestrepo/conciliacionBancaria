@@ -21,4 +21,15 @@ public interface SugerenciaRepositoryPort {
     void eliminarPendientesPorConciliacion(Long idConciliacion);
 
     Set<Long> buscarBancarioIdsConSugerenciaPendiente(Long idConciliacion);
+
+    /**
+     * Sugerencia activa (PENDIENTE_REVISION o ACEPTADA) para un movimiento contable dado.
+     * Ignora sugerencias RECHAZADA históricas — esas no bloquean borrar el contable.
+     * Usado para decidir si un contable "desaparecido" en una recarga del auxiliar
+     * necesita revertir su emparejamiento antes de eliminarse (evita violar la FK de
+     * sugerencias_conciliacion, que no tiene ON DELETE CASCADE).
+     */
+    Optional<Sugerencia> buscarActivaPorMovimientoContable(Long idMovContable);
+
+    void eliminarPorId(Long id);
 }

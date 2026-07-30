@@ -7,6 +7,7 @@ import com.conciliacion.bancaria.domain.port.out.PartidaRepositoryPort;
 import com.conciliacion.bancaria.domain.service.ClosureService;
 import com.conciliacion.bancaria.domain.service.ConciliationEngine;
 import com.conciliacion.bancaria.domain.service.CsvValidatorService;
+import com.conciliacion.bancaria.domain.service.MovimientoReversionService;
 import com.conciliacion.bancaria.domain.service.SiesaXlsParserService;
 import com.conciliacion.bancaria.domain.service.parser.AnchoFijoBankStatementParser;
 import com.conciliacion.bancaria.domain.service.parser.BankStatementParserDispatcher;
@@ -103,6 +104,12 @@ public class DomainConfig {
     @Bean
     public ConciliationEngine conciliationEngine() {
         return new ConciliationEngine();
+    }
+
+    @Bean
+    public MovimientoReversionService movimientoReversionService(MovimientoRepositoryPort movimientoRepo,
+                                                                   PartidaRepositoryPort partidaRepo) {
+        return new MovimientoReversionService(movimientoRepo, partidaRepo);
     }
 
     @Bean

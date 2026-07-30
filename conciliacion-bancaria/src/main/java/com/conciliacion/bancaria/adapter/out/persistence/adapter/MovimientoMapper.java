@@ -27,6 +27,7 @@ public class MovimientoMapper {
                 .monto(e.getMonto())
                 .tipo(e.getTipo())
                 .estado(e.getEstadoConciliacion())
+                .numeroComprobante(e.getNumeroComprobante())
                 .build();
     }
 
@@ -53,6 +54,7 @@ public class MovimientoMapper {
                 .monto(m.getMonto())
                 .tipo(m.getTipo())
                 .estadoConciliacion(m.getEstado())
+                .numeroComprobante(m.getNumeroComprobante())
                 .build();
     }
 }

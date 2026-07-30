@@ -760,8 +760,22 @@ export class SugerenciasComponent implements OnInit {
     this.api.cargarAuxiliar(this.idConciliacion, file).subscribe({
       next: res => {
         this.subiendoAuxiliar = false;
-        this.snackBar.open('Auxiliar cargado. Regenerando sugerencias...', 'Cerrar', { duration: 4000 });
-        this.pollJobAndReload(res.data);
+        const resumen = res.data;
+        const partes = [`${resumen.nuevos} movimiento(s) nuevo(s)`];
+        if (resumen.anulados > 0) {
+          partes.push(`${resumen.anulados} anulado(s)` +
+            (resumen.revertidos > 0 ? ` (${resumen.revertidos} conciliación(es) revertida(s))` : ''));
+        }
+        this.snackBar.open(`Auxiliar cargado: ${partes.join(', ')}.`, 'Cerrar', { duration: 5000 });
+
+        if (resumen.jobId) {
+          this.pollJobAndReload(resumen.jobId);
+        } else {
+          // Sin renglones nuevos que enviar al motor — igual puede haber anulados
+          // que cambiaron el estado de sugerencias/movimientos; refrescar la vista.
+          this.api.obtenerConciliacion(this.idConciliacion).subscribe(r => { this.conciliacion = r.data; });
+          this.cargarSugerencias();
+        }
       },
       error: err => {
         this.subiendoAuxiliar = false;
