@@ -292,9 +292,9 @@ import { ApiService } from '../../core/api.service';
     .summary-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
     .count-badge { padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; }
     .count-badge.pending    { background: #fef3c7; color: #92400e; }
-    .count-badge.incomplete { background: #fee2e2; color: #991b1b; }
-.count-badge.dragged    { background: #e0e7ff; color: #3730a3; }
-    .count-badge.historical { background: #f3f4f6; color: #374151; }
+    .count-badge.incomplete, .estado-badge.incompleto { background: #fee2e2; color: #991b1b; }
+    .count-badge.dragged, .estado-badge.arrastrada { background: #e0e7ff; color: #3730a3; }
+    .count-badge.historical, .hist-badge { background: #f3f4f6; color: #374151; }
 
     .gastos-card { margin-bottom: 20px; border-left: 4px solid #f59e0b !important; border-radius: 10px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important; }
     .gastos-row { display: flex; align-items: center; gap: 16px; }
@@ -313,15 +313,13 @@ import { ApiService } from '../../core/api.service';
 
     .origen-badge { display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; }
     .origen-badge mat-icon { font-size: 15px; width: 15px; height: 15px; }
-    .origen-badge.bancario { background: #dbeafe; color: #1e40af; }
-    .origen-badge.contable { background: #ede9fe; color: #5b21b6; }
+    .origen-badge.bancario, .otra-badge.bancario { background: #dbeafe; color: #1e40af; }
+    .origen-badge.contable, .otra-badge.contable { background: #ede9fe; color: #5b21b6; }
     .partida-id { font-size: 12px; color: #9ca3af; }
-    .hist-badge { background: #f3f4f6; color: #374151; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; }
+    .hist-badge { padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; }
 
     .estado-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; margin-left: auto; }
     .estado-badge.pendiente  { background: #fef3c7; color: #b45309; }
-    .estado-badge.incompleto { background: #fee2e2; color: #991b1b; }
-    .estado-badge.arrastrada { background: #e0e7ff; color: #3730a3; }
 
     .mov-detalle {
       display: flex; gap: 20px; flex-wrap: wrap; align-items: center;
@@ -332,8 +330,8 @@ import { ApiService } from '../../core/api.service';
     .mov-detalle-item mat-icon { font-size: 15px; width: 15px; height: 15px; color: #9ca3af; }
     .mov-desc-text { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mov-monto { font-weight: 600; }
-    .mov-monto.debito  { color: #dc2626; }
-    .mov-monto.credito { color: #16a34a; }
+    .mov-monto.debito,  .otra-monto.debito  { color: #dc2626; }
+    .mov-monto.credito, .otra-monto.credito { color: #16a34a; }
 
     .nota-incompleto {
       display: flex; align-items: center; gap: 8px;
@@ -388,12 +386,8 @@ import { ApiService } from '../../core/api.service';
     .otra-partida:hover { border-color: #93c5fd; background: #f0f7ff; }
     .otra-partida.seleccionada { border-color: #2563eb; background: #eff6ff; }
     .otra-badge { padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; flex-shrink: 0; }
-    .otra-badge.bancario { background: #dbeafe; color: #1e40af; }
-    .otra-badge.contable { background: #ede9fe; color: #5b21b6; }
     .otra-desc { flex: 1; font-size: 13px; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .otra-monto { font-size: 13px; font-weight: 600; flex-shrink: 0; }
-    .otra-monto.debito  { color: #dc2626; }
-    .otra-monto.credito { color: #16a34a; }
 
     .cruzar-resumen {
       margin-top: 12px; padding: 12px; background: #fff;

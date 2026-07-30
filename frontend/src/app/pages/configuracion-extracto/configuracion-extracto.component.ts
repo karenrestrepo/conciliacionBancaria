@@ -609,7 +609,8 @@ const CAMPOS_ANCHO_FIJO: { valor: CampoAnchoFijo; etiqueta: string }[] = [
 
     .page-header { margin-bottom: 24px; }
 
-    .back-btn { color: #6b7a8d; gap: 4px; margin-bottom: 8px; padding: 0; }
+    .back-btn, .back-step-btn { color: #6b7a8d; gap: 4px; }
+    .back-btn { margin-bottom: 8px; padding: 0; }
 
     .page-title { font-size: 26px; font-weight: 600; color: #1a2332; margin: 0 0 4px; }
     .page-subtitle { font-size: 14px; color: #6b7a8d; margin: 0; }
@@ -666,8 +667,6 @@ const CAMPOS_ANCHO_FIJO: { valor: CampoAnchoFijo; etiqueta: string }[] = [
       gap: 6px;
     }
 
-    .back-step-btn { color: #6b7a8d; gap: 4px; }
-
     .save-btn {
       background: #3d7ebf !important;
       color: #fff !important;
@@ -715,23 +714,15 @@ const CAMPOS_ANCHO_FIJO: { valor: CampoAnchoFijo; etiqueta: string }[] = [
 
     .config-nombre { font-weight: 500; }
 
-    .tipo-chip {
+    .tipo-chip, .todas-chip, .activo-chip {
       padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500;
     }
     .tipo-csv   { background: #dbeafe; color: #1e40af; }
     .tipo-txt   { background: #f3f4f6; color: #374151; }
-    .tipo-xls   { background: #dcfce7; color: #166534; }
+    .tipo-xls, .activo     { background: #dcfce7; color: #166534; }
     .tipo-xlsx  { background: #d1fae5; color: #065f46; }
-    .tipo-pdf   { background: #fee2e2; color: #991b1b; }
-
-    .todas-chip {
-      background: #fef3c7; color: #92400e;
-      padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500;
-    }
-
-    .activo-chip { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
-    .activo   { background: #dcfce7; color: #166534; }
-    .inactivo { background: #fee2e2; color: #991b1b; }
+    .tipo-pdf, .inactivo   { background: #fee2e2; color: #991b1b; }
+    .todas-chip { background: #fef3c7; color: #92400e; }
 
     .edit-btn { color: #3d7ebf; }
     .delete-btn { color: #e53935; }
