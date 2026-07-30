@@ -83,12 +83,18 @@ public class ConciliacionController {
 
     @PostMapping("/{id}/auxiliar")
     @PreAuthorize("hasAnyRole('AUXILIAR','CONTADOR','ADMIN')")
-    public ResponseEntity<ApiResponse<String>> cargarAuxiliar(
+    public ResponseEntity<ApiResponse<ResumenCargaAuxiliarResponse>> cargarAuxiliar(
             @PathVariable Long id,
             @RequestParam("archivo") MultipartFile archivo) {
 
-        cargaCsvUseCase.cargarLibroAuxiliar(id, archivo);
-        return ResponseEntity.ok(ApiResponse.ok("Libro auxiliar cargado", null));
+        var resumen = cargaCsvUseCase.cargarLibroAuxiliar(id, archivo);
+        var response = ResumenCargaAuxiliarResponse.builder()
+                .jobId(resumen.getJobId())
+                .nuevos(resumen.getNuevos())
+                .anulados(resumen.getAnulados())
+                .revertidos(resumen.getRevertidos())
+                .build();
+        return ResponseEntity.ok(ApiResponse.ok("Libro auxiliar cargado", response));
     }
 
     // ── Re-procesar motor (sin re-subir archivos) ─────────────────────────────

@@ -79,6 +79,7 @@ public class SiesaXlsParserService {
                 if (fecha == null) continue;   // fila sin fecha → total de sección
 
                 String descripcion = construirDescripcion(fila);
+                String documento = leerTexto(fila, COL_DOCUMENTO);
 
                 String tipo;
                 BigDecimal monto;
@@ -96,6 +97,7 @@ public class SiesaXlsParserService {
                         .monto(monto)
                         .tipo(tipo)
                         .estado(EstadoMovimiento.PENDIENTE)
+                        .numeroComprobante(documento != null && !documento.isBlank() ? documento : null)
                         .build());
             }
 

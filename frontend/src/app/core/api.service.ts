@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
-import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, MetricasResumen, ConfiguracionExtracto, GastoBancario, MovimientoAgrupado, UsuarioResponse, UsuarioCreateRequest, UsuarioUpdateRequest, Permiso, RolUsuario } from './models';
+import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, ResumenCargaAuxiliar, MetricasResumen, ConfiguracionExtracto, GastoBancario, MovimientoAgrupado, UsuarioResponse, UsuarioCreateRequest, UsuarioUpdateRequest, Permiso, RolUsuario } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -81,10 +81,10 @@ export class ApiService {
       `${this.API}/conciliaciones/${id}/extracto`, form, { headers: new HttpHeaders({ Authorization: `Bearer ${this.auth.getToken()}` }) });
   }
 
-  cargarAuxiliar(id: number, archivo: File): Observable<ApiResponse<string>> {
+  cargarAuxiliar(id: number, archivo: File): Observable<ApiResponse<ResumenCargaAuxiliar>> {
     const form = new FormData();
     form.append('archivo', archivo);
-    return this.http.post<ApiResponse<string>>(
+    return this.http.post<ApiResponse<ResumenCargaAuxiliar>>(
       `${this.API}/conciliaciones/${id}/auxiliar`, form, { headers: new HttpHeaders({ Authorization: `Bearer ${this.auth.getToken()}` }) });
   }
 

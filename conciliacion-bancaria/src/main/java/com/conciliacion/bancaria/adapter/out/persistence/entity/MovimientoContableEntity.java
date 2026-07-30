@@ -35,6 +35,9 @@ public class MovimientoContableEntity {
     @Column(nullable = false, length = 10)
     private String tipo;
 
+    @Column(name = "numero_comprobante", length = 50)
+    private String numeroComprobante;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "estado_conciliacion", nullable = false)
     private EstadoMovimiento estadoConciliacion;
