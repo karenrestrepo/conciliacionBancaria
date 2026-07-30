@@ -1,20 +1,27 @@
 package com.conciliacion.bancaria.adapter.in.web.controller;
 
 import com.conciliacion.bancaria.adapter.in.web.dto.ApiResponse;
-import com.conciliacion.bancaria.adapter.in.web.dto.ConfiguracionDetalleDTO;
 import com.conciliacion.bancaria.adapter.in.web.dto.ConfiguracionExtractoRequest;
 import com.conciliacion.bancaria.adapter.in.web.dto.ConfiguracionExtractoResponse;
+import com.conciliacion.bancaria.adapter.in.web.dto.MovimientoPreviewDTO;
+import com.conciliacion.bancaria.adapter.in.web.dto.PruebaConfiguracionResponse;
+import com.conciliacion.bancaria.domain.exception.CsvValidationException;
 import com.conciliacion.bancaria.domain.model.ConfiguracionExtracto;
+import com.conciliacion.bancaria.domain.model.Movimiento;
+import com.conciliacion.bancaria.domain.model.ResultadoPruebaConfiguracion;
+import com.conciliacion.bancaria.domain.model.extractoconfig.ConfiguracionExtractoDetalle;
 import com.conciliacion.bancaria.domain.port.in.ConfiguracionExtractoUseCase;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.conciliacion.bancaria.domain.port.out.ConfiguracionExtractoCodec;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -23,7 +30,7 @@ import java.util.List;
 public class ConfiguracionExtractoController {
 
     private final ConfiguracionExtractoUseCase configuracionExtractoUseCase;
-    private final ObjectMapper objectMapper;
+    private final ConfiguracionExtractoCodec configuracionExtractoCodec;
 
     @PostMapping
     @PreAuthorize("hasAnyRole('CONTADOR','ADMIN')")
@@ -70,17 +77,36 @@ public class ConfiguracionExtractoController {
         return ResponseEntity.ok(ApiResponse.ok("Configuración de extracto eliminada", null));
     }
 
+    /**
+     * Prueba una configuración (aún no guardada) contra un archivo de muestra: parsea
+     * con el motor genérico y valida el cuadre, sin persistir nada. Permite al wizard
+     * mostrar un preview de movimientos + resultado de cuadre antes de guardar.
+     */
+    @PostMapping(value = "/probar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('CONTADOR','ADMIN')")
+    public ResponseEntity<ApiResponse<PruebaConfiguracionResponse>> probar(
+            @RequestParam("archivo") MultipartFile archivo,
+            @RequestParam("configuracionDetalle") String configuracionDetalleJson,
+            @RequestParam(value = "periodo", required = false) String periodo) throws IOException {
+
+        ConfiguracionExtractoDetalle detalle = configuracionExtractoCodec.leer(configuracionDetalleJson);
+
+        if (detalle.getTipoOrigen() == null) {
+            throw new CsvValidationException("Complete la configuración antes de probarla con un archivo de muestra.");
+        }
+
+        ResultadoPruebaConfiguracion resultado =
+                configuracionExtractoUseCase.probarConfiguracion(archivo.getBytes(), detalle, periodo);
+
+        return ResponseEntity.ok(ApiResponse.ok(toPruebaResponse(resultado)));
+    }
+
     // ── Mappers ──────────────────────────────────────────────────────────────
 
     private ConfiguracionExtracto toDomain(ConfiguracionExtractoRequest req) {
-        String detalleJson = null;
-        if (req.getConfiguracionDetalle() != null) {
-            try {
-                detalleJson = objectMapper.writeValueAsString(req.getConfiguracionDetalle());
-            } catch (JsonProcessingException e) {
-                throw new IllegalArgumentException("Error al serializar configuracionDetalle", e);
-            }
-        }
+        String detalleJson = req.getConfiguracionDetalle() != null
+                ? configuracionExtractoCodec.escribir(req.getConfiguracionDetalle())
+                : null;
         return ConfiguracionExtracto.builder()
                 .idBanco(req.getIdBanco())
                 .nombre(req.getNombre())
@@ -105,6 +131,27 @@ public class ConfiguracionExtractoController {
                 .activo(c.getActivo())
                 .fechaCreacion(c.getFechaCreacion())
                 .fechaModificacion(c.getFechaModificacion())
+                .build();
+    }
+
+    private PruebaConfiguracionResponse toPruebaResponse(ResultadoPruebaConfiguracion resultado) {
+        List<MovimientoPreviewDTO> movimientos = resultado.getMovimientos().stream()
+                .map(this::toPreview)
+                .toList();
+        return PruebaConfiguracionResponse.builder()
+                .movimientos(movimientos)
+                .totalMovimientos(resultado.getTotalMovimientos())
+                .cuadre(resultado.getCuadre())
+                .advertencias(resultado.getAdvertencias())
+                .build();
+    }
+
+    private MovimientoPreviewDTO toPreview(Movimiento m) {
+        return MovimientoPreviewDTO.builder()
+                .fecha(m.getFecha())
+                .descripcion(m.getDescripcion())
+                .monto(m.getMonto())
+                .tipo(m.getTipo())
                 .build();
     }
 }

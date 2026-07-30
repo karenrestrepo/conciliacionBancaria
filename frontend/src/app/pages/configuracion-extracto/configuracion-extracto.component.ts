@@ -1,7 +1,7 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, FormArray, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -15,13 +15,30 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
-import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../../core/models';
+import {
+  Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto,
+  TipoOrigenExtracto, ConvencionSigno, CampoAnchoFijo,
+  ConfiguracionExtractoDetalle, PruebaConfiguracionResultado
+} from '../../core/models';
+
+const CAMPOS_ANCHO_FIJO: { valor: CampoAnchoFijo; etiqueta: string }[] = [
+  { valor: 'dia', etiqueta: 'Día' },
+  { valor: 'mes', etiqueta: 'Mes' },
+  { valor: 'anio', etiqueta: 'Año' },
+  { valor: 'fecha', etiqueta: 'Fecha completa' },
+  { valor: 'descripcion', etiqueta: 'Descripción' },
+  { valor: 'monto', etiqueta: 'Monto' },
+  { valor: 'debito', etiqueta: 'Débito' },
+  { valor: 'credito', etiqueta: 'Crédito' },
+  { valor: 'signo', etiqueta: 'Signo (+/-)' },
+  { valor: 'tipo', etiqueta: 'Tipo (DEBITO/CREDITO)' },
+];
 
 @Component({
   selector: 'app-configuracion-extracto',
   standalone: true,
   imports: [
-    CommonModule, RouterModule, ReactiveFormsModule,
+    CommonModule, RouterModule, ReactiveFormsModule, FormsModule,
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatStepperModule,
     MatCheckboxModule, MatTableModule, MatTooltipModule
@@ -111,7 +128,7 @@ import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../..
                     <mat-option value="TXT">TXT</mat-option>
                     <mat-option value="XLS">XLS</mat-option>
                     <mat-option value="XLSX">XLSX</mat-option>
-                    <mat-option value="PDF">PDF (sin configuración de columnas)</mat-option>
+                    <mat-option value="PDF" disabled matTooltip="Próximamente">PDF (aún no soportado)</mat-option>
                   </mat-select>
                   <mat-error *ngIf="tipoForm.get('tipoArchivo')?.hasError('required')">
                     Seleccione un tipo de archivo
@@ -137,47 +154,121 @@ import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../..
               <form [formGroup]="detalleForm" class="step-form">
                 <div *ngIf="tipoArchivo === 'PDF'" class="pdf-notice">
                   <mat-icon>info_outline</mat-icon>
-                  <span>Los archivos PDF no requieren configuración de columnas.</span>
+                  <span>Los archivos PDF aún no están soportados.</span>
                 </div>
 
                 <ng-container *ngIf="tipoArchivo === 'TXT'">
                   <mat-form-field appearance="outline" class="full-field">
                     <mat-label>Formato del TXT</mat-label>
-                    <mat-select formControlName="formatoTxt" (selectionChange)="onFormatoTxtChange()">
+                    <mat-select formControlName="tipoOrigen" (selectionChange)="onTipoOrigenChange()">
                       <mat-option value="DELIMITADO">Delimitado (columnas con separador, ej. CSV)</mat-option>
                       <mat-option value="ANCHO_FIJO">Ancho fijo — reporte de impresión (ej. Davivienda)</mat-option>
                     </mat-select>
-                    <mat-hint>"Ancho fijo" detecta automáticamente día, mes, descripción y valor por posición de línea</mat-hint>
+                    <mat-hint>"Ancho fijo" define columnas por posición de caracter, sin escribir regex</mat-hint>
                   </mat-form-field>
                 </ng-container>
 
-                <div *ngIf="esTxtAnchoFijo()" class="ancho-fijo-info">
-                  <div class="info-header">
-                    <mat-icon>info_outline</mat-icon>
-                    <strong>Formato de reporte de impresión</strong>
+                <!-- ── Modo ANCHO FIJO: columnas por posición, sin regex ─────────── -->
+                <ng-container *ngIf="esTxtAnchoFijo()">
+                  <div class="ancho-fijo-info">
+                    <div class="info-header">
+                      <mat-icon>info_outline</mat-icon>
+                      <strong>Columnas por posición de caracter</strong>
+                    </div>
+                    <p class="info-desc">
+                      Pegue abajo una línea real de ejemplo del extracto, luego defina para cada
+                      columna en qué posición de caracter empieza y termina (1 = primer caracter
+                      de la línea). Verá el texto que se extraería de esa línea en tiempo real.
+                    </p>
                   </div>
-                  <p class="info-desc">
-                    Por defecto usa el patrón de Davivienda cuenta corriente/ahorro
-                    (<code>DD&nbsp;&nbsp;MM&nbsp;&nbsp;Descripción&nbsp;&nbsp;Valor+/-&nbsp;&nbsp;Saldo+/-</code>).
-                    Para otros formatos TXT, configure un <strong>patrón de línea personalizado</strong>
-                    con grupos nombrados (Java regex):
-                  </p>
-                  <table class="grupos-tabla">
-                    <thead><tr><th>Grupo</th><th>Significado</th><th>Ejemplo</th></tr></thead>
-                    <tbody>
-                      <tr><td><code>(?&lt;fecha&gt;...)</code></td><td>Fecha completa (usar "Formato fecha")</td><td><code>(?&lt;fecha&gt;\d&#123;2&#125;/\d&#123;2&#125;/\d&#123;4&#125;)</code></td></tr>
-                      <tr><td><code>(?&lt;dia&gt;...) + (?&lt;mes&gt;...)</code></td><td>Día y mes por separado (año del período)</td><td><code>(?&lt;dia&gt;\d&#123;2&#125;)\s+(?&lt;mes&gt;\d&#123;2&#125;)</code></td></tr>
-                      <tr><td><code>(?&lt;descripcion&gt;...)</code></td><td>Texto de la transacción</td><td><code>(?&lt;descripcion&gt;[A-Z][^\t]+?)</code></td></tr>
-                      <tr><td><code>(?&lt;monto&gt;...)</code></td><td>Valor numérico sin signo</td><td><code>(?&lt;monto&gt;[\d.,]+)</code></td></tr>
-                      <tr><td><code>(?&lt;signo&gt;...)</code></td><td>+ crédito / - débito</td><td><code>(?&lt;signo&gt;[+\-])</code></td></tr>
-                      <tr><td><code>(?&lt;tipo&gt;...)</code></td><td>CREDITO/DEBITO o C/D</td><td><code>(?&lt;tipo&gt;CREDITO|DEBITO)</code></td></tr>
-                    </tbody>
-                  </table>
-                </div>
 
+                  <mat-form-field appearance="outline" class="full-field">
+                    <mat-label>Línea de ejemplo (pegar del extracto)</mat-label>
+                    <textarea matInput rows="2" class="linea-muestra"
+                              [(ngModel)]="lineaMuestra" [ngModelOptions]="{standalone: true}"
+                              (ngModelChange)="onLineaMuestraChange()"
+                              placeholder="Ej: 01   06  Abono ACH BANCOLOMBIA...        800,670.00+"></textarea>
+                  </mat-form-field>
+
+                  <div formArrayName="anchoFijoColumnas" class="columnas-tabla">
+                    <div class="columna-row" *ngFor="let col of anchoFijoColumnas.controls; let i = index" [formGroupName]="i">
+                      <mat-form-field appearance="outline" class="col-campo">
+                        <mat-label>Campo</mat-label>
+                        <mat-select formControlName="campo">
+                          <mat-option *ngFor="let c of camposAnchoFijo" [value]="c.valor">{{ c.etiqueta }}</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="col-pos">
+                        <mat-label>Inicio</mat-label>
+                        <input matInput type="number" formControlName="inicio" min="1">
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="col-pos">
+                        <mat-label>Fin</mat-label>
+                        <input matInput type="number" formControlName="fin" min="1">
+                      </mat-form-field>
+                      <span class="col-preview" [matTooltip]="'Texto extraído de la línea de ejemplo'">
+                        "{{ previewColumna(col) }}"
+                      </span>
+                      <button mat-icon-button type="button" class="delete-btn" (click)="quitarColumna(i)">
+                        <mat-icon>delete_outline</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+                  <button mat-button type="button" (click)="agregarColumna()" class="add-col-btn">
+                    <mat-icon>add</mat-icon> Agregar columna
+                  </button>
+
+                  <div class="form-grid" style="margin-top: 16px;">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Convención de signo</mat-label>
+                      <mat-select formControlName="convencionSigno">
+                        <mat-option value="SUFIJO">Sufijo (ej. 2,364,110.00-)</mat-option>
+                        <mat-option value="PREFIJO">Prefijo (ej. -2,364,110.00)</mat-option>
+                        <mat-option value="COLUMNAS_SEPARADAS">Columnas débito/crédito separadas</mat-option>
+                        <mat-option value="COLUMNA_TIPO">Columna literal (DEBITO/CREDITO o D/C)</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" *ngIf="tieneColumna('fecha')">
+                      <mat-label>Formato fecha (columna "Fecha completa")</mat-label>
+                      <input matInput formControlName="anchoFijoFormatoFecha" placeholder="dd/MM/yyyy">
+                      <mat-hint *ngIf="feedbackFormatoFecha() as fb" [class.hint-ok]="fb.ok" [class.hint-fail]="!fb.ok">
+                        {{ fb.ok ? '✓' : '✗' }} {{ fb.mensaje }}
+                      </mat-hint>
+                    </mat-form-field>
+                  </div>
+
+                  <div class="checkbox-row" *ngIf="detalleForm.get('convencionSigno')?.value !== 'COLUMNAS_SEPARADAS'">
+                    <mat-checkbox formControlName="anchoFijoInvertir">
+                      Invertir signo — usar para tarjetas de crédito donde "+" es cargo y "-" es pago
+                    </mat-checkbox>
+                  </div>
+
+                  <div class="checkbox-row">
+                    <mat-checkbox formControlName="continuacionHabilitada">
+                      El extracto tiene transacciones que continúan en una segunda línea física
+                    </mat-checkbox>
+                  </div>
+                  <div class="form-grid" *ngIf="detalleForm.get('continuacionHabilitada')?.value">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Campo ancla (vacío = posible continuación)</mat-label>
+                      <mat-select formControlName="continuacionCampoAncla">
+                        <mat-option *ngFor="let c of camposAnchoFijo" [value]="c.valor">{{ c.etiqueta }}</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Campo destino (a qué se concatena)</mat-label>
+                      <mat-select formControlName="continuacionCampoDestino">
+                        <mat-option *ngFor="let c of camposAnchoFijo" [value]="c.valor">{{ c.etiqueta }}</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
+                </ng-container>
+
+                <!-- ── Modo DELIMITADO / EXCEL: columnas por índice (como antes) ─── -->
                 <ng-container *ngIf="tipoArchivo !== 'PDF' && !esTxtAnchoFijo()">
                   <div class="form-grid">
-                    <mat-form-field appearance="outline">
+                    <mat-form-field appearance="outline" *ngIf="!esExcel()">
                       <mat-label>Separador</mat-label>
                       <input matInput formControlName="separador" placeholder=",">
                       <mat-hint>Para CSV/TXT: ',' ';' '|' '\\t'</mat-hint>
@@ -241,6 +332,12 @@ import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../..
                       <input matInput formControlName="separadorDecimales" placeholder=",">
                       <mat-hint>Ej: ',' (Colombia) o '.' (Bancolombia/EE.UU.)</mat-hint>
                     </mat-form-field>
+
+                    <mat-form-field appearance="outline" *ngIf="tipoArchivo === 'CSV'">
+                      <mat-label>Columna tipo_movimiento (opcional)</mat-label>
+                      <input matInput type="number" formControlName="columnaTipoMovimiento" min="0">
+                      <mat-hint>Si el monto no trae signo y hay una columna literal DEBITO/CREDITO</mat-hint>
+                    </mat-form-field>
                   </div>
 
                   <div class="checkbox-row">
@@ -270,57 +367,109 @@ import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../..
                   </div>
                 </ng-container>
 
-                <div class="form-grid" *ngIf="esTxtAnchoFijo()">
-                  <mat-form-field appearance="outline">
-                    <mat-label>Encoding</mat-label>
-                    <mat-select formControlName="encoding">
-                      <mat-option value="UTF-8">UTF-8</mat-option>
-                      <mat-option value="ISO-8859-1">ISO-8859-1 (Latin-1)</mat-option>
-                      <mat-option value="windows-1252">Windows-1252</mat-option>
-                    </mat-select>
-                    <mat-hint>Usa ISO-8859-1 si las tildes/ñ aparecen como "?"</mat-hint>
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline">
-                    <mat-label>Factor de escala del monto</mat-label>
-                    <input matInput type="number" formControlName="factorMonto" min="1">
-                    <mat-hint>1 = pesos</mat-hint>
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline">
-                    <mat-label>Separador de miles</mat-label>
-                    <input matInput formControlName="separadorMiles" placeholder=",">
-                    <mat-hint>Davivienda: ',' (ej. $2,364,110.00)</mat-hint>
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline">
-                    <mat-label>Separador decimal</mat-label>
-                    <input matInput formControlName="separadorDecimales" placeholder=".">
-                    <mat-hint>Davivienda: '.' (ej. $2,364,110.00)</mat-hint>
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline"
-                                  *ngIf="detalleForm.get('patronLinea')?.value">
-                    <mat-label>Formato fecha (grupo &lt;fecha&gt;)</mat-label>
-                    <input matInput formControlName="formatoFechaLinea" placeholder="dd/MM/yyyy">
-                    <mat-hint>Solo si usa el grupo (?&lt;fecha&gt;...)</mat-hint>
-                  </mat-form-field>
-                </div>
-
-                <mat-form-field appearance="outline" class="full-field patron-field"
-                                *ngIf="esTxtAnchoFijo()">
-                  <mat-label>Patrón de línea personalizado (opcional)</mat-label>
-                  <textarea matInput formControlName="patronLinea" rows="3"
-                            placeholder="Déjelo vacío para usar el patrón estándar de Davivienda corriente"></textarea>
-                  <mat-hint>
-                    Regex Java con grupos nombrados: (?&lt;fecha&gt;...), (?&lt;descripcion&gt;...), (?&lt;monto&gt;...), (?&lt;signo&gt;...)
+                <!-- ── Validar cuadre (todos los modos) ─────────────────────────── -->
+                <ng-container *ngIf="tipoArchivo !== 'PDF'">
+                  <div class="checkbox-row">
+                    <mat-checkbox formControlName="cuadreHabilitada">
+                      Validar cuadre (saldo anterior + créditos − débitos = saldo final)
+                    </mat-checkbox>
+                  </div>
+                  <div class="form-grid" *ngIf="detalleForm.get('cuadreHabilitada')?.value">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Etiqueta "Saldo anterior"</mat-label>
+                      <input matInput formControlName="cuadreEtiquetaSaldoAnterior" placeholder="Saldo Anterior">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Etiqueta "Créditos"</mat-label>
+                      <input matInput formControlName="cuadreEtiquetaCreditos" placeholder="Más Créditos">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Etiqueta "Débitos"</mat-label>
+                      <input matInput formControlName="cuadreEtiquetaDebitos" placeholder="Menos Débitos">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Etiqueta "Saldo final"</mat-label>
+                      <input matInput formControlName="cuadreEtiquetaSaldoFinal" placeholder="Nuevo Saldo">
+                    </mat-form-field>
+                  </div>
+                  <mat-hint class="cuadre-hint" *ngIf="detalleForm.get('cuadreHabilitada')?.value">
+                    Busque el texto tal cual aparece en el extracto (sin tildes si el archivo no las trae).
+                    No se necesita regex: se toma el primer número que aparece después de la etiqueta.
                   </mat-hint>
-                </mat-form-field>
+                </ng-container>
 
-                <div class="checkbox-row" *ngIf="esTxtAnchoFijo() && detalleForm.get('patronLinea')?.value">
-                  <mat-checkbox formControlName="invertirSigno">
-                    Invertir signo (+/-) — usar para tarjetas de crédito donde "+" es cargo y "-" es pago
-                  </mat-checkbox>
+                <!-- ── Probar con archivo de muestra ────────────────────────────── -->
+                <div class="prueba-card" *ngIf="tipoArchivo !== 'PDF'">
+                  <div class="info-header">
+                    <mat-icon>science</mat-icon>
+                    <strong>Probar con archivo de muestra</strong>
+                  </div>
+                  <div class="prueba-actions">
+                    <mat-form-field appearance="outline" class="periodo-field">
+                      <mat-label>Periodo (opcional, ej: 2026-06)</mat-label>
+                      <input matInput [(ngModel)]="periodoPrueba" [ngModelOptions]="{standalone: true}" placeholder="2026-06">
+                    </mat-form-field>
+                    <input type="file" #archivoMuestra hidden (change)="onArchivoMuestraSeleccionado($event)">
+                    <button mat-stroked-button type="button" (click)="archivoMuestra.click()" [disabled]="probando">
+                      <mat-spinner diameter="16" *ngIf="probando"></mat-spinner>
+                      <mat-icon *ngIf="!probando">upload_file</mat-icon>
+                      Seleccionar archivo y probar
+                    </button>
+                  </div>
+
+                  <div class="error-message" *ngIf="errorPrueba">
+                    <mat-icon>error_outline</mat-icon>{{ errorPrueba }}
+                  </div>
+
+                  <div class="resultado-prueba" *ngIf="resultadoPrueba">
+                    <div class="cuadre-card" [ngClass]="cuadreClass()">
+                      <mat-icon>{{ resultadoPrueba.cuadre.cuadra ? 'check_circle' : 'warning' }}</mat-icon>
+                      <div *ngIf="resultadoPrueba.cuadre.habilitada">
+                        <strong>{{ resultadoPrueba.cuadre.cuadra ? 'El extracto cuadra' : 'El extracto NO cuadra' }}</strong>
+                        <div class="cuadre-cifras" *ngIf="resultadoPrueba.cuadre.saldoAnterior !== undefined">
+                          Saldo anterior: {{ resultadoPrueba.cuadre.saldoAnterior }} +
+                          Créditos: {{ resultadoPrueba.cuadre.creditos }} −
+                          Débitos: {{ resultadoPrueba.cuadre.debitos }} =
+                          Calculado: {{ resultadoPrueba.cuadre.saldoCalculado }}
+                          (saldo final del archivo: {{ resultadoPrueba.cuadre.saldoFinal }})
+                        </div>
+                      </div>
+                      <div *ngIf="!resultadoPrueba.cuadre.habilitada">Validación de cuadre no habilitada.</div>
+                    </div>
+
+                    <div class="advertencias" *ngIf="resultadoPrueba.advertencias.length">
+                      <div *ngFor="let a of resultadoPrueba.advertencias" class="advertencia-item">
+                        <mat-icon>info_outline</mat-icon>{{ a }}
+                      </div>
+                    </div>
+
+                    <p class="preview-total">{{ resultadoPrueba.totalMovimientos }} movimiento(s) encontrado(s)
+                      <span *ngIf="resultadoPrueba.movimientos.length < resultadoPrueba.totalMovimientos">
+                        (mostrando los primeros {{ resultadoPrueba.movimientos.length }})</span>
+                    </p>
+
+                    <table mat-table [dataSource]="resultadoPrueba.movimientos" class="data-table"
+                           *ngIf="resultadoPrueba.movimientos.length">
+                      <ng-container matColumnDef="fecha">
+                        <th mat-header-cell *matHeaderCellDef>Fecha</th>
+                        <td mat-cell *matCellDef="let m">{{ m.fecha }}</td>
+                      </ng-container>
+                      <ng-container matColumnDef="descripcion">
+                        <th mat-header-cell *matHeaderCellDef>Descripción</th>
+                        <td mat-cell *matCellDef="let m">{{ m.descripcion }}</td>
+                      </ng-container>
+                      <ng-container matColumnDef="monto">
+                        <th mat-header-cell *matHeaderCellDef>Monto</th>
+                        <td mat-cell *matCellDef="let m">{{ m.monto }}</td>
+                      </ng-container>
+                      <ng-container matColumnDef="tipo">
+                        <th mat-header-cell *matHeaderCellDef>Tipo</th>
+                        <td mat-cell *matCellDef="let m">{{ m.tipo }}</td>
+                      </ng-container>
+                      <tr mat-header-row *matHeaderRowDef="previewColumns"></tr>
+                      <tr mat-row *matRowDef="let row; columns: previewColumns;"></tr>
+                    </table>
+                  </div>
                 </div>
 
                 <div class="step-actions">
@@ -600,23 +749,48 @@ import { Banco, Cuenta, ConfiguracionExtracto, TipoArchivoExtracto } from '../..
       display: flex; align-items: center; gap: 8px;
       color: #1e40af; font-size: 14px; margin-bottom: 8px;
     }
-    .info-desc { margin: 0 0 10px; color: #374151; line-height: 1.5; }
-    .grupos-tabla {
-      width: 100%; border-collapse: collapse; font-size: 12px;
+    .info-desc { margin: 0; color: #374151; line-height: 1.5; }
+
+    .linea-muestra { font-family: monospace; font-size: 13px; white-space: pre; }
+
+    .columnas-tabla { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+    .columna-row {
+      display: flex; align-items: center; gap: 10px;
     }
-    .grupos-tabla th {
-      background: #e8edf8; padding: 6px 10px; text-align: left;
-      font-weight: 600; color: #374151; border: 1px solid #c7d7f5;
+    .col-campo { width: 180px; }
+    .col-pos { width: 90px; }
+    .col-preview {
+      font-family: monospace; font-size: 13px; background: #f1f5f9;
+      padding: 4px 8px; border-radius: 4px; flex: 1; color: #1a2332;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .grupos-tabla td {
-      padding: 5px 10px; border: 1px solid #dde3ef; vertical-align: top;
+    .add-col-btn { color: #3d7ebf; margin-bottom: 8px; }
+
+    .prueba-card {
+      background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+      padding: 16px 18px; margin-top: 20px;
     }
-    .grupos-tabla code {
-      background: #f1f5f9; padding: 1px 4px; border-radius: 4px;
-      font-family: monospace; font-size: 11px; white-space: nowrap;
+    .prueba-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .periodo-field { width: 220px; }
+
+    .resultado-prueba { margin-top: 16px; }
+    .cuadre-card {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 12px;
     }
-    .patron-field { margin-top: 12px; }
-    .patron-field textarea { font-family: monospace; font-size: 13px; }
+    .cuadre-card.ok { background: #dcfce7; color: #166534; }
+    .cuadre-card.fail { background: #fef2f2; color: #991b1b; }
+    .cuadre-cifras { margin-top: 4px; font-size: 12px; }
+
+    .advertencias { margin-bottom: 12px; }
+    .advertencia-item {
+      display: flex; align-items: center; gap: 6px; font-size: 12px;
+      color: #92400e; background: #fef3c7; padding: 6px 10px; border-radius: 6px; margin-bottom: 4px;
+    }
+    .preview-total { font-size: 13px; color: #6b7a8d; margin: 8px 0; }
+    .cuadre-hint { display: block; font-size: 12px; color: #6b7a8d; margin-top: 4px; }
+    .hint-ok { color: #166534 !important; }
+    .hint-fail { color: #e53935 !important; }
   `]
 })
 export class ConfiguracionExtractoComponent implements OnInit {
@@ -642,6 +816,14 @@ export class ConfiguracionExtractoComponent implements OnInit {
   loadingLista = false;
   errorGuardar = '';
 
+  camposAnchoFijo = CAMPOS_ANCHO_FIJO;
+  lineaMuestra = '';
+  periodoPrueba = '';
+  probando = false;
+  errorPrueba = '';
+  resultadoPrueba: PruebaConfiguracionResultado | null = null;
+  previewColumns = ['fecha', 'descripcion', 'monto', 'tipo'];
+
   columns = ['nombre', 'tipoArchivo', 'cuentas', 'activo', 'acciones'];
 
   constructor(
@@ -661,30 +843,52 @@ export class ConfiguracionExtractoComponent implements OnInit {
       tipoArchivo: [null, Validators.required]
     });
     this.detalleForm = this.fb.group({
-      separador: [''],
+      tipoOrigen: ['DELIMITADO' as TipoOrigenExtracto],
+
+      // Comunes (delimitado/excel)
+      separador: [','],
       filasASaltar: [0],
-      columnaFecha: [null],
+      columnaFecha: [0],
       formatoFecha: ['dd/MM/yyyy'],
-      columnaDescripcion: [null],
-      columnaReferencia: [null],
-      columnaMonto: [null],
-      columnaDebito: [null],
-      columnaCredito: [null],
+      columnaDescripcion: [1],
+      columnaReferencia: [-1],
+      columnaMonto: [2],
+      columnaDebito: [-1],
+      columnaCredito: [-1],
+      columnaTipoMovimiento: [-1],
       debitoYCreditoSeparados: [false],
       encoding: ['UTF-8'],
       numeroHoja: [0],
       factorMonto: [1],
       separadorMiles: ['.'],
       separadorDecimales: [','],
-      formatoTxt: ['DELIMITADO'],
-      patronLinea: [''],
-      formatoFechaLinea: ['dd/MM/yyyy'],
-      invertirSigno: [false]
+
+      // Ancho fijo
+      anchoFijoColumnas: this.fb.array([]),
+      convencionSigno: ['SUFIJO' as ConvencionSigno],
+      anchoFijoFormatoFecha: ['dd/MM/yyyy'],
+      anchoFijoInvertir: [false],
+
+      // Continuación de línea (todos los modos, principalmente ancho fijo)
+      continuacionHabilitada: [false],
+      continuacionCampoAncla: ['dia'],
+      continuacionCampoDestino: ['descripcion'],
+
+      // Cuadre (todos los modos)
+      cuadreHabilitada: [false],
+      cuadreEtiquetaSaldoAnterior: [''],
+      cuadreEtiquetaCreditos: [''],
+      cuadreEtiquetaDebitos: [''],
+      cuadreEtiquetaSaldoFinal: ['']
     });
     this.cuentasForm = this.fb.group({
       aplicaParaTodasLasCuentas: [true],
       idsCuentas: [[]]
     });
+  }
+
+  get anchoFijoColumnas(): FormArray {
+    return this.detalleForm.get('anchoFijoColumnas') as FormArray;
   }
 
   ngOnInit(): void {
@@ -699,6 +903,102 @@ export class ConfiguracionExtractoComponent implements OnInit {
         }
       }
     });
+
+    // Cada vez que cambian las posiciones de columnas, re-intenta detectar el
+    // formato de fecha automáticamente a partir de la línea de ejemplo pegada.
+    this.anchoFijoColumnas.valueChanges.subscribe(() => this.autoDetectarFormatoFecha());
+  }
+
+  onLineaMuestraChange(): void {
+    this.autoDetectarFormatoFecha();
+  }
+
+  /**
+   * Infiere el patrón de fecha (ej. "yyyyMMdd", "dd/MM/yyyy") a partir del texto
+   * real extraído por la columna "Fecha completa" en la línea de ejemplo pegada,
+   * en vez de dejar que el usuario adivine a partir del placeholder del campo
+   * (que fue la causa de un error real: alguien vio "dd/MM/yyyy" como placeholder
+   * y asumió que el archivo traía separadores cuando en realidad no los trae).
+   */
+  private autoDetectarFormatoFecha(): void {
+    const col = this.anchoFijoColumnas.controls.find(c => c.get('campo')?.value === 'fecha');
+    if (!col || !this.lineaMuestra) return;
+    const texto = this.previewColumna(col);
+    const formato = this.detectarFormatoFecha(texto);
+    if (formato) {
+      this.detalleForm.get('anchoFijoFormatoFecha')?.setValue(formato, { emitEvent: false });
+    }
+  }
+
+  detectarFormatoFecha(texto: string): string | null {
+    const t = (texto || '').trim();
+    if (!t) return null;
+
+    const sepMatch = t.match(/[^0-9]/);
+    if (!sepMatch) {
+      // Todo dígitos, sin separador (ej. "20260428" o "28042026")
+      if (t.length !== 8) return null;
+      const primeros4 = Number(t.substring(0, 4));
+      const esAnioPlausible = primeros4 >= 1900 && primeros4 <= 2100;
+      return esAnioPlausible ? 'yyyyMMdd' : 'ddMMyyyy';
+    }
+
+    const sep = sepMatch[0];
+    const partes = t.split(sep);
+    if (partes.length !== 3) return null;
+    if (partes[0].length === 4) return `yyyy${sep}MM${sep}dd`;
+    if (partes[2].length === 4) return `dd${sep}MM${sep}yyyy`;
+    return null;
+  }
+
+  /** Retroalimentación en vivo: ¿el formato actual sí interpreta la línea de ejemplo? */
+  feedbackFormatoFecha(): { ok: boolean; mensaje: string } | null {
+    const col = this.anchoFijoColumnas.controls.find(c => c.get('campo')?.value === 'fecha');
+    if (!col || !this.lineaMuestra) return null;
+    const texto = this.previewColumna(col);
+    if (!texto) return null;
+    const formato = this.detalleForm.get('anchoFijoFormatoFecha')?.value;
+    if (!formato) return null;
+
+    const fecha = this.intentarParsearFecha(texto, formato);
+    return fecha
+      ? { ok: true, mensaje: `se interpreta como ${fecha.toLocaleDateString('es-CO')}` }
+      : { ok: false, mensaje: `"${texto}" no coincide con el formato "${formato}"` };
+  }
+
+  /** Parser mínimo de patrones tipo Java (yyyy/MM/dd, dd-MM-yyyy, yyyyMMdd, etc.) solo para dar feedback visual. */
+  private intentarParsearFecha(texto: string, formato: string): Date | null {
+    let regex = '';
+    const grupos: { tipo: 'y' | 'M' | 'd'; len: number }[] = [];
+    let i = 0;
+    while (i < formato.length) {
+      const c = formato[i];
+      if (c === 'y' || c === 'M' || c === 'd') {
+        let j = i;
+        while (j < formato.length && formato[j] === c) j++;
+        grupos.push({ tipo: c, len: j - i });
+        regex += `(\\d{${j - i}})`;
+        i = j;
+      } else {
+        regex += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        i++;
+      }
+    }
+
+    const m = new RegExp('^' + regex + '$').exec(texto.trim());
+    if (!m) return null;
+
+    let anio = 0, mes = 1, dia = 1;
+    grupos.forEach((g, idx) => {
+      const v = Number(m[idx + 1]);
+      if (g.tipo === 'y') anio = g.len <= 2 ? 2000 + v : v;
+      if (g.tipo === 'M') mes = v;
+      if (g.tipo === 'd') dia = v;
+    });
+
+    const fecha = new Date(anio, mes - 1, dia);
+    const esValida = fecha.getFullYear() === anio && fecha.getMonth() === mes - 1 && fecha.getDate() === dia;
+    return esValida ? fecha : null;
   }
 
   onBancoChange(idBanco: number): void {
@@ -711,20 +1011,26 @@ export class ConfiguracionExtractoComponent implements OnInit {
 
   onTipoArchivoChange(): void {
     this.tipoArchivo = this.tipoForm.get('tipoArchivo')?.value as TipoArchivoExtracto;
-    if (this.tipoArchivo !== 'TXT') {
-      this.detalleForm.patchValue({ formatoTxt: 'DELIMITADO' });
+    if (this.tipoArchivo === 'CSV') {
+      this.detalleForm.patchValue({ tipoOrigen: 'DELIMITADO' });
+    } else if (this.tipoArchivo === 'XLS' || this.tipoArchivo === 'XLSX') {
+      this.detalleForm.patchValue({ tipoOrigen: 'EXCEL' });
+    } else if (this.tipoArchivo === 'TXT') {
+      this.detalleForm.patchValue({ tipoOrigen: 'DELIMITADO' });
     }
+    this.limpiarResultadoPrueba();
   }
 
-  onFormatoTxtChange(): void {
-    if (this.esTxtAnchoFijo()) {
-      // Valores por defecto típicos de un extracto de impresión (ej. Davivienda)
-      this.detalleForm.patchValue({
-        encoding: this.detalleForm.get('encoding')?.value || 'ISO-8859-1',
-        separadorMiles: ',',
-        separadorDecimales: '.'
-      });
+  onTipoOrigenChange(): void {
+    if (this.esTxtAnchoFijo() && this.anchoFijoColumnas.length === 0) {
+      // Columnas por defecto típicas de un reporte de impresión (ej. Davivienda)
+      this.agregarColumna('dia', 1, 2);
+      this.agregarColumna('mes', 4, 5);
+      this.agregarColumna('descripcion', 8, 60);
+      this.agregarColumna('monto', 61, 85);
+      this.detalleForm.patchValue({ encoding: 'ISO-8859-1', separadorMiles: ',', separadorDecimales: '.' });
     }
+    this.limpiarResultadoPrueba();
   }
 
   onDebitosCreditosSeparadosChange(): void {
@@ -740,7 +1046,33 @@ export class ConfiguracionExtractoComponent implements OnInit {
   }
 
   esTxtAnchoFijo(): boolean {
-    return this.tipoArchivo === 'TXT' && this.detalleForm.get('formatoTxt')?.value === 'ANCHO_FIJO';
+    return this.tipoArchivo === 'TXT' && this.detalleForm.get('tipoOrigen')?.value === 'ANCHO_FIJO';
+  }
+
+  tieneColumna(campo: CampoAnchoFijo): boolean {
+    return this.anchoFijoColumnas.controls.some(c => c.get('campo')?.value === campo);
+  }
+
+  agregarColumna(campo: CampoAnchoFijo = 'descripcion', inicio = 1, fin = 1): void {
+    this.anchoFijoColumnas.push(this.fb.group({
+      campo: [campo],
+      inicio: [inicio],
+      fin: [fin]
+    }));
+  }
+
+  quitarColumna(index: number): void {
+    this.anchoFijoColumnas.removeAt(index);
+  }
+
+  previewColumna(col: any): string {
+    const inicio = Number(col.get('inicio')?.value) || 1;
+    const fin = Number(col.get('fin')?.value) || 1;
+    if (!this.lineaMuestra) return '';
+    const desde = Math.max(0, inicio - 1);
+    const hasta = Math.min(this.lineaMuestra.length, fin);
+    if (desde >= hasta) return '';
+    return this.lineaMuestra.substring(desde, hasta).trim();
   }
 
   cargarCuentas(idBanco: number): void {
@@ -755,6 +1087,101 @@ export class ConfiguracionExtractoComponent implements OnInit {
       next: res => { this.configuraciones = res.data; this.loadingLista = false; },
       error: () => { this.loadingLista = false; }
     });
+  }
+
+  /** Arma el schema tipado ConfiguracionExtractoDetalle a partir del formulario. */
+  private construirDetalle(): ConfiguracionExtractoDetalle {
+    const v = this.detalleForm.value;
+    const detalle: ConfiguracionExtractoDetalle = {
+      tipoOrigen: v.tipoOrigen,
+      encoding: v.encoding,
+      factorMonto: v.factorMonto,
+      separadorMiles: v.separadorMiles,
+      separadorDecimales: v.separadorDecimales,
+      continuacion: {
+        habilitada: !!v.continuacionHabilitada,
+        campoAncla: v.continuacionCampoAncla,
+        campoDestino: v.continuacionCampoDestino
+      },
+      cuadre: {
+        habilitada: !!v.cuadreHabilitada,
+        etiquetaSaldoAnterior: v.cuadreEtiquetaSaldoAnterior,
+        etiquetaCreditos: v.cuadreEtiquetaCreditos,
+        etiquetaDebitos: v.cuadreEtiquetaDebitos,
+        etiquetaSaldoFinal: v.cuadreEtiquetaSaldoFinal
+      }
+    };
+
+    if (v.tipoOrigen === 'ANCHO_FIJO') {
+      detalle.anchoFijo = {
+        columnas: (v.anchoFijoColumnas || []).map((c: any) => ({ campo: c.campo, inicio: c.inicio, fin: c.fin })),
+        convencionSigno: v.convencionSigno,
+        formatoFecha: v.anchoFijoFormatoFecha,
+        invertir: !!v.anchoFijoInvertir
+      };
+    } else if (v.tipoOrigen === 'EXCEL') {
+      detalle.excel = {
+        numeroHoja: v.numeroHoja,
+        filasASaltar: v.filasASaltar,
+        columnaFecha: v.columnaFecha,
+        formatoFecha: v.formatoFecha,
+        columnaDescripcion: v.columnaDescripcion,
+        columnaReferencia: v.columnaReferencia,
+        columnaMonto: v.columnaMonto,
+        columnaDebito: v.columnaDebito,
+        columnaCredito: v.columnaCredito,
+        debitoYCreditoSeparados: v.debitoYCreditoSeparados
+      };
+    } else {
+      detalle.delimitado = {
+        separador: v.separador,
+        filasASaltar: v.filasASaltar,
+        columnaFecha: v.columnaFecha,
+        formatoFecha: v.formatoFecha,
+        columnaDescripcion: v.columnaDescripcion,
+        columnaReferencia: v.columnaReferencia,
+        columnaMonto: v.columnaMonto,
+        columnaDebito: v.columnaDebito,
+        columnaCredito: v.columnaCredito,
+        columnaTipoMovimiento: v.columnaTipoMovimiento,
+        debitoYCreditoSeparados: v.debitoYCreditoSeparados
+      };
+    }
+
+    return detalle;
+  }
+
+  onArchivoMuestraSeleccionado(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    if (!archivo) return;
+
+    this.probando = true;
+    this.errorPrueba = '';
+    this.resultadoPrueba = null;
+
+    const detalle = this.construirDetalle();
+    this.api.probarConfiguracion(archivo, detalle, this.periodoPrueba || undefined).subscribe({
+      next: res => {
+        this.resultadoPrueba = res.data;
+        this.probando = false;
+      },
+      error: err => {
+        this.errorPrueba = err.error?.message ?? 'Error al probar la configuración';
+        this.probando = false;
+      }
+    });
+    input.value = '';
+  }
+
+  cuadreClass(): string {
+    if (!this.resultadoPrueba) return '';
+    return this.resultadoPrueba.cuadre.habilitada && !this.resultadoPrueba.cuadre.cuadra ? 'fail' : 'ok';
+  }
+
+  private limpiarResultadoPrueba(): void {
+    this.resultadoPrueba = null;
+    this.errorPrueba = '';
   }
 
   guardar(): void {
@@ -780,38 +1207,7 @@ export class ConfiguracionExtractoComponent implements OnInit {
     const aplicaParaTodasLasCuentas = this.cuentasForm.get('aplicaParaTodasLasCuentas')?.value;
     const idsCuentas = aplicaParaTodasLasCuentas ? [] : (this.cuentasForm.get('idsCuentas')?.value ?? []);
 
-    let configuracionDetalle: any = null;
-    if (tipoArchivo !== 'PDF') {
-      configuracionDetalle = { ...this.detalleForm.value };
-      if (tipoArchivo !== 'TXT') {
-        delete configuracionDetalle.formatoTxt;
-      }
-      if (this.esTxtAnchoFijo()) {
-        const patron = (configuracionDetalle.patronLinea || '').trim();
-        configuracionDetalle = {
-          formatoTxt: 'ANCHO_FIJO',
-          encoding: configuracionDetalle.encoding,
-          factorMonto: configuracionDetalle.factorMonto,
-          separadorMiles: configuracionDetalle.separadorMiles,
-          separadorDecimales: configuracionDetalle.separadorDecimales,
-          ...(patron ? { patronLinea: patron } : {}),
-          ...(patron && configuracionDetalle.formatoFechaLinea
-              ? { formatoFechaLinea: configuracionDetalle.formatoFechaLinea } : {}),
-          ...(patron && configuracionDetalle.invertirSigno
-              ? { invertirSigno: true } : {})
-        };
-      } else {
-        if (!configuracionDetalle.debitoYCreditoSeparados) {
-          delete configuracionDetalle.columnaDebito;
-          delete configuracionDetalle.columnaCredito;
-        } else {
-          delete configuracionDetalle.columnaMonto;
-        }
-        if (!this.esExcel()) {
-          delete configuracionDetalle.numeroHoja;
-        }
-      }
-    }
+    const configuracionDetalle = tipoArchivo !== 'PDF' ? this.construirDetalle() : null;
 
     const payload = {
       idBanco,
@@ -858,8 +1254,8 @@ export class ConfiguracionExtractoComponent implements OnInit {
 
     if (config.configuracionDetalle) {
       try {
-        const detalle = JSON.parse(config.configuracionDetalle);
-        this.detalleForm.patchValue(detalle);
+        const detalle: ConfiguracionExtractoDetalle = JSON.parse(config.configuracionDetalle);
+        this.aplicarDetalleAlFormulario(detalle);
       } catch (_) { /* ignore */ }
     }
 
@@ -867,6 +1263,63 @@ export class ConfiguracionExtractoComponent implements OnInit {
       this.stepper.selectedIndex = 3;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 0);
+  }
+
+  private aplicarDetalleAlFormulario(detalle: ConfiguracionExtractoDetalle): void {
+    this.detalleForm.patchValue({
+      tipoOrigen: detalle.tipoOrigen,
+      encoding: detalle.encoding ?? 'UTF-8',
+      factorMonto: detalle.factorMonto ?? 1,
+      separadorMiles: detalle.separadorMiles ?? '.',
+      separadorDecimales: detalle.separadorDecimales ?? ',',
+      continuacionHabilitada: detalle.continuacion?.habilitada ?? false,
+      continuacionCampoAncla: detalle.continuacion?.campoAncla ?? 'dia',
+      continuacionCampoDestino: detalle.continuacion?.campoDestino ?? 'descripcion',
+      cuadreHabilitada: detalle.cuadre?.habilitada ?? false,
+      cuadreEtiquetaSaldoAnterior: detalle.cuadre?.etiquetaSaldoAnterior ?? '',
+      cuadreEtiquetaCreditos: detalle.cuadre?.etiquetaCreditos ?? '',
+      cuadreEtiquetaDebitos: detalle.cuadre?.etiquetaDebitos ?? '',
+      cuadreEtiquetaSaldoFinal: detalle.cuadre?.etiquetaSaldoFinal ?? ''
+    });
+
+    if (detalle.tipoOrigen === 'ANCHO_FIJO' && detalle.anchoFijo) {
+      this.anchoFijoColumnas.clear();
+      for (const col of detalle.anchoFijo.columnas || []) {
+        this.agregarColumna(col.campo, col.inicio, col.fin);
+      }
+      this.detalleForm.patchValue({
+        convencionSigno: detalle.anchoFijo.convencionSigno,
+        anchoFijoFormatoFecha: detalle.anchoFijo.formatoFecha ?? 'dd/MM/yyyy',
+        anchoFijoInvertir: detalle.anchoFijo.invertir ?? false
+      });
+    } else if (detalle.tipoOrigen === 'EXCEL' && detalle.excel) {
+      this.detalleForm.patchValue({
+        numeroHoja: detalle.excel.numeroHoja ?? 0,
+        filasASaltar: detalle.excel.filasASaltar ?? 0,
+        columnaFecha: detalle.excel.columnaFecha ?? 0,
+        formatoFecha: detalle.excel.formatoFecha ?? 'dd/MM/yyyy',
+        columnaDescripcion: detalle.excel.columnaDescripcion ?? 1,
+        columnaReferencia: detalle.excel.columnaReferencia ?? -1,
+        columnaMonto: detalle.excel.columnaMonto ?? 4,
+        columnaDebito: detalle.excel.columnaDebito ?? -1,
+        columnaCredito: detalle.excel.columnaCredito ?? -1,
+        debitoYCreditoSeparados: detalle.excel.debitoYCreditoSeparados ?? false
+      });
+    } else if (detalle.delimitado) {
+      this.detalleForm.patchValue({
+        separador: detalle.delimitado.separador ?? ',',
+        filasASaltar: detalle.delimitado.filasASaltar ?? 0,
+        columnaFecha: detalle.delimitado.columnaFecha ?? 0,
+        formatoFecha: detalle.delimitado.formatoFecha ?? 'dd/MM/yyyy',
+        columnaDescripcion: detalle.delimitado.columnaDescripcion ?? 1,
+        columnaReferencia: detalle.delimitado.columnaReferencia ?? -1,
+        columnaMonto: detalle.delimitado.columnaMonto ?? 2,
+        columnaDebito: detalle.delimitado.columnaDebito ?? -1,
+        columnaCredito: detalle.delimitado.columnaCredito ?? -1,
+        columnaTipoMovimiento: detalle.delimitado.columnaTipoMovimiento ?? -1,
+        debitoYCreditoSeparados: detalle.delimitado.debitoYCreditoSeparados ?? false
+      });
+    }
   }
 
   eliminar(config: ConfiguracionExtracto): void {
@@ -885,14 +1338,23 @@ export class ConfiguracionExtractoComponent implements OnInit {
     this.bancoForm.reset();
     this.nombreForm.reset();
     this.tipoForm.reset();
+    this.anchoFijoColumnas.clear();
     this.detalleForm.reset({
-      filasASaltar: 0, formatoFecha: 'dd/MM/yyyy',
-      debitoYCreditoSeparados: false, encoding: 'UTF-8', numeroHoja: 0,
+      tipoOrigen: 'DELIMITADO',
+      separador: ',', filasASaltar: 0, columnaFecha: 0, formatoFecha: 'dd/MM/yyyy',
+      columnaDescripcion: 1, columnaReferencia: -1, columnaMonto: 2, columnaDebito: -1, columnaCredito: -1,
+      columnaTipoMovimiento: -1, debitoYCreditoSeparados: false, encoding: 'UTF-8', numeroHoja: 0,
       factorMonto: 1, separadorMiles: '.', separadorDecimales: ',',
-      formatoTxt: 'DELIMITADO', patronLinea: '', formatoFechaLinea: 'dd/MM/yyyy', invertirSigno: false
+      convencionSigno: 'SUFIJO', anchoFijoFormatoFecha: 'dd/MM/yyyy', anchoFijoInvertir: false,
+      continuacionHabilitada: false, continuacionCampoAncla: 'dia', continuacionCampoDestino: 'descripcion',
+      cuadreHabilitada: false, cuadreEtiquetaSaldoAnterior: '', cuadreEtiquetaCreditos: '',
+      cuadreEtiquetaDebitos: '', cuadreEtiquetaSaldoFinal: ''
     });
     this.cuentasForm.reset({ aplicaParaTodasLasCuentas: true, idsCuentas: [] });
     this.tipoArchivo = null;
+    this.lineaMuestra = '';
+    this.periodoPrueba = '';
+    this.limpiarResultadoPrueba();
   }
 
   canManage(): boolean {

@@ -1,0 +1,18 @@
+{
+  "tipoOrigen": "ANCHO_FIJO",
+  "encoding": "ISO-8859-1",
+  "factorMonto": 1,
+  "separadorMiles": ",",
+  "separadorDecimales": ".",
+  "anchoFijo": {
+    "columnas": [
+      { "campo": "fecha", "inicio": 20, "fin": 43 },
+      { "campo": "descripcion", "inicio": 44, "fin": 77 },
+      { "campo": "monto", "inicio": 78, "fin": 98 }
+    ],
+    "convencionSigno": "SUFIJO",
+    "formatoFecha": "dd/MM/yyyy"
+  },
+  "continuacion": { "habilitada": false },
+  "cuadre": { "habilitada": false }
+}

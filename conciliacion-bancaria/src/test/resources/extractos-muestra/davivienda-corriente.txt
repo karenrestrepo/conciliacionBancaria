@@ -1,0 +1,420 @@
+
+
+
+
+                                                                                                                                                              H.01
+
+
+
+
+                                                                    CUENTA CORRIENTE
+
+                                                                            1366 6999 5997
+
+
+                                                                                                                INFORME DEL MES:  JUNIO /2026
+
+
+
+
+             Apreciado Cliente
+
+             PROINDUSTAR SAS
+             jaimevelasquez@PROINDUSTAR.COM
+
+
+
+
+
+              
+
+
+
+
+
+
+
+
+
+
+
+
+             Saldo Anterior                        $80,568,399.90                                                 D?as Sobregiro                                 0
+
+             M?s:Cr?ditos                        $166,072,718.00                                                  Inter?s de Sobregiro                       $0.00
+
+             Menos: D?bitos                      $146,832,168.67                                                  Tasa Sobregiro                       28.78% E .A
+
+             Nuevo Saldo                           $99,808,949.23                                                 Tasa Mora                            28.78% E .A
+
+
+
+               Fecha                 Clase de M ovimiento                          O ficina            Do c.           V alor                     Saldo
+
+              D?a Mes
+              01   06  Abono ACH BANCOLOMBIA 900700192 ORES DE INDUSTRIA SASPROCESOS ACH               6259                  $800,670.00+             $81,369,069.90+
+                       fc43188a43464proindus AS
+              01   06  Abono ACH BANCOLOMBIA 900748549 ORREAS COLOMBIANA PROCESOS ACH                  6303                 $1,263,820.00+            $82,632,889.90+
+                       S.A.S. 900748549 IMPORTADORA DE
+              01   06  Consignacion Efectivo en Oficina                  COLONIAL                      1272                 $2,000,000.00+            $84,632,889.90+
+
+              01   06  Transferencia recibida desde Daviplata            DAVIPLATA                     7700                  $779,323.00+             $85,412,212.90+
+              01   06  Abono Transferencia 550488435193401 23084329      App Davivienda                3961                 $1,407,342.00+            $86,819,554.90+
+              01   06  Descuento para pago de Nomina                     PORTAL PYMES                  1902                 $1,520,000.00-            $85,299,554.90+
+              02   06  Abono ACH BOGOTA 14883284                         PROCESOS ACH                  8818                 $1,047,238.00+            $86,346,792.90+
+              02   06  Dcto por Transferencia de Fondos 550470100479562 9003103561PORTAL PYMES          4662                $1,843,000.00-            $84,503,792.90+
+                       MT 1780412390935
+              02   06  Consignacion Efectivo en Oficina                  LA VIRGINIA                   0696                 $1,806,399.00+            $86,310,191.90+
+              02   06  Abono Transferencia 45565 9000464091 900046409 45565PORTAL PYMES                1963                 $2,301,991.00+            $88,612,182.90+
+
+              02   06  Abono ACH BBVA 900618303                          PROCESOS ACH                  4531                   $47,326.00+             $88,659,508.90+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+              
+              Inter?s de Sobregiro:        2.13 %   M.V.      28.78 %      E.A.
+
+
+                                                                   Este producto cuenta con seguro de dep?sitos
+                                      Cualquier diferencia con el saldo, favor comunicarla a nuestra revisor?a fiscal KPMG Ltda. A.A. 77859 de Bogot?.
+              Recuerde que usted tambi?n cuenta con nuestro Defensor del Consumidor Financiero: Jos? Guillermo Pe?a Gonz?lez Direcci?n: Av. 19 No. 114 -09, Of. 502. Bogot?
+
+                                     D.C., Colombia. Tel?fono: (+57 601) 2131370 | 2131322  Correo Electr?nico: defensordelcliente@davivienda.com. 
+                                                                  Para mayor informaci?n en www.davivienda.com
+              Banco Davivienda S.A NIT.860.034.313-7
+
+
+                                                                       CUENTA CORRIENTE
+
+
+
+
+
+
+
+
+
+
+
+               Fecha                 Clase de M ovimiento                          O ficina            Do c.           V alor                     Saldo
+              D?a Mes
+              03   06  Abono ACH BANCOLOMBIA 900748549 ORREAS COLOMBIANA PROCESOS ACH                  0349                 $1,269,967.00+            $89,929,475.90+
+                       S.A.S. 900748549 IMPORTADORA DE
+
+              04   06  Transferencia recibida desde Daviplata            DAVIPLATA                     2700                  $240,975.00+             $90,170,450.90+
+              04   06  Consignacion Efectivo en Oficina                  PEREIRA PRINCIPAL             3800                  $425,723.00+             $90,596,173.90+
+              04   06  Transferencia recibida desde Daviplata            DAVIPLATA                     8800                 $1,123,000.00+            $91,719,173.90+
+              04   06  Consignacion Efectivo en Oficina                  LA VIRGINIA                   7500                 $1,053,050.00+            $92,772,223.90+
+              04   06  Consignacion Efectivo en Oficina                  ARMENIA PRINCIPAL             7600                 $7,530,450.00+            $100,302,673.90+
+              04   06  Abono Por Pago a proveedores 8070005704 PAGO DE   PORTAL-EMPRESARIAL            0872                 $4,907,845.00+            $105,210,518.90+
+                       PROVEEDORES
+              04   06  Recaudos Compras Pse                              PROCESOS ACH                  1243                 $2,273,408.00+            $107,483,926.90+
+              05   06  Abono ACH BBVA 890113879                          PROCESOS ACH                  7163                 $1,219,279.00+            $108,703,205.90+
+
+              05   06  Abono ACH BOGOTA 85460319 Factura 42195           PROCESOS ACH                  4871                 $3,645,165.00+            $112,348,370.90+
+              05   06  Descuento para pago de Nomina                     PORTAL PYMES                  7669                    $90,000.00-            $112,258,370.90+
+              05   06  Descuento por Pago a Proveedores                  PORTAL PYMES                  7674                 $8,750,000.00-            $103,508,370.90+
+              05   06  Abono Transferencia 550138100092822 18371013      App Davivienda                3818                   $62,000.00+             $103,570,370.90+
+              05   06  Abono ACH BOGOTA 12565986                         PROCESOS ACH                  6214                  $848,303.00+             $104,418,673.90+
+              09   06  Abono Transferencia 8110339971 8110339971 8110339971PORTAL PYMES                1760                 $2,661,832.00+            $107,080,505.90+
+                       8110339971
+              09   06  Abono Transferencia 550488405042935 41953792      www.davivienda.com            0591                 $1,500,000.00+            $108,580,505.90+
+              09   06  Recaudos Compras Pse                              PROCESOS ACH                  8854                  $882,024.00+             $109,462,529.90+
+
+              09   06  Abono ACH OCCIDENTE 1116269700 1116269700 JUAN FELIPE HPROCESOS ACH             0687                  $127,260.00+             $109,589,789.90+
+                       PAGO FC 45623
+              09   06  Recaudos Compras Pse                              PROCESOS ACH                  1096                 $2,880,146.00+            $112,469,935.90+
+              09   06  Abono ACH CAJA SOCIAL 8903176594 CENPROVIN CENPROVINPROCESOS ACH                7842                  $338,196.00+             $112,808,131.90+
+              09   06  Abono Por Pago a proveedores 7000238881 PAGO DE   PORTAL-EMPRESARIAL            8696                 $2,464,109.00+            $115,272,240.90+
+                       PROVEEDORES
+              09   06  Abono Transferencia 570026870117459 336978        www.davivienda.com            2750                 $1,577,802.00+            $116,850,042.90+
+              09   06  Descuento por Pago a Proveedores                  PORTAL PYMES                  6834                 $3,369,377.00-            $113,480,665.90+
+
+              09   06  Pago A Llave De Comercio                          Redeban BreB                  7828                  $121,008.00+             $113,601,673.90+
+              09   06  Recaudos Compras Pse                              PROCESOS ACH                  3250                  $428,400.00+             $114,030,073.90+
+              09   06  Recaudos Compras Pse                              PROCESOS ACH                  1945                    $8,436.00+             $114,038,509.90+
+              10   06  Abono Transferencia 570450470361244 1070945681    App Davivienda                0651                  $450,106.00+             $114,488,615.90+
+              10   06  Abono ACH CAJA SOCIAL 9013159211 FACT46032 FACT46032PROCESOS ACH                9303                  $424,829.00+             $114,913,444.90+
+              10   06  Recaudos Compras Pse                              PROCESOS ACH                  7159                  $751,931.00+             $115,665,375.90+
+              10   06  Abono Transferencia 393033592 6454281 TRANSFERENCIAPORTAL PYMES                 9327                  $230,000.00+             $115,895,375.90+
+                       TERCEROS
+              10   06  Abono ACH CAJA SOCIAL 8050317168 PAGO FACTS 45629-654PROCESOS ACH               5921                 $1,799,822.00+            $117,695,197.90+
+
+              11   06  Abono ACH BANCOLOMBIA 1140415706 JUAN JOSE BRICENOPROCESOS ACH                  3473                  $443,098.00+             $118,138,295.90+
+                       HERNAN 1140415706
+              11   06  Pago A Llave De Comercio                          Redeban BreB                  6465                  $119,904.00+             $118,258,199.90+
+              11   06  Recaudos Compras Pse                              PROCESOS ACH                  3558                  $215,024.00+             $118,473,223.90+
+              11   06  Consignacion Efectivo en Oficina                  Exito Magangue                7235                 $2,343,028.00+            $120,816,251.90+
+              11   06  Abono ACH BANCOLOMBIA 902063013 AS cotizacion 8807PROCESOS ACH                  1714                  $876,126.00+             $121,692,377.90+
+                       FERMACOR
+              11   06  Abono ACH BANCOLOMBIA 902063013 AS cotizacion 8765PROCESOS ACH                  1715                 $6,770,550.00+            $128,462,927.90+
+                       FERMACOR
+
+              12   06  Abono Transferencia 9004787613 9004787613 compra de mangueraPORTAL PYMES          4933                $827,493.00+             $129,290,420.90+
+                       9004787613
+              12   06  Abono Por Pago a proveedores 8070005704 PAGO DE   PORTAL-EMPRESARIAL            1488                 $4,105,613.00+            $133,396,033.90+
+                       PROVEEDORES
+              12   06  Abono ACH NEQUI 79043075                          PROCESOS ACH                  5255                 $9,569,505.00+            $142,965,538.90+
+              12   06  Abono ACH BOGOTA 8050267444 45226 45254 45431 45519PROCESOS ACH                 1774                 $1,104,586.00+            $144,070,124.90+
+              12   06  Recaudos Compras Pse                              PROCESOS ACH                  3551                 $1,499,400.00+            $145,569,524.90+
+              16   06  Pago poliza Seguros Bolivar                       BTA PROCESOS ESP.             0001                 $1,038,870.00-            $144,530,654.90+
+
+              16   06  Abono ACH BBVA 900687323                          PROCESOS ACH                  1105                  $935,090.00+             $145,465,744.90+
+              16   06  Descuento para pago de Nomina                     PORTAL PYMES                  6208                $23,643,592.00-            $121,822,152.90+
+              16   06  Descuento Transferencia otra entidad              PORTAL PYMES INTERBANC        6212                 $3,449,094.00-            $118,373,058.90+
+              16   06  Descuento para pago de Nomina                     PORTAL PYMES                  6215                   $830,000.00-            $117,543,058.90+
+              16   06  Descuento para pago de Nomina                     PORTAL PYMES                  6219                $14,750,000.00-            $102,793,058.90+
+              16   06  Descuento por Pago a Proveedores                  PORTAL PYMES                  6222                   $191,560.00-            $102,601,498.90+
+              16   06  Abono Por Pago a proveedores 9002233204 PAGO DE   PORTAL-EMPRESARIAL            1725                 $1,868,996.00+            $104,470,494.90+
+                       PROVEEDORES 900223320400000000
+              16   06  Recaudos Compras Pse                              PROCESOS ACH                  8447                  $588,170.00+             $105,058,664.90+
+
+              16   06  Recaudos Compras Pse                              PROCESOS ACH                  4968                 $1,957,570.00+            $107,016,234.90+
+              16   06  Consignacion Efectivo en Oficina                  CARRERA SEGUNDA               2865                  $949,468.00+             $107,965,702.90+
+              16   06  Consignacion Efectivo en Oficina                  El Espinal                    6908                 $3,213,000.00+            $111,178,702.90+
+              16   06  Abono ACH BANCOLOMBIA 901105334 45364 BAMACOL GROUPPROCESOS ACH                 6296                 $1,243,892.00+            $112,422,594.90+
+                       SAS
+              16   06  Cobro Servicio Recaudo Nacional.                  BOG C.C.I.                    8712                    $43,200.00-            $112,379,394.90+
+              17   06  Abono Transferencia 550488439485795 31917187      App Davivienda                4841                 $1,500,000.00+            $113,879,394.90+
+
+
+
+
+
+
+
+
+
+              Banco Davivienda S.A NIT.860.034.313-7
+
+                                                                                                                                                              H.02
+
+
+
+
+
+                                                                       CUENTA CORRIENTE
+
+                                                                              1366 6999 5997
+
+
+
+
+               Fecha                 Clase de M ovimiento                          O ficina            Do c.           V alor                     Saldo
+              D?a Mes
+              17   06  Abono ACH CAJA SOCIAL 8050317168 PAGO FACTS 45802-833PROCESOS ACH               5628                 $1,642,770.00+            $115,522,164.90+
+              17   06  Recaudos Compras Pse                              PROCESOS ACH                  9372                  $301,146.00+             $115,823,310.90+
+
+              17   06  Consignacion Efectivo en Oficina                  REC y PAGOS CALLE JESU        1287                 $2,300,000.00+            $118,123,310.90+
+              17   06  Abono ACH BANCOLOMBIA 900166459 VULCAMEC S.A.S    PROCESOS ACH                  7438                 $2,717,523.00+            $120,840,833.90+
+              18   06  Consignacion Efectivo en Oficina                  MANIZALES CENTRO              7528                 $2,342,062.00+            $123,182,895.90+
+              18   06  Pago A Llave De Comercio                          Redeban BreB                  8543                  $138,816.00+             $123,321,711.90+
+              18   06  Recaudos Compras Pse                              PROCESOS ACH                  8941                  $497,923.00+             $123,819,634.90+
+              18   06  Abono ACH BANCOLOMBIA 860530442 ES SURTIPIEZAS SA PROCESOS ACH                  6146                 $1,434,344.00+            $125,253,978.90+
+                       MANGUERAS CORREAS ACO
+              18   06  Recaudos Compras Pse                              PROCESOS ACH                  3088                 $1,231,328.00+            $126,485,306.90+
+              19   06  Consignacion Efectivo en Oficina                  REC y PAGOS CALLE JESU        1524                 $3,000,000.00+            $129,485,306.90+
+
+              19   06  Abono ACH BBVA 900687323                          PROCESOS ACH                  5149                  $656,003.00+             $130,141,309.90+
+              19   06  Abono ACH BANCOLOMBIA 900556104 STI SUMINISTROS   PROCESOS ACH                  5358                  $343,252.00+             $130,484,561.90+
+                       TECNICOS 900556104
+              19   06  Abono ACH BANCOLOMBIA 1140415706 JUAN JOSE BRICENOPROCESOS ACH                  3830                  $481,080.00+             $130,965,641.90+
+                       HERNAN 1140415706
+              19   06  Pago A Llave De Comercio                          Redeban BreB                  9152                   $92,018.00+             $131,057,659.90+
+              19   06  Consignacion Efectivo en Oficina                  LA VIRGINIA                   1728                  $218,900.00+             $131,276,559.90+
+              19   06  Cobro Pago Proveedores Otros Bancos               PORTAL PYMES                  8312                    $2,142.10-             $131,274,417.80+
+              19   06  Descuento Transferencia otra entidad              PORTAL PYMES INTERBANC        8313                   $460,000.00-            $130,814,417.80+
+
+              19   06  Abono Transferencia 560475360004323 19355560      www.davivienda.com            0480                 $3,184,648.00+            $133,999,065.80+
+              20   06  Cobro Pasarela Pse                                BTA PROCESOS ESP.             7397                    $11,519.80-            $133,987,546.00+
+              20   06  Pago Tarj. Credito N5474820046035264              BTA PROCESOS ESP.             0094                    $20,053.00-            $133,967,493.00+
+              20   06  Pago Tarj. Credito N5474820049693127              BTA PROCESOS ESP.             0095                   $771,528.00-            $133,195,965.00+
+              20   06  Pago Tarj. Credito N5474820078035042              BTA PROCESOS ESP.             0096                    $47,360.00-            $133,148,605.00+
+              22   06  Abono ACH BOGOTA 9013379980                       PROCESOS ACH                  6349                  $377,220.00+             $133,525,825.00+
+              22   06  Abono Transferencia 570026870117459 336978        www.davivienda.com            1222                 $2,306,838.00+            $135,832,663.00+
+              22   06  Recaudos Compras Pse                              PROCESOS ACH                  9416                 $2,645,313.00+            $138,477,976.00+
+
+              23   06  Abono ACH BANCOLOMBIA 902063013 ACOR SAS coti 8823PROCESOS ACH                  3639                  $827,929.00+             $139,305,905.00+
+                       FERMACOR SA FE
+              23   06  Abono ACH BANCOLOMBIA 901474836 RSIONES EMMANUEL  PROCESOS ACH                  1233                  $172,744.00+             $139,478,649.00+
+                       GMB SAS Compra correas y mang IN
+              23   06  Pago A Llave De Comercio                          Redeban BreB                  4064                 $1,250,000.00+            $140,728,649.00+
+              23   06  Abono ACH CAJA SOCIAL 8050317168 PAGO FACT 46020  PROCESOS ACH                  0068                  $419,732.00+             $141,148,381.00+
+              23   06  Recaudos Compras Pse                              PROCESOS ACH                  6731                  $605,518.00+             $141,753,899.00+
+              23   06  Pago A Llave De Comercio                          Redeban BreB                  4625                  $464,000.00+             $142,217,899.00+
+              24   06  Abono Transferencia 550017400000778 8001921382    PORTAL PYMES                  4254                 $4,640,838.00+            $146,858,737.00+
+
+                       TRANSFERENCIA TERCEROS
+              24   06  Pago A Llave De Comercio                          Redeban BreB                  4094                  $976,966.00+             $147,835,703.00+
+              24   06  Consignacion Efectivo en Oficina                  ZARZAL                        3685                  $328,390.00+             $148,164,093.00+
+              24   06  Abono Transferencia 550008000475528 19355560      www.davivienda.com            1874                 $3,493,592.00+            $151,657,685.00+
+              24   06  Abono Por Pago a proveedores 8070005704 PAGO DE   PORTAL-EMPRESARIAL            3262                 $6,928,533.00+            $158,586,218.00+
+                       PROVEEDORES
+              25   06  Abono ACH BOGOTA 8903284857                       PROCESOS ACH                  6632                 $1,316,066.00+            $159,902,284.00+
+              25   06  Abono ACH BANCO AGRARIO 9008118680 FV 46357       PROCESOS ACH                  0063                 $1,050,761.00+            $160,953,045.00+
+              25   06  Consignacion Efectivo en Oficina                  REC y PAGOS CALLE JESU        2439                 $1,500,000.00+            $162,453,045.00+
+
+              25   06  Abono Transferencia 550488439485795 31917187      App Davivienda                2811                 $1,500,000.00+            $163,953,045.00+
+              26   06  Pago A Llave De Comercio                          Redeban BreB                  8663                  $101,892.00+             $164,054,937.00+
+              26   06  Recaudos Compras Pse                              PROCESOS ACH                  7808                 $6,000,000.00+            $170,054,937.00+
+              26   06  Pago A Llave De Comercio                          Redeban BreB                  8172                   $80,825.00+             $170,135,762.00+
+              26   06  Abono ACH CAJA SOCIAL 9013159211 FACT46332 FACT46332PROCESOS ACH                6524                  $456,960.00+             $170,592,722.00+
+              26   06  Abono Transferencia 560475360004323 19355560      www.davivienda.com            3679                 $1,588,700.00+            $172,181,422.00+
+              26   06  Cobro Pago Proveedores Otros Bancos               PORTAL PYMES                  4609                    $2,142.10-             $172,179,279.90+
+              26   06  Descuento para pago de Nomina                     PORTAL PYMES                  4603                 $1,200,000.00-            $170,979,279.90+
+
+              26   06  Descuento por Pago a Proveedores                  PORTAL PYMES                  4606                 $5,955,840.00-            $165,023,439.90+
+              26   06  Descuento Transferencia otra entidad              PORTAL PYMES INTERBANC        4610                 $3,596,270.00-            $161,427,169.90+
+              26   06  Cobro cuota de manejo tarjeta debito              BTA PROCESOS ESP.             0626                       $0.00+              $161,427,169.90+
+              27   06  Pago A Llave Comercio                             Redeban BreB                  5974                  $456,000.00+             $161,883,169.90+
+              30   06  Recaudos Compras Pse                              PROCESOS ACH                  3560                  $804,135.00+             $162,687,304.90+
+              30   06  Abono Por Pago a proveedores 8050190258 PAGO COTIZACIONPORTAL PYMES             8498                  $117,000.00+             $162,804,304.90+
+                       8866
+              30   06  Abono Transferencia 550488424291489 1007452091    www.davivienda.com            5254                   $69,000.00+             $162,873,304.90+
+              30   06  Descuento para pago de Nomina                     PORTAL PYMES                  7032                $24,968,000.00-            $137,905,304.90+
+
+              30   06  Descuento para pago de Nomina                     PORTAL PYMES                  7054                $42,240,231.00-            $95,665,073.90+
+              30   06  Descuento Transferencia otra entidad              PORTAL PYMES INTERBANC        7058                 $6,642,190.00-            $89,022,883.90+
+              30   06  Abono Por Pago a proveedores 9011373747 PAGO DE   PORTAL PYMES                  2039                 $9,802,497.00+            $98,825,380.90+
+                       PROVEEDORES 901137374
+              30   06  Abono Transferencia 550002100120597 8301445777    PORTAL PYMES                  7302                  $609,102.00+             $99,434,482.90+
+                       TRANSFERENCIA TERCEROS
+              30   06  Descuento para pago de Nomina                     PORTAL PYMES                  6580                   $800,000.00-            $98,634,482.90+
+
+
+
+
+
+
+
+
+
+              Banco Davivienda S.A NIT.860.034.313-7
+
+
+                                                                       CUENTA CORRIENTE
+
+
+
+
+
+
+
+
+
+
+
+               Fecha                 Clase de M ovimiento                          O ficina            Do c.           V alor                     Saldo
+              D?a Mes
+              30   06  Recaudos Compras Pse                              PROCESOS ACH                  7242                 $1,770,666.00+            $100,405,148.90+
+              30   06  Gravamen a los Movimientos Financieros                                          0000                   $584,988.67-            $99,820,160.23+
+
+              30   06  IVA por Servicios                                                               0000                    $11,211.00-            $99,808,949.23+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+              Banco Davivienda S.A NIT.860.034.313-7

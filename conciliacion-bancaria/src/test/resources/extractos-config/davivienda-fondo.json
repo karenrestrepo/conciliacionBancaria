@@ -1,0 +1,25 @@
+{
+  "tipoOrigen": "ANCHO_FIJO",
+  "encoding": "ISO-8859-1",
+  "factorMonto": 1,
+  "separadorMiles": ",",
+  "separadorDecimales": ".",
+  "anchoFijo": {
+    "columnas": [
+      { "campo": "fecha", "inicio": 12, "fin": 25 },
+      { "campo": "descripcion", "inicio": 73, "fin": 110 },
+      { "campo": "monto", "inicio": 111, "fin": 140 }
+    ],
+    "convencionSigno": "SUFIJO",
+    "formatoFecha": "dd/MM/yyyy"
+  },
+  "continuacion": { "habilitada": false },
+  "cuadre": {
+    "habilitada": true,
+    "etiquetaSaldoAnterior": "Saldo al inicio del mes",
+    "etiquetaCreditos": "Total Ingresos del mes",
+    "etiquetaDebitos": "Total egresos del mes",
+    "etiquetaSaldoFinal": "Saldo al final del mes",
+    "tolerancia": 0.01
+  }
+}

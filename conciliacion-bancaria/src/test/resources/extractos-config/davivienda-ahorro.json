@@ -1,0 +1,27 @@
+{
+  "tipoOrigen": "ANCHO_FIJO",
+  "encoding": "ISO-8859-1",
+  "factorMonto": 1,
+  "separadorMiles": ",",
+  "separadorDecimales": ".",
+  "anchoFijo": {
+    "columnas": [
+      { "campo": "dia", "inicio": 15, "fin": 16 },
+      { "campo": "mes", "inicio": 20, "fin": 21 },
+      { "campo": "monto", "inicio": 22, "fin": 54 },
+      { "campo": "doc", "inicio": 55, "fin": 62 },
+      { "campo": "descripcion", "inicio": 63, "fin": 125 },
+      { "campo": "oficina", "inicio": 126, "fin": 150 }
+    ],
+    "convencionSigno": "SUFIJO"
+  },
+  "continuacion": { "habilitada": false },
+  "cuadre": {
+    "habilitada": true,
+    "etiquetaSaldoAnterior": "Saldo Anterior",
+    "etiquetaCreditos": "M?s Cr?ditos",
+    "etiquetaDebitos": "Menos D?bitos",
+    "etiquetaSaldoFinal": "Nuevo Saldo",
+    "tolerancia": 0.01
+  }
+}

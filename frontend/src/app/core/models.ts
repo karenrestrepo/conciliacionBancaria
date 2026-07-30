@@ -146,7 +146,24 @@ export interface JobStatus {
 
 export type TipoArchivoExtracto = 'CSV' | 'TXT' | 'XLS' | 'XLSX' | 'PDF';
 
-export interface ConfiguracionDetalle {
+/** Layout estructural del extracto — determina qué estrategia de parseo usa el motor genérico. */
+export type TipoOrigenExtracto = 'DELIMITADO' | 'ANCHO_FIJO' | 'EXCEL';
+
+/** Convención de signo para un extracto de ancho fijo. */
+export type ConvencionSigno = 'SUFIJO' | 'PREFIJO' | 'COLUMNAS_SEPARADAS' | 'COLUMNA_TIPO';
+
+/** Campo lógico que puede ocupar una columna de ancho fijo. */
+export type CampoAnchoFijo =
+  'dia' | 'mes' | 'anio' | 'fecha' | 'descripcion' | 'monto' | 'debito' | 'credito' | 'signo' | 'tipo';
+
+/** Una columna definida por posición de caracter (1-based, inclusive) — sin regex. */
+export interface ColumnaPosicion {
+  campo: CampoAnchoFijo;
+  inicio: number;
+  fin: number;
+}
+
+export interface ConfigDelimitado {
   separador?: string;
   filasASaltar?: number;
   columnaFecha?: number;
@@ -156,14 +173,84 @@ export interface ConfiguracionDetalle {
   columnaMonto?: number;
   columnaDebito?: number;
   columnaCredito?: number;
+  columnaTipoMovimiento?: number;
   debitoYCreditoSeparados?: boolean;
-  encoding?: string;
+}
+
+export interface ConfigExcel {
   numeroHoja?: number;
+  filasASaltar?: number;
+  columnaFecha?: number;
+  formatoFecha?: string;
+  columnaDescripcion?: number;
+  columnaReferencia?: number;
+  columnaMonto?: number;
+  columnaDebito?: number;
+  columnaCredito?: number;
+  debitoYCreditoSeparados?: boolean;
+}
+
+export interface ConfigAnchoFijo {
+  columnas: ColumnaPosicion[];
+  convencionSigno: ConvencionSigno;
+  formatoFecha?: string;
+  /** Invierte DEBITO/CREDITO (tarjetas de crédito: "+" es cargo, "-" es pago). No aplica a columnas separadas. */
+  invertir?: boolean;
+}
+
+export interface ReglaContinuacion {
+  habilitada: boolean;
+  campoAncla?: string;
+  campoDestino?: string;
+}
+
+export interface ReglaCuadre {
+  habilitada: boolean;
+  etiquetaSaldoAnterior?: string;
+  etiquetaCreditos?: string;
+  etiquetaDebitos?: string;
+  etiquetaSaldoFinal?: string;
+  tolerancia?: number;
+}
+
+/** Schema tipado único de configuración de extracto — el mismo objeto para editar en el wizard y para probar/guardar. */
+export interface ConfiguracionExtractoDetalle {
+  tipoOrigen: TipoOrigenExtracto | null;
+  encoding?: string;
   factorMonto?: number;
   separadorMiles?: string;
   separadorDecimales?: string;
-  /** Solo para tipoArchivo=TXT: 'DELIMITADO' (CSV genérico) o 'ANCHO_FIJO' (ej. Davivienda). */
-  formatoTxt?: 'DELIMITADO' | 'ANCHO_FIJO';
+  delimitado?: ConfigDelimitado;
+  anchoFijo?: ConfigAnchoFijo;
+  excel?: ConfigExcel;
+  continuacion?: ReglaContinuacion;
+  cuadre?: ReglaCuadre;
+}
+
+export interface ResultadoCuadre {
+  habilitada: boolean;
+  saldoAnterior?: number;
+  creditos?: number;
+  debitos?: number;
+  saldoFinal?: number;
+  saldoCalculado?: number;
+  diferencia?: number;
+  cuadra: boolean;
+  advertencias: string[];
+}
+
+export interface MovimientoPreview {
+  fecha: string;
+  descripcion: string;
+  monto: number;
+  tipo: string;
+}
+
+export interface PruebaConfiguracionResultado {
+  movimientos: MovimientoPreview[];
+  totalMovimientos: number;
+  cuadre: ResultadoCuadre;
+  advertencias: string[];
 }
 
 export interface ConfiguracionExtracto {

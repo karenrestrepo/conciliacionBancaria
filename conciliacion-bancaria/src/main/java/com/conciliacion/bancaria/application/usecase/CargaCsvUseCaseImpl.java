@@ -4,8 +4,11 @@ import com.conciliacion.bancaria.domain.exception.CsvValidationException;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
 import com.conciliacion.bancaria.domain.model.ConfiguracionExtracto;
 import com.conciliacion.bancaria.domain.model.Movimiento;
+import com.conciliacion.bancaria.domain.model.extractoconfig.ConfiguracionExtractoDetalle;
 import com.conciliacion.bancaria.domain.port.in.CargaCsvUseCase;
+import com.conciliacion.bancaria.domain.port.out.BankStatementParserPort;
 import com.conciliacion.bancaria.domain.port.out.ConciliacionRepositoryPort;
+import com.conciliacion.bancaria.domain.port.out.ConfiguracionExtractoCodec;
 import com.conciliacion.bancaria.domain.port.out.ConfiguracionExtractoRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.ConfiguracionGastoBancarioRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.EventLogPort;
@@ -13,15 +16,10 @@ import com.conciliacion.bancaria.domain.port.out.JobRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.MovimientoRepositoryPort;
 import com.conciliacion.bancaria.domain.service.ConciliationEngine;
 import com.conciliacion.bancaria.domain.service.CsvValidatorService;
-import com.conciliacion.bancaria.domain.service.ExtractoBancarioTxtAnchoFijoParserService;
-import com.conciliacion.bancaria.domain.service.ExtractoBancarioXlsxParserService;
 import com.conciliacion.bancaria.domain.service.SiesaXlsParserService;
-import com.conciliacion.bancaria.shared.TipoArchivoExtracto;
 import com.conciliacion.bancaria.domain.port.out.SugerenciaRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.PartidaRepositoryPort;
 import com.conciliacion.bancaria.shared.EstadoMovimiento;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -32,7 +30,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -46,8 +43,8 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
 
     private final CsvValidatorService csvValidator;
     private final SiesaXlsParserService siesaParser;
-    private final ExtractoBancarioXlsxParserService extractoXlsxParser;
-    private final ExtractoBancarioTxtAnchoFijoParserService extractoTxtAnchoFijoParser;
+    private final BankStatementParserPort bankStatementParserPort;
+    private final ConfiguracionExtractoCodec configuracionExtractoCodec;
     private final ConciliationEngine conciliationEngine;
     private final MovimientoRepositoryPort movimientoRepo;
     private final SugerenciaRepositoryPort sugerenciaRepo;
@@ -58,9 +55,8 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
     private final ConfiguracionGastoBancarioRepositoryPort gastoRepo;
     private final ConfiguracionExtractoRepositoryPort configuracionExtractoRepo;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    // Mapeo estándar — columnas genéricas
+    // Mapeo estándar — columnas genéricas. Solo usado por cargarLibroAuxiliar (auxiliar
+    // contable), que no pasa por ConfiguracionExtracto ni por el motor de extractos bancarios.
     private static final Map<String, String> MAPEO_ESTANDAR = Map.of(
             "fecha", "fecha",
             "descripcion", "descripcion",
@@ -77,17 +73,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
             eventLog.csvUpload(idConciliacion, null, archivo.getOriginalFilename());
             byte[] contenido = archivo.getBytes();
 
-            List<Movimiento> bancarios;
-            ConfiguracionExtracto configActiva = buscarConfiguracionActiva(idConciliacion).orElse(null);
-
-            if (configActiva != null && configActiva.getTipoArchivo() == TipoArchivoExtracto.TXT
-                    && esFormatoTxtAnchoFijo(configActiva)) {
-                bancarios = parsearExtractoTxtAnchoFijo(idConciliacion, contenido, configActiva);
-            } else if (esArchivoXls(archivo.getOriginalFilename())) {
-                bancarios = parsearExtractoXlsx(idConciliacion, contenido);
-            } else {
-                bancarios = csvValidator.parsear(contenido, MAPEO_ESTANDAR);
-            }
+            List<Movimiento> bancarios = parsearExtractoBancario(idConciliacion, contenido);
 
             // Tarjetas de crédito con auxiliar conjunto: múltiples extractos se acumulan.
             // Cuentas normales: el extracto reemplaza al anterior.
@@ -139,68 +125,29 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                 .findFirst();
     }
 
-    private boolean esFormatoTxtAnchoFijo(ConfiguracionExtracto config) {
-        Map<String, Object> detalle = parseConfigJson(config.getConfiguracionDetalle());
-        return "ANCHO_FIJO".equals(String.valueOf(detalle.getOrDefault("formatoTxt", "")));
-    }
-
     /**
-     * Busca la ConfiguracionExtracto activa para la conciliación y parsea el XLSX
-     * usando esa configuración. Si no se encuentra configuración, lanza excepción.
+     * Único camino de parseo de extractos bancarios: resuelve la configuración activa
+     * del banco/cuenta y delega al motor genérico (BankStatementParserPort), que despacha
+     * internamente por el tipoOrigen declarado en la propia configuración. Sin ramas por
+     * tipo de archivo ni por nombre de banco.
      */
-    private List<Movimiento> parsearExtractoXlsx(Long idConciliacion, byte[] contenido) {
+    private List<Movimiento> parsearExtractoBancario(Long idConciliacion, byte[] contenido) {
         Conciliacion conciliacion = conciliacionRepo.buscarPorId(idConciliacion)
                 .orElseThrow(() -> new CsvValidationException(
                         "No se encontró la conciliación " + idConciliacion));
-
-        if (conciliacion.getIdBanco() == null) {
-            throw new CsvValidationException(
-                    "La conciliación no tiene banco asociado; "
-                    + "configure primero la cuenta bancaria.");
-        }
-
-        String periodo = conciliacion.getPeriodo();
 
         ConfiguracionExtracto config = buscarConfiguracionActiva(idConciliacion)
                 .orElseThrow(() -> new CsvValidationException(
-                        "No se encontró configuración de extracto XLSX activa para este banco/cuenta. "
+                        "No se encontró configuración de extracto activa para este banco/cuenta. "
                         + "Configure el extracto en Bancos → Configuración de extractos."));
 
-        Map<String, Object> detalleMap = parseConfigJson(config.getConfiguracionDetalle());
-
-        log.info("Parseando extracto XLSX con configuración '{}' (id={}), periodo={}",
-                config.getNombre(), config.getId(), periodo);
-
-        return extractoXlsxParser.parsear(contenido, detalleMap, periodo);
-    }
-
-    /**
-     * Parsea un extracto de texto plano de ancho fijo (ej. Davivienda) usando la
-     * configuración activa ya resuelta.
-     */
-    private List<Movimiento> parsearExtractoTxtAnchoFijo(Long idConciliacion, byte[] contenido,
-                                                          ConfiguracionExtracto config) {
-        Conciliacion conciliacion = conciliacionRepo.buscarPorId(idConciliacion)
-                .orElseThrow(() -> new CsvValidationException(
-                        "No se encontró la conciliación " + idConciliacion));
+        ConfiguracionExtractoDetalle detalle = configuracionExtractoCodec.leer(config.getConfiguracionDetalle());
         String periodo = conciliacion.getPeriodo();
 
-        Map<String, Object> detalleMap = parseConfigJson(config.getConfiguracionDetalle());
+        log.info("Parseando extracto con configuración '{}' (id={}, tipoOrigen={}), periodo={}",
+                config.getNombre(), config.getId(), detalle.getTipoOrigen(), periodo);
 
-        log.info("Parseando extracto TXT ancho fijo con configuración '{}' (id={}), periodo={}",
-                config.getNombre(), config.getId(), periodo);
-
-        return extractoTxtAnchoFijoParser.parsear(contenido, detalleMap, periodo);
-    }
-
-    private Map<String, Object> parseConfigJson(String json) {
-        if (json == null || json.isBlank()) return Collections.emptyMap();
-        try {
-            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-        } catch (Exception e) {
-            log.warn("No se pudo parsear configuracionDetalle JSON: {}", e.getMessage());
-            return Collections.emptyMap();
-        }
+        return bankStatementParserPort.parsear(contenido, detalle, periodo);
     }
 
     @Override

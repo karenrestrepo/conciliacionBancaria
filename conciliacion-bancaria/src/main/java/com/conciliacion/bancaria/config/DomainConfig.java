@@ -7,9 +7,17 @@ import com.conciliacion.bancaria.domain.port.out.PartidaRepositoryPort;
 import com.conciliacion.bancaria.domain.service.ClosureService;
 import com.conciliacion.bancaria.domain.service.ConciliationEngine;
 import com.conciliacion.bancaria.domain.service.CsvValidatorService;
-import com.conciliacion.bancaria.domain.service.ExtractoBancarioTxtAnchoFijoParserService;
-import com.conciliacion.bancaria.domain.service.ExtractoBancarioXlsxParserService;
 import com.conciliacion.bancaria.domain.service.SiesaXlsParserService;
+import com.conciliacion.bancaria.domain.service.parser.AnchoFijoBankStatementParser;
+import com.conciliacion.bancaria.domain.service.parser.BankStatementParserDispatcher;
+import com.conciliacion.bancaria.domain.service.parser.DelimitadoBankStatementParser;
+import com.conciliacion.bancaria.domain.service.parser.ExcelBankStatementParser;
+import com.conciliacion.bancaria.domain.service.parser.support.ContinuacionLineaHelper;
+import com.conciliacion.bancaria.domain.service.parser.support.CuadreValidator;
+import com.conciliacion.bancaria.domain.service.parser.support.FechaResolver;
+import com.conciliacion.bancaria.domain.service.parser.support.LineasTextoReader;
+import com.conciliacion.bancaria.domain.service.parser.support.MontoParser;
+import com.conciliacion.bancaria.domain.service.parser.support.SignoResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -30,14 +38,66 @@ public class DomainConfig {
         return new SiesaXlsParserService();
     }
 
+    // ── Motor genérico de extractos bancarios (BankStatementParserPort) ────
+
     @Bean
-    public ExtractoBancarioXlsxParserService extractoBancarioXlsxParserService() {
-        return new ExtractoBancarioXlsxParserService();
+    public MontoParser montoParser() {
+        return new MontoParser();
     }
 
     @Bean
-    public ExtractoBancarioTxtAnchoFijoParserService extractoBancarioTxtAnchoFijoParserService() {
-        return new ExtractoBancarioTxtAnchoFijoParserService();
+    public FechaResolver fechaResolver() {
+        return new FechaResolver();
+    }
+
+    @Bean
+    public SignoResolver signoResolver() {
+        return new SignoResolver();
+    }
+
+    @Bean
+    public ContinuacionLineaHelper continuacionLineaHelper() {
+        return new ContinuacionLineaHelper();
+    }
+
+    @Bean
+    public CuadreValidator cuadreValidator(MontoParser montoParser) {
+        return new CuadreValidator(montoParser);
+    }
+
+    @Bean
+    public LineasTextoReader lineasTextoReader() {
+        return new LineasTextoReader();
+    }
+
+    @Bean
+    public DelimitadoBankStatementParser delimitadoBankStatementParser(
+            MontoParser montoParser, FechaResolver fechaResolver, SignoResolver signoResolver,
+            CuadreValidator cuadreValidator, LineasTextoReader lineasTextoReader) {
+        return new DelimitadoBankStatementParser(montoParser, fechaResolver, signoResolver, cuadreValidator, lineasTextoReader);
+    }
+
+    @Bean
+    public AnchoFijoBankStatementParser anchoFijoBankStatementParser(
+            MontoParser montoParser, FechaResolver fechaResolver, SignoResolver signoResolver,
+            ContinuacionLineaHelper continuacionLineaHelper, CuadreValidator cuadreValidator,
+            LineasTextoReader lineasTextoReader) {
+        return new AnchoFijoBankStatementParser(montoParser, fechaResolver, signoResolver,
+                continuacionLineaHelper, cuadreValidator, lineasTextoReader);
+    }
+
+    @Bean
+    public ExcelBankStatementParser excelBankStatementParser(
+            MontoParser montoParser, FechaResolver fechaResolver,
+            ContinuacionLineaHelper continuacionLineaHelper, CuadreValidator cuadreValidator) {
+        return new ExcelBankStatementParser(montoParser, fechaResolver, continuacionLineaHelper, cuadreValidator);
+    }
+
+    @Bean
+    public BankStatementParserDispatcher bankStatementParserDispatcher(
+            DelimitadoBankStatementParser delimitadoParser, AnchoFijoBankStatementParser anchoFijoParser,
+            ExcelBankStatementParser excelParser) {
+        return new BankStatementParserDispatcher(delimitadoParser, anchoFijoParser, excelParser);
     }
 
     @Bean

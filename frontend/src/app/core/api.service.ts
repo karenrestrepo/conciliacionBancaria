@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
-import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, MetricasResumen, ConfiguracionExtracto, GastoBancario, MovimientoAgrupado, UsuarioResponse, UsuarioCreateRequest, UsuarioUpdateRequest, Permiso, RolUsuario } from './models';
+import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, MetricasResumen, ConfiguracionExtracto, ConfiguracionExtractoDetalle, PruebaConfiguracionResultado, GastoBancario, MovimientoAgrupado, UsuarioResponse, UsuarioCreateRequest, UsuarioUpdateRequest, Permiso, RolUsuario } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -206,6 +206,17 @@ export class ApiService {
   eliminarConfiguracion(id: number): Observable<ApiResponse<any>> {
     return this.http.delete<ApiResponse<any>>(
       `${this.API}/configuraciones-extracto/${id}`, { headers: this.headers() });
+  }
+
+  /** Prueba una configuración (aún no guardada) contra un archivo de muestra: preview + cuadre. */
+  probarConfiguracion(archivo: File, detalle: ConfiguracionExtractoDetalle, periodo?: string):
+      Observable<ApiResponse<PruebaConfiguracionResultado>> {
+    const form = new FormData();
+    form.append('archivo', archivo);
+    form.append('configuracionDetalle', JSON.stringify(detalle));
+    if (periodo) form.append('periodo', periodo);
+    return this.http.post<ApiResponse<PruebaConfiguracionResultado>>(
+      `${this.API}/configuraciones-extracto/probar`, form, { headers: this.headers() });
   }
 
   // Usuarios (solo ADMIN)
