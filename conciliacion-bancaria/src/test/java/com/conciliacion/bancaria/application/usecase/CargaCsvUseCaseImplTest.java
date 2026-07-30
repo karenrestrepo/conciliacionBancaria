@@ -6,8 +6,6 @@ import com.conciliacion.bancaria.domain.model.Sugerencia;
 import com.conciliacion.bancaria.domain.port.out.*;
 import com.conciliacion.bancaria.domain.service.ConciliationEngine;
 import com.conciliacion.bancaria.domain.service.CsvValidatorService;
-import com.conciliacion.bancaria.domain.service.ExtractoBancarioTxtAnchoFijoParserService;
-import com.conciliacion.bancaria.domain.service.ExtractoBancarioXlsxParserService;
 import com.conciliacion.bancaria.domain.service.MovimientoReversionService;
 import com.conciliacion.bancaria.domain.service.SiesaXlsParserService;
 import com.conciliacion.bancaria.shared.EstadoMovimiento;
@@ -54,6 +52,8 @@ class CargaCsvUseCaseImplTest {
     @Mock private ConciliacionRepositoryPort conciliacionRepo;
     @Mock private ConfiguracionGastoBancarioRepositoryPort gastoRepo;
     @Mock private ConfiguracionExtractoRepositoryPort configuracionExtractoRepo;
+    @Mock private BankStatementParserPort bankStatementParserPort;
+    @Mock private ConfiguracionExtractoCodec configuracionExtractoCodec;
 
     private CargaCsvUseCaseImpl useCase;
 
@@ -66,8 +66,8 @@ class CargaCsvUseCaseImplTest {
         useCase = new CargaCsvUseCaseImpl(
                 new CsvValidatorService(),
                 new SiesaXlsParserService(),
-                new ExtractoBancarioXlsxParserService(),
-                new ExtractoBancarioTxtAnchoFijoParserService(),
+                bankStatementParserPort,
+                configuracionExtractoCodec,
                 new ConciliationEngine(),
                 movimientoRepo, sugerenciaRepo, partidaRepo, jobRepo, eventLog,
                 conciliacionRepo, gastoRepo, configuracionExtractoRepo, reversionService);
