@@ -3,6 +3,7 @@ package com.conciliacion.bancaria.domain.service;
 import com.conciliacion.bancaria.domain.exception.ConciliacionCerradaException;
 import com.conciliacion.bancaria.domain.exception.InvalidPeriodTransferException;
 import com.conciliacion.bancaria.domain.exception.PartidaPendienteException;
+import com.conciliacion.bancaria.domain.exception.RecursoNoEncontradoException;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
 import com.conciliacion.bancaria.domain.model.PartidaConciliatoria;
 import com.conciliacion.bancaria.domain.model.ConfiguracionGastoBancario;
@@ -42,7 +43,7 @@ public class ClosureService {
                                BigDecimal saldoExtracto, BigDecimal saldoAuxiliar) {
 
         Conciliacion conciliacion = conciliacionRepo.buscarPorId(idConciliacion)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Conciliación no encontrada: " + idConciliacion));
 
         if (conciliacion.esCerrada()) {
@@ -74,7 +75,7 @@ public class ClosureService {
                                                  Long idUsuario) {
 
         PartidaConciliatoria partida = partidaRepo.buscarPorId(idPartida)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Partida no encontrada: " + idPartida));
 
         // Verificar estado del período destino
@@ -107,7 +108,7 @@ public class ClosureService {
     public List<PartidaConciliatoria> cruzarPartidas(Long idOrigen, List<Long> idsDestino,
                                                      String tipo, Long idConciliacion) {
         PartidaConciliatoria origen = partidaRepo.buscarPorId(idOrigen)
-                .orElseThrow(() -> new IllegalArgumentException("Partida no encontrada: " + idOrigen));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Partida no encontrada: " + idOrigen));
 
         return switch (tipo) {
             case "GASTO_BANCARIO" -> {
@@ -145,7 +146,7 @@ public class ClosureService {
             case "CRUZAR" -> {
                 List<PartidaConciliatoria> destinos = idsDestino.stream()
                         .map(id -> partidaRepo.buscarPorId(id)
-                                .orElseThrow(() -> new IllegalArgumentException("Partida no encontrada: " + id)))
+                                .orElseThrow(() -> new RecursoNoEncontradoException("Partida no encontrada: " + id)))
                         .toList();
 
                 // neto = |origen| - sum(|destinos|): igual signo económico se anula a 0
@@ -235,7 +236,7 @@ public class ClosureService {
                                            java.time.LocalDate fecha) {
 
         PartidaConciliatoria partida = partidaRepo.buscarPorId(idPartida)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Partida no encontrada: " + idPartida));
 
         PartidaConciliatoria justificada = partida

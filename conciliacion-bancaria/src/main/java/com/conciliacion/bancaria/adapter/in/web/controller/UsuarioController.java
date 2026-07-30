@@ -9,6 +9,7 @@ import com.conciliacion.bancaria.adapter.out.persistence.entity.UsuarioEntity;
 import com.conciliacion.bancaria.adapter.out.persistence.entity.UsuarioPermisoEntity;
 import com.conciliacion.bancaria.adapter.out.persistence.repository.EmpresaJpaRepository;
 import com.conciliacion.bancaria.adapter.out.persistence.repository.UsuarioJpaRepository;
+import com.conciliacion.bancaria.domain.exception.RecursoNoEncontradoException;
 import com.conciliacion.bancaria.shared.Permiso;
 import com.conciliacion.bancaria.shared.Rol;
 import jakarta.validation.Valid;
@@ -102,7 +103,7 @@ public class UsuarioController {
 
         Long empresaId = getEmpresaId();
         UsuarioEntity usuario = usuarioRepo.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
 
         if (usuario.getEmpresa() == null || !usuario.getEmpresa().getId().equals(empresaId)) {
             throw new IllegalArgumentException("No tiene permisos para modificar este usuario");

@@ -1,5 +1,6 @@
 package com.conciliacion.bancaria.application.usecase;
 
+import com.conciliacion.bancaria.domain.exception.RecursoNoEncontradoException;
 import com.conciliacion.bancaria.domain.model.ConfiguracionExtracto;
 import com.conciliacion.bancaria.domain.model.Movimiento;
 import com.conciliacion.bancaria.domain.model.ResultadoCuadre;
@@ -69,7 +70,7 @@ public class ConfiguracionExtractoUseCaseImpl implements ConfiguracionExtractoUs
     @Transactional(readOnly = true)
     public ConfiguracionExtracto obtenerPorId(Long id) {
         return configuracionExtractoRepo.buscarPorId(id)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Configuración de extracto no encontrada: " + id));
     }
 

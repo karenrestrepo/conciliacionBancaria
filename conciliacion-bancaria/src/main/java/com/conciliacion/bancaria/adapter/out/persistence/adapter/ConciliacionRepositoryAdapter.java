@@ -5,6 +5,7 @@ import com.conciliacion.bancaria.adapter.out.persistence.entity.CuentaEntity;
 import com.conciliacion.bancaria.adapter.out.persistence.repository.BancoJpaRepository;
 import com.conciliacion.bancaria.adapter.out.persistence.repository.ConciliacionJpaRepository;
 import com.conciliacion.bancaria.adapter.out.persistence.repository.CuentaJpaRepository;
+import com.conciliacion.bancaria.domain.exception.RecursoNoEncontradoException;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
 import com.conciliacion.bancaria.domain.port.out.ConciliacionRepositoryPort;
 import com.conciliacion.bancaria.shared.EstadoConciliacion;
@@ -60,7 +61,7 @@ public class ConciliacionRepositoryAdapter implements ConciliacionRepositoryPort
     @Override
     public EstadoConciliacion obtenerEstado(Long id) {
         return jpaRepository.findEstadoById(id)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Conciliación no encontrada: " + id));
     }
 
@@ -68,7 +69,7 @@ public class ConciliacionRepositoryAdapter implements ConciliacionRepositoryPort
     public Long obtenerIdCuentaPorConciliacion(Long idConciliacion) {
         return jpaRepository.findById(idConciliacion)
                 .map(ConciliacionEntity::getIdCuenta)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Conciliación no encontrada: " + idConciliacion));
     }
 

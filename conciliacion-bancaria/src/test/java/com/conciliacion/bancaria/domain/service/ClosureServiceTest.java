@@ -3,6 +3,7 @@ package com.conciliacion.bancaria.domain.service;
 import com.conciliacion.bancaria.domain.exception.ConciliacionCerradaException;
 import com.conciliacion.bancaria.domain.exception.InvalidPeriodTransferException;
 import com.conciliacion.bancaria.domain.exception.PartidaPendienteException;
+import com.conciliacion.bancaria.domain.exception.RecursoNoEncontradoException;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
 import com.conciliacion.bancaria.domain.model.PartidaConciliatoria;
 import com.conciliacion.bancaria.domain.port.out.ConciliacionRepositoryPort;
@@ -88,12 +89,12 @@ class ClosureServiceTest {
     }
 
     @Test
-    @DisplayName("lanzar IllegalArgumentException si la conciliacion no existe")
+    @DisplayName("lanzar RecursoNoEncontradoException si la conciliacion no existe")
     void cerrarNoExiste() {
         when(conciliacionRepo.buscarPorId(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> closureService.cerrar(99L, 1L, BigDecimal.TEN, BigDecimal.ONE))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(RecursoNoEncontradoException.class);
     }
 
     @Test
@@ -111,12 +112,12 @@ class ClosureServiceTest {
     }
 
     @Test
-    @DisplayName("lanzar IllegalArgumentException si la partida no existe al justificar")
+    @DisplayName("lanzar RecursoNoEncontradoException si la partida no existe al justificar")
     void justificarNoExiste() {
         when(partidaRepo.buscarPorId(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> closureService.justificar(99L, "texto", LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(RecursoNoEncontradoException.class);
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.conciliacion.bancaria.application.usecase;
 
+import com.conciliacion.bancaria.domain.exception.RecursoNoEncontradoException;
 import com.conciliacion.bancaria.domain.model.Sugerencia;
 import com.conciliacion.bancaria.domain.port.in.RevisionUseCase;
 import com.conciliacion.bancaria.domain.port.out.EventLogPort;
@@ -32,7 +33,7 @@ public class RevisionUseCaseImpl implements RevisionUseCase {
     @Transactional
     public Sugerencia aceptarSugerencia(Long idSugerencia, Long idUsuario) {
         Sugerencia sugerencia = sugerenciaRepo.buscarPorId(idSugerencia)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Sugerencia no encontrada: " + idSugerencia));
 
         Sugerencia aceptada = sugerencia.aceptar();
@@ -68,7 +69,7 @@ public class RevisionUseCaseImpl implements RevisionUseCase {
     @Transactional
     public Sugerencia rechazarSugerencia(Long idSugerencia, Long idUsuario) {
         Sugerencia sugerencia = sugerenciaRepo.buscarPorId(idSugerencia)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Sugerencia no encontrada: " + idSugerencia));
 
         Sugerencia rechazada = sugerencia.rechazar();

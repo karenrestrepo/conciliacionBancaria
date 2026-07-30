@@ -1,5 +1,6 @@
 package com.conciliacion.bancaria.application.usecase;
 
+import com.conciliacion.bancaria.domain.exception.RecursoNoEncontradoException;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
 import com.conciliacion.bancaria.domain.port.in.ConciliacionUseCase;
 import com.conciliacion.bancaria.domain.port.out.ConciliacionRepositoryPort;
@@ -44,7 +45,7 @@ public class IniciarConciliacionUseCase implements ConciliacionUseCase {
     @Transactional(readOnly = true)
     public Conciliacion obtenerPorId(Long id) {
         return conciliacionRepo.buscarPorId(id)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Conciliación no encontrada: " + id));
     }
 
@@ -64,7 +65,7 @@ public class IniciarConciliacionUseCase implements ConciliacionUseCase {
     @Transactional
     public Conciliacion pasarARevision(Long idConciliacion) {
         Conciliacion conciliacion = conciliacionRepo.buscarPorId(idConciliacion)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Conciliación no encontrada: " + idConciliacion));
 
         Conciliacion enRevision = conciliacion.pasarAEnRevision();

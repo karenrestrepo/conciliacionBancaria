@@ -2,6 +2,7 @@ package com.conciliacion.bancaria.adapter.out.persistence.adapter;
 
 import com.conciliacion.bancaria.adapter.out.persistence.entity.ConciliacionJobEntity;
 import com.conciliacion.bancaria.adapter.out.persistence.repository.JobJpaRepository;
+import com.conciliacion.bancaria.domain.exception.RecursoNoEncontradoException;
 import com.conciliacion.bancaria.domain.port.in.JobStatusUseCase.JobStatus;
 import com.conciliacion.bancaria.domain.port.out.JobRepositoryPort;
 import lombok.RequiredArgsConstructor;
@@ -62,7 +63,7 @@ public class JobRepositoryAdapter implements JobRepositoryPort {
         return jpaRepository.findById(jobId)
                 .map(j -> new JobStatus(j.getId(), j.getEstado(),
                         j.getProgreso(), j.getMensajeError()))
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Job no encontrado: " + jobId));
     }
 }
