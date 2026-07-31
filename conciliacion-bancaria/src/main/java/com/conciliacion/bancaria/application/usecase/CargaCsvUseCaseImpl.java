@@ -465,7 +465,83 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
         return lower.endsWith(".xls") || lower.endsWith(".xlsx");
     }
 
+    /**
+     * Persistencia atómica del resultado del motor incremental: sugerencias, limpieza de
+     * la partida pendiente de cada bancario emparejado, partidas de contables sin par, y
+     * la reconciliación final -- todo en una sola transacción. Si cualquier paso falla, se
+     * revierte TODO en vez de quedar a medias.
+     *
+     * Necesario porque este método corre dentro de {@code ejecutarMotorIncrementalAsync},
+     * que es {@code @Async} y por lo tanto NO hereda ninguna transacción ambiental del
+     * método que lo invocó -- las consultas {@code @Modifying} de aquí adentro (como
+     * {@code eliminarPendientePorMovimiento}, usada tanto en la limpieza explícita como en
+     * {@link #limpiarPendientesConSugerenciaActiva}) requieren una transacción activa para
+     * ejecutar, algo que {@code save}/{@code saveAll} obtienen automáticamente pero
+     * {@code @Modifying @Query} no. Sin esta transacción, la corrida real que motivó este
+     * fix llegó a guardar 321 sugerencias con éxito (guardarTodas corre en su propia
+     * transacción implícita) pero falló con {@code TransactionRequiredException} justo al
+     * intentar la primera limpieza, dejando 328 partidas pendientes intactas -- exactamente
+     * el estado a medias que esta transacción única evita hacia adelante.
+     *
+     * Es {@code public} (no {@code private}) y se invoca vía {@code self.} por la misma
+     * razón que {@code ejecutarMotorIncrementalAsync}: el proxy de Spring que aplica
+     * {@code @Transactional} sólo intercepta llamadas que pasan por él, no invocaciones
+     * directas dentro de la misma instancia.
+     */
+    @Transactional
+    public void persistirResultadoMotorIncremental(Long idConciliacion,
+                                                    ConciliationEngine.ResultadoMotor resultado) {
+        sugerenciaRepo.guardarTodas(resultado.sugerencias());
+
+        // Los bancarios que obtuvieron sugerencia ya no son pendientes; eliminar su partida
+        resultado.sugerencias().stream()
+                .map(s -> s.getMovimientoBancario().getId())
+                .distinct()
+                .forEach(id -> partidaRepo.eliminarPendientePorMovimiento(id, "BANCARIO"));
+
+        // Guardar sólo partidas de contables nuevos que no encontraron par
+        partidaRepo.guardarTodas(resultado.partidasContables());
+
+        limpiarPendientesConSugerenciaActiva(idConciliacion);
+    }
+
+    /** Misma razón de ser que {@link #persistirResultadoMotorIncremental} para la rama sin bancarios libres. */
+    @Transactional
+    public void persistirSoloContablesIncremental(Long idConciliacion, List<Movimiento> nuevosContables) {
+        partidaRepo.guardarTodas(
+                nuevosContables.stream()
+                        .map(c -> com.conciliacion.bancaria.domain.model.PartidaConciliatoria.builder()
+                                .idConciliacion(idConciliacion)
+                                .idMovimiento(c.getId())
+                                .tipoOrigen("CONTABLE")
+                                .estado("PENDIENTE")
+                                .build())
+                        .toList());
+        limpiarPendientesConSugerenciaActiva(idConciliacion);
+    }
+
+    /**
+     * Persistencia atómica del resultado del motor completo -- misma razón de ser que
+     * {@link #persistirResultadoMotorIncremental}, para {@code ejecutarMotorAsync}.
+     */
+    @Transactional
+    public void persistirResultadoMotorCompleto(Long idConciliacion,
+                                                 ConciliationEngine.ResultadoMotor resultado) {
+        sugerenciaRepo.guardarTodas(resultado.sugerencias());
+        partidaRepo.guardarTodas(resultado.partidasBancarias());
+        partidaRepo.guardarTodas(resultado.partidasContables());
+        limpiarPendientesConSugerenciaActiva(idConciliacion);
+    }
+
     // Motor incremental — sólo compara nuevos contables contra bancarios sin sugerencia activa
+    //
+    // Deliberadamente NO lleva @Transactional en este método -- las llamadas a
+    // jobRepo.actualizarProgreso deben seguir comiteando cada una por separado (como ya
+    // hacen save/saveAll) para que el polling del frontend vea progreso incremental en vivo;
+    // envolver todo el método en una sola transacción dejaría esos updates invisibles para
+    // otras conexiones hasta el commit final. Sólo los pasos que escriben resultado del
+    // motor (self.persistirResultadoMotorIncremental/persistirSoloContablesIncremental) son
+    // transaccionales, y punto: el resto son lecturas o saves que ya son atómicos por sí solos.
     @Async("conciliacionExecutor")
     public void ejecutarMotorIncrementalAsync(String jobId, Long idConciliacion,
                                               List<Movimiento> nuevosContables) {
@@ -486,16 +562,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
 
             if (bancariosLibres.isEmpty()) {
                 // Sin bancarios libres: los nuevos contables van directo a partidas
-                partidaRepo.guardarTodas(
-                        nuevosContables.stream()
-                                .map(c -> com.conciliacion.bancaria.domain.model.PartidaConciliatoria.builder()
-                                        .idConciliacion(idConciliacion)
-                                        .idMovimiento(c.getId())
-                                        .tipoOrigen("CONTABLE")
-                                        .estado("PENDIENTE")
-                                        .build())
-                                .toList());
-                limpiarPendientesConSugerenciaActiva(idConciliacion);
+                self.persistirSoloContablesIncremental(idConciliacion, nuevosContables);
                 jobRepo.completar(jobId);
                 return;
             }
@@ -504,20 +571,9 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                     conciliationEngine.ejecutar(idConciliacion, bancariosLibres, nuevosContables);
             jobRepo.actualizarProgreso(jobId, 75);
 
-            sugerenciaRepo.guardarTodas(resultado.sugerencias());
-
-            // Los bancarios que obtuvieron sugerencia ya no son pendientes; eliminar su partida
-            resultado.sugerencias().stream()
-                    .map(s -> s.getMovimientoBancario().getId())
-                    .distinct()
-                    .forEach(id -> partidaRepo.eliminarPendientePorMovimiento(id, "BANCARIO"));
-
-            // Guardar sólo partidas de contables nuevos que no encontraron par
-            partidaRepo.guardarTodas(resultado.partidasContables());
+            self.persistirResultadoMotorIncremental(idConciliacion, resultado);
 
             jobRepo.actualizarProgreso(jobId, 90);
-
-            limpiarPendientesConSugerenciaActiva(idConciliacion);
 
             long duracion = System.currentTimeMillis() - inicio;
             eventLog.engineCompleted(idConciliacion, duracion,
@@ -531,7 +587,8 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
         }
     }
 
-    // Motor asíncrono — se ejecuta en el pool "conciliacionExecutor"
+    // Motor asíncrono — se ejecuta en el pool "conciliacionExecutor". Ver el comentario sobre
+    // @Transactional en ejecutarMotorIncrementalAsync -- misma razón para no anotar este método.
     @Async("conciliacionExecutor")
     public void ejecutarMotorAsync(String jobId, Long idConciliacion) {
         long inicio = System.currentTimeMillis();
@@ -550,12 +607,9 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                     conciliationEngine.ejecutar(idConciliacion, bancarios, contables);
             jobRepo.actualizarProgreso(jobId, 75);
 
-            sugerenciaRepo.guardarTodas(resultado.sugerencias());
-            partidaRepo.guardarTodas(resultado.partidasBancarias());
-            partidaRepo.guardarTodas(resultado.partidasContables());
-            jobRepo.actualizarProgreso(jobId, 90);
+            self.persistirResultadoMotorCompleto(idConciliacion, resultado);
 
-            limpiarPendientesConSugerenciaActiva(idConciliacion);
+            jobRepo.actualizarProgreso(jobId, 90);
 
             long duracion = System.currentTimeMillis() - inicio;
             eventLog.engineCompleted(idConciliacion, duracion,
