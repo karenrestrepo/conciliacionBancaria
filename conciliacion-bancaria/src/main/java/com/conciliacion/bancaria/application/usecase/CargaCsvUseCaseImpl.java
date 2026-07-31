@@ -431,6 +431,34 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
         }
     }
 
+    /**
+     * Reconciliación final de partidas pendientes: borra cualquier partida PENDIENTE cuyo
+     * movimiento ya tenga, EN ESTE MOMENTO, una sugerencia activa (PENDIENTE_REVISION o
+     * ACEPTADA) — sin importar si esa sugerencia la generó este mismo job o el otro.
+     *
+     * Necesaria porque {@code ejecutarMotorAsync} (disparado al subir el extracto) y
+     * {@code ejecutarMotorIncrementalAsync} (disparado al subir el auxiliar) corren de
+     * verdad en paralelo en el mismo pool ({@code conciliacionExecutor}) desde que se
+     * corrigió el bug de auto-invocación de {@code @Async}. Cada uno calcula su propio
+     * resultado sobre una FOTO de bancarios/contables leída en su propio momento — si
+     * el motor del extracto lee 0 contables porque el auxiliar todavía no había hecho
+     * commit, genera partidas pendientes para TODOS los bancarios; si esa inserción
+     * ocurre después de que el motor del auxiliar ya intentó limpiar la partida del
+     * bancario que sí emparejó (intento que no borra nada porque la partida todavía no
+     * existía), esa partida queda huérfana para siempre — bug real reproducido con 328
+     * bancarios, 321 sugerencias generadas correctamente y 328 pendientes fantasma.
+     *
+     * Al llamarse SIEMPRE al final de ambos jobs, cualquiera de los dos que termine
+     * después vuelve a limpiar contra el estado más reciente de sugerencias, cerrando la
+     * carrera sin importar el orden real en que terminen.
+     */
+    private void limpiarPendientesConSugerenciaActiva(Long idConciliacion) {
+        sugerenciaRepo.buscarBancarioIdsConSugerenciaActiva(idConciliacion)
+                .forEach(id -> partidaRepo.eliminarPendientePorMovimiento(id, "BANCARIO"));
+        sugerenciaRepo.buscarContableIdsConSugerenciaActiva(idConciliacion)
+                .forEach(id -> partidaRepo.eliminarPendientePorMovimiento(id, "CONTABLE"));
+    }
+
     private boolean esArchivoXls(String nombre) {
         if (nombre == null) return false;
         String lower = nombre.toLowerCase();
@@ -467,6 +495,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                                         .estado("PENDIENTE")
                                         .build())
                                 .toList());
+                limpiarPendientesConSugerenciaActiva(idConciliacion);
                 jobRepo.completar(jobId);
                 return;
             }
@@ -487,6 +516,8 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
             partidaRepo.guardarTodas(resultado.partidasContables());
 
             jobRepo.actualizarProgreso(jobId, 90);
+
+            limpiarPendientesConSugerenciaActiva(idConciliacion);
 
             long duracion = System.currentTimeMillis() - inicio;
             eventLog.engineCompleted(idConciliacion, duracion,
@@ -523,6 +554,8 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
             partidaRepo.guardarTodas(resultado.partidasBancarias());
             partidaRepo.guardarTodas(resultado.partidasContables());
             jobRepo.actualizarProgreso(jobId, 90);
+
+            limpiarPendientesConSugerenciaActiva(idConciliacion);
 
             long duracion = System.currentTimeMillis() - inicio;
             eventLog.engineCompleted(idConciliacion, duracion,

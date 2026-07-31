@@ -26,6 +26,12 @@ public interface SugerenciaJpaRepository extends JpaRepository<SugerenciaEntity,
     @Query("SELECT s.idMovBancario FROM SugerenciaEntity s WHERE s.idConciliacion = :idConciliacion AND s.estado = 'PENDIENTE_REVISION'")
     Set<Long> findBancarioIdsConSugerenciaPendiente(@Param("idConciliacion") Long idConciliacion);
 
+    @Query("SELECT s.idMovBancario FROM SugerenciaEntity s WHERE s.idConciliacion = :idConciliacion AND s.estado IN ('PENDIENTE_REVISION', 'ACEPTADA')")
+    Set<Long> findBancarioIdsConSugerenciaActiva(@Param("idConciliacion") Long idConciliacion);
+
+    @Query("SELECT s.idMovContable FROM SugerenciaEntity s WHERE s.idConciliacion = :idConciliacion AND s.estado IN ('PENDIENTE_REVISION', 'ACEPTADA')")
+    Set<Long> findContableIdsConSugerenciaActiva(@Param("idConciliacion") Long idConciliacion);
+
     @Query("SELECT s FROM SugerenciaEntity s WHERE s.idMovContable = :idMovContable "
             + "AND s.estado IN ('PENDIENTE_REVISION', 'ACEPTADA')")
     Optional<SugerenciaEntity> findActivaByIdMovContable(@Param("idMovContable") Long idMovContable);

@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -114,6 +115,8 @@ class CargaCsvUseCaseImplTest {
     private void sinBancariosLibres() {
         when(movimientoRepo.buscarBancariosPendientesPorConciliacion(CONCILIACION_ID)).thenReturn(List.of());
         when(sugerenciaRepo.buscarBancarioIdsConSugerenciaPendiente(CONCILIACION_ID)).thenReturn(Set.of());
+        when(sugerenciaRepo.buscarBancarioIdsConSugerenciaActiva(CONCILIACION_ID)).thenReturn(Set.of());
+        when(sugerenciaRepo.buscarContableIdsConSugerenciaActiva(CONCILIACION_ID)).thenReturn(Set.of());
     }
 
     @Nested
@@ -294,6 +297,106 @@ class CargaCsvUseCaseImplTest {
             assertThat(resumen.getRevertidos()).isEqualTo(0);
             verify(movimientoRepo, never()).eliminarContablesPorIds(any());
             verify(movimientoRepo, never()).guardarContables(any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Race entre ejecutarMotorAsync y ejecutarMotorIncrementalAsync (bug real: 328 pendientes fantasma)")
+    class RaceEntreMotores {
+
+        private List<Movimiento> bancarios;
+        private List<Movimiento> contables;
+        private List<Long> idsBancariosConMatch;
+
+        @BeforeEach
+        void prepararDatos() {
+            // 8 bancarios con cruce (mismo monto/tipo/fecha que sus contables) + 2 genuinamente
+            // huérfanos (monto sin par) — misma proporción "muchos matches, pocos huérfanos" del
+            // caso real reportado (328 bancarios, 321 sugerencias, 7 huérfanos).
+            bancarios = new ArrayList<>();
+            idsBancariosConMatch = new ArrayList<>();
+            for (long id = 101; id <= 108; id++) {
+                bancarios.add(Movimiento.builder().id(id).fecha(LocalDate.of(2026, 6, 1))
+                        .monto(new BigDecimal("100")).tipo("DEBITO").descripcion("bancario " + id)
+                        .estado(EstadoMovimiento.PENDIENTE).build());
+                idsBancariosConMatch.add(id);
+            }
+            bancarios.add(Movimiento.builder().id(109L).fecha(LocalDate.of(2026, 6, 1))
+                    .monto(new BigDecimal("999")).tipo("DEBITO").descripcion("huerfano 1")
+                    .estado(EstadoMovimiento.PENDIENTE).build());
+            bancarios.add(Movimiento.builder().id(110L).fecha(LocalDate.of(2026, 6, 1))
+                    .monto(new BigDecimal("998")).tipo("DEBITO").descripcion("huerfano 2")
+                    .estado(EstadoMovimiento.PENDIENTE).build());
+
+            contables = new ArrayList<>();
+            for (long id = 201; id <= 208; id++) {
+                contables.add(Movimiento.builder().id(id).fecha(LocalDate.of(2026, 6, 1))
+                        .monto(new BigDecimal("100")).tipo("DEBITO").descripcion("contable " + id)
+                        .estado(EstadoMovimiento.PENDIENTE).build());
+            }
+        }
+
+        private boolean partidaBancarioPresente(
+                List<com.conciliacion.bancaria.domain.model.PartidaConciliatoria> partidas, Long idMovimiento) {
+            return partidas.stream().anyMatch(p ->
+                    idMovimiento.equals(p.getIdMovimiento()) && "BANCARIO".equals(p.getTipoOrigen()));
+        }
+
+        @Test
+        @DisplayName("orden problemático (auxiliar cruza y limpia antes de que el extracto inserte sus pendientes stale) -> la reconciliación final los limpia igual")
+        void ordenProblematicoQuedaReconciliado() {
+            // --- Job B (auxiliar): corre PRIMERO, cruza los 8 contables contra los 8 bancarios ---
+            when(movimientoRepo.buscarBancariosPendientesPorConciliacion(CONCILIACION_ID)).thenReturn(bancarios);
+            when(sugerenciaRepo.buscarBancarioIdsConSugerenciaPendiente(CONCILIACION_ID)).thenReturn(Set.of());
+            // La reconciliación al final de CADA job consulta el estado "actual" de sugerencias
+            // activas: en este escenario las 8 sugerencias del auxiliar ya existen para cuando
+            // cualquiera de los dos jobs llega a su propio paso de limpieza.
+            when(sugerenciaRepo.buscarBancarioIdsConSugerenciaActiva(CONCILIACION_ID))
+                    .thenReturn(new java.util.HashSet<>(idsBancariosConMatch));
+            when(sugerenciaRepo.buscarContableIdsConSugerenciaActiva(CONCILIACION_ID)).thenReturn(Set.of());
+
+            useCase.ejecutarMotorIncrementalAsync("job-aux", CONCILIACION_ID, contables);
+
+            // Job B generó las 8 sugerencias correctamente.
+            verify(sugerenciaRepo).guardarTodas(argThat(list -> list.size() == 8));
+            // E intentó limpiar la partida pendiente de cada bancario emparejado dos veces: una
+            // vez por el paso existente (uno por sugerencia recién creada) y otra por la
+            // reconciliación final que corre siempre al terminar CUALQUIER job (la del propio
+            // job B ya ve sus propias sugerencias recién guardadas). En la BD real, en este punto
+            // el extracto (job A) todavía no ha insertado nada, así que ninguno de los dos
+            // intentos encontraría fila alguna que borrar (aquí son solo invocaciones a un mock).
+            idsBancariosConMatch.forEach(id ->
+                    verify(partidaRepo, times(2)).eliminarPendientePorMovimiento(id, "BANCARIO"));
+
+            // --- Job A (extracto): corre SEGUNDO, con una lectura stale de contables (vacía) ---
+            // porque en producción su hilo async puede leer la tabla de contables antes de que el
+            // commit del auxiliar sea visible — el mecanismo exacto del bug real reportado.
+            when(movimientoRepo.buscarBancariosPorConciliacion(CONCILIACION_ID)).thenReturn(bancarios);
+            when(movimientoRepo.buscarContablesPorConciliacion(CONCILIACION_ID)).thenReturn(List.of());
+
+            useCase.ejecutarMotorAsync("job-extracto", CONCILIACION_ID);
+
+            // Job A, al no ver contables, calculó (incorrectamente) que los 10 bancarios están sin
+            // cruce y los guardó TODOS como partida pendiente — incluyendo los 8 que job B ya
+            // había resuelto. Esta es la inserción que, antes del fix, quedaba huérfana para
+            // siempre (el intento de borrado de job B ya había pasado y no encontró nada).
+            verify(partidaRepo).guardarTodas(argThat(partidas ->
+                    partidas.size() == 10 && idsBancariosConMatch.stream()
+                            .allMatch(id -> partidaBancarioPresente(partidas, id))));
+
+            // Propiedad que debe cumplirse SIEMPRE, sin importar el orden real de los dos jobs:
+            // cada bancario con sugerencia recibe una limpieza adicional DESPUÉS de que job A
+            // insertó su partida stale — un tercer intento, esta vez desde la reconciliación
+            // final de job A, que en la BD real SÍ encuentra y borra la fila recién insertada.
+            // Sin el fix, el conteo se habría quedado en 2 (ninguno de los dos intentos de job B
+            // encuentra nada, porque corren antes de que job A inserte) y la partida fantasma
+            // sobrevive para siempre — exactamente el bug reportado.
+            idsBancariosConMatch.forEach(id ->
+                    verify(partidaRepo, times(3)).eliminarPendientePorMovimiento(id, "BANCARIO"));
+
+            // Los 2 huérfanos genuinos nunca deben limpiarse — no tienen sugerencia.
+            verify(partidaRepo, never()).eliminarPendientePorMovimiento(109L, "BANCARIO");
+            verify(partidaRepo, never()).eliminarPendientePorMovimiento(110L, "BANCARIO");
         }
     }
 }
