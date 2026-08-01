@@ -156,23 +156,33 @@ public class ClosureService {
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
                 BigDecimal neto = montoOrigen.subtract(totalDestinos);
 
-                String justificacion = neto.compareTo(BigDecimal.ZERO) == 0
-                        ? "Cruzado manualmente"
-                        : "INCOMPLETO|diferencia:" + neto.toPlainString();
-
                 List<PartidaConciliatoria> todas = new ArrayList<>();
                 todas.add(origen);
                 todas.addAll(destinos);
 
-                List<PartidaConciliatoria> guardadas = todas.stream().map(p ->
+                // neto == 0: cruce completo, sin nada más que hacer. neto != 0: el sobrante
+                // se traslada a una partida nueva en vez de quedar pegado a los movimientos
+                // originales -- ver crearPartidaResto.
+                String justificacion;
+                PartidaConciliatoria partidaResto = null;
+                if (neto.compareTo(BigDecimal.ZERO) == 0) {
+                    justificacion = "Cruzado manualmente";
+                } else {
+                    partidaResto = crearPartidaResto(idConciliacion, origen, neto);
+                    justificacion = "Cruzado con diferencia trasladada a partida #" + partidaResto.getId();
+                }
+
+                List<PartidaConciliatoria> guardadas = new ArrayList<>(todas.stream().map(p ->
                         partidaRepo.actualizar(p
                                 .withEstado("CRUZADA")
                                 .withJustificacion(justificacion)
                                 .withFechaJustificacion(LocalDate.now()))
-                ).toList();
+                ).toList());
 
                 // Marcar los movimientos subyacentes como CONCILIADO para que el
-                // motor no los vuelva a procesar en un reprocesado posterior.
+                // motor no los vuelva a procesar en un reprocesado posterior. Esto aplica
+                // siempre, incluso con diferencia: origen y destinos YA quedaron
+                // completamente resueltos -- lo que sobra vive en partidaResto, no en ellos.
                 for (PartidaConciliatoria p : todas) {
                     if (p.getIdMovimiento() == null) continue;
                     if ("BANCARIO".equals(p.getTipoOrigen())) {
@@ -182,11 +192,73 @@ public class ClosureService {
                     }
                 }
 
+                if (partidaResto != null) {
+                    guardadas.add(partidaResto);
+                }
+
                 yield guardadas;
             }
 
             default -> throw new IllegalArgumentException("Tipo de cruce no válido: " + tipo);
         };
+    }
+
+    /**
+     * Cuando un cruce no da neto cero, el sobrante no puede quedar pegado a los mismos
+     * movimientos que ya se marcaron CRUZADA/CONCILIADO -- se traslada a un movimiento y
+     * partida sintéticos nuevos, PENDIENTE, disponibles para cruzarse después o mandarse a
+     * "próximo mes" como cualquier otra partida (antes no existía ningún concepto de
+     * "monto restante": la partida "incompleta" seguía cargando el monto completo
+     * original, así que un segundo intento de cruzarla volvía a comparar contra el total,
+     * no contra lo que en realidad faltaba).
+     *
+     * Mismo patrón que {@link #sincronizarSinteticoGastos} (movimiento sintético +
+     * partida PENDIENTE), aplicado una sola vez en vez de recalculado en cada carga.
+     *
+     * Lado del sobrante: la fórmula de {@code neto} (armada en el caller) ya asume que
+     * origen y destinos tienen signo económico opuesto -- así se cancelan cuando son
+     * iguales. Si {@code neto > 0}, origen pesaba más que la suma de destinos, así que el
+     * origen es el que se quedó con dinero sin cruzar (mismo tipoOrigen/tipoMovimiento que
+     * origen, por el monto restante). Si {@code neto < 0}, destinos pesaban más, y el
+     * sobrante es del lado CONTRARIO a origen -- esa es la única lectura consistente
+     * incluso cuando destinos mezcla partidas BANCARIO y CONTABLE, porque no depende de
+     * cuál destino individual "cargó" con la diferencia (el sobrante es un neto agregado,
+     * no algo atribuible a un destino en particular).
+     */
+    private PartidaConciliatoria crearPartidaResto(Long idConciliacion, PartidaConciliatoria origen,
+                                                    BigDecimal neto) {
+        boolean sobraEnOrigen = neto.compareTo(BigDecimal.ZERO) > 0;
+        String tipoOrigenResto = sobraEnOrigen ? origen.getTipoOrigen() : opuestoTipoOrigen(origen.getTipoOrigen());
+        String tipoMovimientoResto = sobraEnOrigen
+                ? origen.getTipoMovimiento() : opuestoTipoMovimiento(origen.getTipoMovimiento());
+        BigDecimal montoResto = neto.abs();
+
+        Movimiento sintetico = Movimiento.builder()
+                .fecha(LocalDate.now())
+                .descripcion("DIFERENCIA DE CRUCE — partida #" + origen.getId())
+                .monto(montoResto)
+                .tipo(tipoMovimientoResto)
+                .estado(EstadoMovimiento.PENDIENTE)
+                .build();
+
+        List<Movimiento> guardados = "BANCARIO".equals(tipoOrigenResto)
+                ? movimientoRepo.guardarBancarios(List.of(sintetico), idConciliacion)
+                : movimientoRepo.guardarContables(List.of(sintetico), idConciliacion);
+
+        return partidaRepo.guardar(PartidaConciliatoria.builder()
+                .idConciliacion(idConciliacion)
+                .idMovimiento(guardados.get(0).getId())
+                .tipoOrigen(tipoOrigenResto)
+                .estado("PENDIENTE")
+                .build());
+    }
+
+    private String opuestoTipoOrigen(String tipoOrigen) {
+        return "BANCARIO".equals(tipoOrigen) ? "CONTABLE" : "BANCARIO";
+    }
+
+    private String opuestoTipoMovimiento(String tipoMovimiento) {
+        return "DEBITO".equals(tipoMovimiento) ? "CREDITO" : "DEBITO";
     }
 
     /**

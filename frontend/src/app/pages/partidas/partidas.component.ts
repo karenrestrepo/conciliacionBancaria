@@ -411,6 +411,7 @@ import { ApiService } from '../../core/api.service';
 })
 export class PartidasComponent implements OnInit {
   idConciliacion!: number;
+  periodoConciliacion: string | null = null;
   partidas: any[] = [];
   partidasHistoricas: any[] = [];
   loading = true;
@@ -434,7 +435,15 @@ private arrastrarForms: Record<number, FormGroup> = {};
 
   ngOnInit(): void {
     this.idConciliacion = +this.route.snapshot.paramMap.get('id')!;
-    this.cargar();
+    // El período debe estar disponible ANTES de cargar() -- ese método arma los
+    // formularios de "próximo mes" usando siguienteMes(), que depende de él.
+    this.api.obtenerConciliacion(this.idConciliacion).subscribe({
+      next: res => {
+        this.periodoConciliacion = res.data.periodo;
+        this.cargar();
+      },
+      error: () => this.cargar()  // periodoConciliacion queda null; siguienteMes() cae al fallback de hoy
+    });
   }
 
   cargar(): void {
@@ -590,6 +599,10 @@ private arrastrarForms: Record<number, FormGroup> = {};
       p.estado = updated.estado;
       p.justificacion = updated.justificacion;
       p.periodoArrastre = updated.periodoArrastre;
+    } else {
+      // Partida nueva que no existía localmente -- p.ej. el "resto" de un cruce
+      // incompleto, que el backend crea y devuelve en la misma respuesta.
+      this.partidas.push(updated);
     }
   }
 
@@ -630,7 +643,21 @@ private arrastrarForms: Record<number, FormGroup> = {};
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
+  /**
+   * Mes siguiente al PERÍODO DE LA CONCILIACIÓN, no a la fecha real de hoy -- si el
+   * usuario está conciliando julio en agosto (o en cualquier otro momento posterior),
+   * "próximo mes" debe proponer agosto (el mes después de julio), no el mes después de
+   * la fecha en que efectivamente hace clic.
+   */
   siguienteMes(): string {
+    if (this.periodoConciliacion && /^\d{4}-\d{2}$/.test(this.periodoConciliacion)) {
+      const [anioStr, mesStr] = this.periodoConciliacion.split('-');
+      let anio = parseInt(anioStr, 10);
+      let mes = parseInt(mesStr, 10) + 1;
+      if (mes > 12) { mes = 1; anio += 1; }
+      return `${anio}-${String(mes).padStart(2, '0')}`;
+    }
+    // Fallback si por algún motivo no se pudo cargar el período de la conciliación.
     const d = new Date();
     d.setMonth(d.getMonth() + 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
