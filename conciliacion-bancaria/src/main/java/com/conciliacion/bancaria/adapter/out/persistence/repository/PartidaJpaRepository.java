@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Set;
 
 public interface PartidaJpaRepository extends JpaRepository<PartidaEntity, Long> {
 
@@ -53,4 +54,13 @@ public interface PartidaJpaRepository extends JpaRepository<PartidaEntity, Long>
     List<PartidaEntity> findPendientesDeOtrasConciliaciones(
             @Param("idCuenta") Long idCuenta,
             @Param("idConciliacionActual") Long idConciliacionActual);
+
+    @Query("""
+            SELECT p.idMovimiento FROM PartidaEntity p
+            WHERE p.idConciliacion = :idConciliacion
+              AND p.tipoOrigen = :tipoOrigen
+              AND p.estado = 'PENDIENTE'
+            """)
+    Set<Long> findIdsMovimientoConPendiente(@Param("idConciliacion") Long idConciliacion,
+                                            @Param("tipoOrigen") String tipoOrigen);
 }

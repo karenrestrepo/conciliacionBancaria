@@ -102,6 +102,10 @@ import { ApiService } from '../../core/api.service';
                     <mat-icon>description</mat-icon>
                     <span class="mov-desc-text" [title]="p.descripcionMovimiento">{{ p.descripcionMovimiento }}</span>
                   </div>
+                  <div class="mov-detalle-item" *ngIf="p.ultimosDigitosTarjeta">
+                    <mat-icon>credit_card</mat-icon>
+                    <span class="tarjeta-tag">•••• {{ p.ultimosDigitosTarjeta }}</span>
+                  </div>
                   <div class="mov-detalle-item">
                     <mat-icon>attach_money</mat-icon>
                     <span class="mov-monto"
@@ -189,7 +193,10 @@ import { ApiService } from '../../core/api.service';
                                                [class.contable]="otra.tipoOrigen === 'CONTABLE'">
                         {{ otra.tipoOrigen === 'BANCARIO' ? 'Bancario' : 'Contable' }}
                       </span>
-                      <span class="otra-desc">{{ otra.descripcionMovimiento || ('Partida #' + otra.id) }}</span>
+                      <span class="otra-desc">
+                        {{ otra.descripcionMovimiento || ('Partida #' + otra.id) }}
+                        <span *ngIf="otra.ultimosDigitosTarjeta" class="tarjeta-tag-inline">•••• {{ otra.ultimosDigitosTarjeta }}</span>
+                      </span>
                       <span class="otra-monto" [class.debito]="otra.tipoMovimiento === 'DEBITO'"
                                                [class.credito]="otra.tipoMovimiento === 'CREDITO'">
                         {{ otra.tipoMovimiento === 'DEBITO' ? '−' : '+' }}{{ otra.montoMovimiento | currency:'COP':'symbol':'1.0-0' }}
@@ -263,6 +270,10 @@ import { ApiService } from '../../core/api.service';
                     <mat-icon>description</mat-icon>
                     <span class="mov-desc-text">{{ p.descripcionMovimiento }}</span>
                   </div>
+                  <div class="mov-detalle-item" *ngIf="p.ultimosDigitosTarjeta">
+                    <mat-icon>credit_card</mat-icon>
+                    <span class="tarjeta-tag">•••• {{ p.ultimosDigitosTarjeta }}</span>
+                  </div>
                   <div class="mov-detalle-item">
                     <mat-icon>attach_money</mat-icon>
                     <span class="mov-monto"
@@ -329,6 +340,13 @@ import { ApiService } from '../../core/api.service';
     .mov-detalle-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #374151; }
     .mov-detalle-item mat-icon { font-size: 15px; width: 15px; height: 15px; color: #9ca3af; }
     .mov-desc-text { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tarjeta-tag {
+      background: #f3f4f6; color: #4b5563; font-size: 11px; font-weight: 600;
+      padding: 2px 8px; border-radius: 10px; letter-spacing: 0.5px;
+    }
+    .tarjeta-tag-inline {
+      font-size: 11px; color: #9ca3af; margin-left: 6px; white-space: nowrap;
+    }
     .mov-monto { font-weight: 600; }
     .mov-monto.debito,  .otra-monto.debito  { color: #dc2626; }
     .mov-monto.credito, .otra-monto.credito { color: #16a34a; }

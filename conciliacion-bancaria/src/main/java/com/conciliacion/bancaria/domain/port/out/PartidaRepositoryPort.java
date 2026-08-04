@@ -4,6 +4,7 @@ import com.conciliacion.bancaria.domain.model.PartidaConciliatoria;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface PartidaRepositoryPort {
 
@@ -26,4 +27,12 @@ public interface PartidaRepositoryPort {
     void eliminarPendientePorMovimiento(Long idMovimiento, String tipoOrigen);
 
     List<PartidaConciliatoria> buscarPendientesDeOtrasConciliaciones(Long idCuenta, Long idConciliacionActual);
+
+    /**
+     * Ids de movimiento que YA tienen una partida PENDIENTE para esta conciliación y este
+     * tipoOrigen -- usado para filtrar duplicados antes de insertar partidas nuevas cuando
+     * el motor completo reprocesa movimientos ya vistos en una corrida anterior (ej. cada
+     * extracto de tarjeta de crédito subido en una conciliación con auxiliar_conjunto).
+     */
+    Set<Long> buscarIdsMovimientoConPendiente(Long idConciliacion, String tipoOrigen);
 }

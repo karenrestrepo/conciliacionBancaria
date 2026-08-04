@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -78,6 +79,11 @@ public class PartidaRepositoryAdapter implements PartidaRepositoryPort {
                 .toList();
     }
 
+    @Override
+    public Set<Long> buscarIdsMovimientoConPendiente(Long idConciliacion, String tipoOrigen) {
+        return jpaRepository.findIdsMovimientoConPendiente(idConciliacion, tipoOrigen);
+    }
+
     private PartidaEntity toEntity(PartidaConciliatoria p) {
         return PartidaEntity.builder()
                 .id(p.getId())
@@ -112,7 +118,8 @@ public class PartidaRepositoryAdapter implements PartidaRepositoryPort {
                 builder.fechaMovimiento(m.getFecha())
                         .descripcionMovimiento(m.getDescripcion())
                         .montoMovimiento(m.getMonto())
-                        .tipoMovimiento(m.getTipo());
+                        .tipoMovimiento(m.getTipo())
+                        .ultimosDigitosTarjeta(m.getUltimosDigitosTarjeta());
             });
         } else {
             contableRepo.findById(e.getIdMovimiento()).ifPresent(m -> {

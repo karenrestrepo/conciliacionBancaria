@@ -313,6 +313,7 @@ public class ConciliacionController {
                 .descripcionMovimiento(p.getDescripcionMovimiento())
                 .montoMovimiento(p.getMontoMovimiento())
                 .tipoMovimiento(p.getTipoMovimiento())
+                .ultimosDigitosTarjeta(p.getUltimosDigitosTarjeta())
                 .esHistorica(p.isEsHistorica())
                 .build();
     }
@@ -330,6 +331,7 @@ public class ConciliacionController {
                 .descripcionBancario(s.getMovimientoBancario().getDescripcion())
                 .montoBancario(s.getMovimientoBancario().getMonto())
                 .tipoBancario(s.getMovimientoBancario().getTipo())
+                .ultimosDigitosTarjeta(s.getMovimientoBancario().getUltimosDigitosTarjeta())
                 .idMovContable(s.getMovimientoContable().getId())
                 .fechaContable(s.getMovimientoContable().getFecha())
                 .descripcionContable(s.getMovimientoContable().getDescripcion())

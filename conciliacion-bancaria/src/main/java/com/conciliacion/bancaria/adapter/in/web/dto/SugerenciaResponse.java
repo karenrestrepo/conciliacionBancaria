@@ -22,6 +22,7 @@ public class SugerenciaResponse {
     private String descripcionBancario;
     private BigDecimal montoBancario;
     private String tipoBancario;
+    private String ultimosDigitosTarjeta;
     // Movimiento contable
     private Long idMovContable;
     private LocalDate fechaContable;

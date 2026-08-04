@@ -130,6 +130,7 @@ export interface Sugerencia {
   descripcionBancario: string;
   montoBancario: number;
   tipoBancario: string;
+  ultimosDigitosTarjeta: string | null;
   idMovContable: number;
   fechaContable: string;
   descripcionContable: string;

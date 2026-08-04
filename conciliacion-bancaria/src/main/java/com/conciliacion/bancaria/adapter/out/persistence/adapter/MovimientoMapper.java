@@ -16,6 +16,7 @@ public class MovimientoMapper {
                 .monto(e.getMonto())
                 .tipo(e.getTipo())
                 .estado(e.getEstadoConciliacion())
+                .ultimosDigitosTarjeta(e.getUltimosDigitosTarjeta())
                 .build();
     }
 
@@ -41,6 +42,7 @@ public class MovimientoMapper {
                 .monto(m.getMonto())
                 .tipo(m.getTipo())
                 .estadoConciliacion(m.getEstado())
+                .ultimosDigitosTarjeta(m.getUltimosDigitosTarjeta())
                 .build();
     }
 

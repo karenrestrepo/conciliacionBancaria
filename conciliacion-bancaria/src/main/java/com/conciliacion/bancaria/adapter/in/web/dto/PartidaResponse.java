@@ -22,6 +22,7 @@ public class PartidaResponse {
     private String descripcionMovimiento;
     private BigDecimal montoMovimiento;
     private String tipoMovimiento;
+    private String ultimosDigitosTarjeta;
 
     private boolean esHistorica;
 }

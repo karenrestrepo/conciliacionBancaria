@@ -74,6 +74,8 @@ class ExtractosRealesIntegrationTest {
 
         assertThat(movimientos).isNotEmpty();
         assertThat(cuadre.isCuadra()).as("advertencias: %s", cuadre.getAdvertencias()).isTrue();
+        // Extracto de cuenta de ahorro, sin tarjeta -- no debe inventar dígitos.
+        assertThat(movimientos).allMatch(m -> m.getUltimosDigitosTarjeta() == null);
     }
 
     @Test
@@ -92,6 +94,7 @@ class ExtractosRealesIntegrationTest {
                 .as("al menos un movimiento debe incluir el texto de su línea de continuación")
                 .isTrue();
         assertThat(cuadre.isCuadra()).as("advertencias: %s", cuadre.getAdvertencias()).isTrue();
+        assertThat(movimientos).allMatch(m -> m.getUltimosDigitosTarjeta() == null);
     }
 
     @Test
@@ -122,6 +125,9 @@ class ExtractosRealesIntegrationTest {
         assertThat(movimientos.stream().filter(m -> m.getDescripcion().contains("IMP 4XMIL")))
                 .as("los cargos (impuesto 4x1000) deben quedar como DEBITO")
                 .allMatch(m -> m.getTipo().equals("DEBITO"));
+        // El encabezado trae "#  5474 8200 4603 5264" -- todo movimiento de este archivo
+        // debe quedar etiquetado con los últimos 4 dígitos de ESA tarjeta.
+        assertThat(movimientos).allMatch(m -> "5264".equals(m.getUltimosDigitosTarjeta()));
     }
 
     @Test

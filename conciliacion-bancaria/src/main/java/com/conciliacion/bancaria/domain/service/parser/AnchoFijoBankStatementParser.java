@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Parser de extractos de texto de ancho fijo (reporte de impresión), dirigido
@@ -36,10 +38,26 @@ public class AnchoFijoBankStatementParser {
     private final CuadreValidator cuadreValidator;
     private final LineasTextoReader lineasReader;
 
+    /**
+     * Encabezado de extracto de tarjeta de crédito (ver clase, formato de reporte de
+     * impresión de Davivienda): "Tarjeta de Crédito" en una línea, y el número completo
+     * en otra unas líneas más abajo, con el patrón "#  5474 8200 0465 4924". El "." en vez
+     * de "é" es deliberado -- el archivo real trae ese acento reemplazado por un "?"
+     * literal (ya venía así del sistema que exporta el reporte, no es un problema de
+     * encoding de este parser), así que se acepta cualquier caracter en esa posición en
+     * vez de asumir un acento bien formado. DOTALL para que ".*?" cruce el salto de línea
+     * en blanco entre el título y el número; no-greedy para no capturar de más si el
+     * archivo tiene más de un "#" antes del número de tarjeta.
+     */
+    private static final Pattern PATRON_TARJETA = Pattern.compile(
+            "Tarjeta de Cr.dito.*?#\\s*(\\d{4}\\s?\\d{4}\\s?\\d{4}\\s?\\d{4})",
+            Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+
     public List<Movimiento> parsear(byte[] contenido, ConfiguracionExtractoDetalle config, String periodo) {
         ConfigAnchoFijo c = config.getAnchoFijo();
         int anio = fechaResolver.extraerAnio(periodo);
         List<String> lineas = lineasReader.leer(contenido, config.getEncoding());
+        String ultimosDigitosTarjeta = extraerUltimosDigitosTarjeta(lineas);
 
         List<Movimiento> movimientos = new ArrayList<>();
 
@@ -62,10 +80,27 @@ public class AnchoFijoBankStatementParser {
                     .monto(montoConTipo.monto())
                     .tipo(montoConTipo.tipo())
                     .estado(EstadoMovimiento.PENDIENTE)
+                    .ultimosDigitosTarjeta(ultimosDigitosTarjeta)
                     .build());
         }
 
         return movimientos;
+    }
+
+    /**
+     * Busca el número de tarjeta en el encabezado del archivo (fuera de la tabla de
+     * movimientos) y devuelve sus últimos 4 dígitos. Este parser es genérico -- lo usan
+     * también extractos de cuenta bancaria normal sin tarjeta -- así que si el patrón no
+     * aparece (otro banco, otro formato) devuelve {@code null} sin lanzar nada; el campo
+     * es nullable justamente para este caso.
+     */
+    private String extraerUltimosDigitosTarjeta(List<String> lineas) {
+        String contenidoCompleto = String.join("\n", lineas);
+        Matcher m = PATRON_TARJETA.matcher(contenidoCompleto);
+        if (!m.find()) return null;
+
+        String digitos = m.group(1).replaceAll("\\D", "");
+        return digitos.length() >= 4 ? digitos.substring(digitos.length() - 4) : null;
     }
 
     public ResultadoCuadre validarCuadre(byte[] contenido, ConfiguracionExtractoDetalle config) {

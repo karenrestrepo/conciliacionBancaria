@@ -211,6 +211,76 @@ class AnchoFijoBankStatementParserTest {
     }
 
     @Nested
+    @DisplayName("Número de tarjeta en el encabezado")
+    class NumeroTarjeta {
+
+        @Test
+        @DisplayName("sin 'Tarjeta de Cr.dito' en el archivo, ultimosDigitosTarjeta queda null (cuenta bancaria normal)")
+        void sinEncabezadoDeTarjetaQuedaNull() {
+            byte[] contenido = archivo(
+                    "NIT. 860.034.313-7          Extracto Cuenta de Ahorros",
+                    linea("01", "06", "Abono ACH", "100.00+", "")
+            );
+
+            List<Movimiento> resultado = parser.parsear(contenido, configBasica(null), "2026-06");
+
+            assertThat(resultado).hasSize(1);
+            assertThat(resultado.get(0).getUltimosDigitosTarjeta()).isNull();
+        }
+
+        @Test
+        @DisplayName("con el encabezado real (acento reemplazado por '?', como vienen los archivos reales), "
+                + "todos los movimientos quedan etiquetados con los últimos 4 dígitos")
+        void conEncabezadoRealEtiquetaLosUltimos4Digitos() {
+            byte[] contenido = archivo(
+                    "                    NIT. 860.034.313-7          Tarjeta de Cr?dito",
+                    "",
+                    "                                       #  5474 8200 0465 4924",
+                    "",
+                    linea("01", "06", "Compra en linea", "100.00+", ""),
+                    linea("02", "06", "Pago tarjeta", "50.00-", "")
+            );
+
+            List<Movimiento> resultado = parser.parsear(contenido, configBasica(null), "2026-06");
+
+            assertThat(resultado).hasSize(2);
+            assertThat(resultado).allMatch(m -> "4924".equals(m.getUltimosDigitosTarjeta()));
+        }
+
+        @Test
+        @DisplayName("con el acento bien formado (é en vez de '?') también reconoce el patrón")
+        void conAcentoBienFormadoTambienFunciona() {
+            byte[] contenido = archivo(
+                    "                    NIT. 860.034.313-7          Tarjeta de Crédito",
+                    "",
+                    "                                       #  5474 8200 4603 5264",
+                    "",
+                    linea("01", "06", "Compra", "100.00+", "")
+            );
+
+            List<Movimiento> resultado = parser.parsear(contenido, configBasica(null), "2026-06");
+
+            assertThat(resultado).hasSize(1);
+            assertThat(resultado.get(0).getUltimosDigitosTarjeta()).isEqualTo("5264");
+        }
+
+        @Test
+        @DisplayName("extracto sin movimientos igual permite reconocer el patrón sin lanzar nada (lista vacía)")
+        void sinMovimientosNoLanzaAunqueHayaEncabezadoDeTarjeta() {
+            byte[] contenido = archivo(
+                    "Tarjeta de Cr?dito",
+                    "#  5474 8200 0465 4924",
+                    "        MOVIMIENTOS",
+                    ""
+            );
+
+            List<Movimiento> resultado = parser.parsear(contenido, configBasica(null), "2026-06");
+
+            assertThat(resultado).isEmpty();
+        }
+    }
+
+    @Nested
     @DisplayName("Cuadre")
     class Cuadre {
 

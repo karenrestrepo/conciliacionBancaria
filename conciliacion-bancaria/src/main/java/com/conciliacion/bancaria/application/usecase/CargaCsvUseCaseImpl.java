@@ -500,7 +500,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                 .forEach(id -> partidaRepo.eliminarPendientePorMovimiento(id, "BANCARIO"));
 
         // Guardar sólo partidas de contables nuevos que no encontraron par
-        partidaRepo.guardarTodas(resultado.partidasContables());
+        partidaRepo.guardarTodas(sinPendienteExistente(idConciliacion, resultado.partidasContables(), "CONTABLE"));
 
         limpiarPendientesConSugerenciaActiva(idConciliacion);
     }
@@ -508,7 +508,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
     /** Misma razón de ser que {@link #persistirResultadoMotorIncremental} para la rama sin bancarios libres. */
     @Transactional
     public void persistirSoloContablesIncremental(Long idConciliacion, List<Movimiento> nuevosContables) {
-        partidaRepo.guardarTodas(
+        List<com.conciliacion.bancaria.domain.model.PartidaConciliatoria> partidas =
                 nuevosContables.stream()
                         .map(c -> com.conciliacion.bancaria.domain.model.PartidaConciliatoria.builder()
                                 .idConciliacion(idConciliacion)
@@ -516,7 +516,8 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                                 .tipoOrigen("CONTABLE")
                                 .estado("PENDIENTE")
                                 .build())
-                        .toList());
+                        .toList();
+        partidaRepo.guardarTodas(sinPendienteExistente(idConciliacion, partidas, "CONTABLE"));
         limpiarPendientesConSugerenciaActiva(idConciliacion);
     }
 
@@ -528,9 +529,33 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
     public void persistirResultadoMotorCompleto(Long idConciliacion,
                                                  ConciliationEngine.ResultadoMotor resultado) {
         sugerenciaRepo.guardarTodas(resultado.sugerencias());
-        partidaRepo.guardarTodas(resultado.partidasBancarias());
-        partidaRepo.guardarTodas(resultado.partidasContables());
+        partidaRepo.guardarTodas(sinPendienteExistente(idConciliacion, resultado.partidasBancarias(), "BANCARIO"));
+        partidaRepo.guardarTodas(sinPendienteExistente(idConciliacion, resultado.partidasContables(), "CONTABLE"));
         limpiarPendientesConSugerenciaActiva(idConciliacion);
+    }
+
+    /**
+     * Filtra los movimientos que YA tienen una partida PENDIENTE para esta conciliación y
+     * este tipoOrigen, antes de insertar. Necesario porque {@code ejecutarMotorAsync} relee
+     * TODOS los bancarios/contables no conciliados de la conciliación en cada corrida (no
+     * sólo los nuevos) -- en una conciliación con auxiliar_conjunto (tarjetas de crédito),
+     * cada extracto adicional que se sube dispara el motor completo sobre lo ya acumulado,
+     * y {@link ConciliationEngine#ejecutar} genera una partida PENDIENTE por cada bancario
+     * sin par SIN saber que ya existe una de una corrida anterior -- guardarTodas() hace
+     * saveAll() sobre entidades sin id, así que JPA siempre inserta filas nuevas. Bug real:
+     * subir 5 extractos de tarjeta antes de cargar el auxiliar dejaba al movimiento del
+     * primer archivo con hasta 4 partidas PENDIENTE duplicadas.
+     */
+    private List<com.conciliacion.bancaria.domain.model.PartidaConciliatoria> sinPendienteExistente(
+            Long idConciliacion,
+            List<com.conciliacion.bancaria.domain.model.PartidaConciliatoria> partidas,
+            String tipoOrigen) {
+        if (partidas.isEmpty()) return partidas;
+        Set<Long> yaPendientes = partidaRepo.buscarIdsMovimientoConPendiente(idConciliacion, tipoOrigen);
+        if (yaPendientes.isEmpty()) return partidas;
+        return partidas.stream()
+                .filter(p -> !yaPendientes.contains(p.getIdMovimiento()))
+                .toList();
     }
 
     // Motor incremental — sólo compara nuevos contables contra bancarios sin sugerencia activa

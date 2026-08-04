@@ -25,6 +25,7 @@ public class PartidaConciliatoria {
     private final String descripcionMovimiento;
     private final java.math.BigDecimal montoMovimiento;
     private final String tipoMovimiento;      // "DEBITO" o "CREDITO"
+    private final String ultimosDigitosTarjeta; // sólo si el movimiento bancario viene de un extracto de tarjeta
     private final boolean esHistorica;        // partida de conciliación anterior
 
     public boolean estaJustificada() {

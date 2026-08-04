@@ -1,6 +1,7 @@
 package com.conciliacion.bancaria.application.usecase;
 
 import com.conciliacion.bancaria.domain.model.Movimiento;
+import com.conciliacion.bancaria.domain.model.PartidaConciliatoria;
 import com.conciliacion.bancaria.domain.model.ResumenCargaAuxiliar;
 import com.conciliacion.bancaria.domain.model.Sugerencia;
 import com.conciliacion.bancaria.domain.port.out.*;
@@ -15,12 +16,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -31,6 +34,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -397,6 +401,102 @@ class CargaCsvUseCaseImplTest {
             // Los 2 huérfanos genuinos nunca deben limpiarse — no tienen sugerencia.
             verify(partidaRepo, never()).eliminarPendientePorMovimiento(109L, "BANCARIO");
             verify(partidaRepo, never()).eliminarPendientePorMovimiento(110L, "BANCARIO");
+        }
+    }
+
+    @Nested
+    @DisplayName("Partidas PENDIENTE duplicadas al subir varios extractos (tarjetas de crédito, auxiliar conjunto)")
+    class DuplicadosPartidasPendientes {
+
+        private Movimiento bancario(Long id, String descripcion) {
+            return Movimiento.builder()
+                    .id(id).fecha(LocalDate.of(2026, 6, 1))
+                    .monto(new BigDecimal("100")).tipo("DEBITO").descripcion(descripcion)
+                    .estado(EstadoMovimiento.PENDIENTE).build();
+        }
+
+        @Test
+        @DisplayName("3 extractos subidos seguidos sin auxiliar: el bancario del primero termina con 1 sola partida PENDIENTE")
+        void tresExtractosSeguidosNoDuplicanPartida() {
+            // Simula el estado real de partidas_conciliatorias: el conjunto de ids de
+            // movimiento que YA tienen una partida PENDIENTE se actualiza con cada
+            // guardarTodas(), tal como lo vería PartidaJpaRepository.findIdsMovimientoConPendiente
+            // contra la BD real entre una corrida del motor y la siguiente.
+            Set<Long> pendientesExistentes = new HashSet<>();
+            when(partidaRepo.buscarIdsMovimientoConPendiente(eq(CONCILIACION_ID), eq("BANCARIO")))
+                    .thenAnswer(inv -> new HashSet<>(pendientesExistentes));
+            when(partidaRepo.guardarTodas(anyList())).thenAnswer(inv -> {
+                List<PartidaConciliatoria> partidas = inv.getArgument(0);
+                partidas.stream()
+                        .filter(p -> "BANCARIO".equals(p.getTipoOrigen()))
+                        .forEach(p -> pendientesExistentes.add(p.getIdMovimiento()));
+                return partidas;
+            });
+            when(sugerenciaRepo.buscarBancarioIdsConSugerenciaActiva(CONCILIACION_ID)).thenReturn(Set.of());
+            when(sugerenciaRepo.buscarContableIdsConSugerenciaActiva(CONCILIACION_ID)).thenReturn(Set.of());
+            // Sin auxiliar cargado todavía: cero contables en las 3 corridas.
+            when(movimientoRepo.buscarContablesPorConciliacion(CONCILIACION_ID)).thenReturn(List.of());
+
+            Movimiento archivo1 = bancario(101L, "extracto 1");
+            Movimiento archivo2 = bancario(102L, "extracto 2");
+            Movimiento archivo3 = bancario(103L, "extracto 3");
+
+            // Cada "subida de extracto" relee TODOS los bancarios acumulados de la
+            // conciliación (auxiliar_conjunto=true no borra los anteriores) y dispara el
+            // motor COMPLETO -- exactamente el flujo real de cargarExtractoBancario.
+            when(movimientoRepo.buscarBancariosPorConciliacion(CONCILIACION_ID))
+                    .thenReturn(List.of(archivo1));
+            useCase.ejecutarMotorAsync("job-1", CONCILIACION_ID);
+
+            when(movimientoRepo.buscarBancariosPorConciliacion(CONCILIACION_ID))
+                    .thenReturn(List.of(archivo1, archivo2));
+            useCase.ejecutarMotorAsync("job-2", CONCILIACION_ID);
+
+            when(movimientoRepo.buscarBancariosPorConciliacion(CONCILIACION_ID))
+                    .thenReturn(List.of(archivo1, archivo2, archivo3));
+            useCase.ejecutarMotorAsync("job-3", CONCILIACION_ID);
+
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<List<PartidaConciliatoria>> captor = ArgumentCaptor.forClass(List.class);
+            verify(partidaRepo, atLeastOnce()).guardarTodas(captor.capture());
+
+            long vecesGuardadoArchivo1 = captor.getAllValues().stream()
+                    .flatMap(List::stream)
+                    .filter(p -> "BANCARIO".equals(p.getTipoOrigen()) && archivo1.getId().equals(p.getIdMovimiento()))
+                    .count();
+            long vecesGuardadoArchivo2 = captor.getAllValues().stream()
+                    .flatMap(List::stream)
+                    .filter(p -> "BANCARIO".equals(p.getTipoOrigen()) && archivo2.getId().equals(p.getIdMovimiento()))
+                    .count();
+
+            // Antes del fix: archivo1 se hubiera guardado 3 veces (una por cada corrida
+            // que lo relee todavía PENDIENTE); archivo2, 2 veces. Con el fix, cada
+            // movimiento sólo genera su partida PENDIENTE una vez, en la corrida donde
+            // apareció por primera vez.
+            assertThat(vecesGuardadoArchivo1).as("archivo1 no debe duplicarse en corridas posteriores").isEqualTo(1);
+            assertThat(vecesGuardadoArchivo2).as("archivo2 no debe duplicarse en la corrida 3").isEqualTo(1);
+            assertThat(pendientesExistentes).containsExactlyInAnyOrder(101L, 102L, 103L);
+        }
+
+        @Test
+        @DisplayName("sinPendienteExistente no filtra nada si no hay partidas previas (caso normal)")
+        void sinPartidasPreviasNoFiltraNada() {
+            when(partidaRepo.buscarIdsMovimientoConPendiente(eq(CONCILIACION_ID), any())).thenReturn(Set.of());
+            when(sugerenciaRepo.buscarBancarioIdsConSugerenciaActiva(CONCILIACION_ID)).thenReturn(Set.of());
+            when(sugerenciaRepo.buscarContableIdsConSugerenciaActiva(CONCILIACION_ID)).thenReturn(Set.of());
+            when(movimientoRepo.buscarContablesPorConciliacion(CONCILIACION_ID)).thenReturn(List.of());
+            when(movimientoRepo.buscarBancariosPorConciliacion(CONCILIACION_ID))
+                    .thenReturn(List.of(bancario(201L, "único")));
+            when(partidaRepo.guardarTodas(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+            useCase.ejecutarMotorAsync("job-1", CONCILIACION_ID);
+
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<List<PartidaConciliatoria>> captor = ArgumentCaptor.forClass(List.class);
+            verify(partidaRepo, atLeastOnce()).guardarTodas(captor.capture());
+            long veces = captor.getAllValues().stream().flatMap(List::stream)
+                    .filter(p -> 201L == p.getIdMovimiento()).count();
+            assertThat(veces).isEqualTo(1);
         }
     }
 }
