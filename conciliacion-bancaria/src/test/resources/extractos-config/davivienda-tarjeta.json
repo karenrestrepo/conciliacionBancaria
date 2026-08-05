@@ -6,12 +6,14 @@
   "separadorDecimales": ".",
   "anchoFijo": {
     "columnas": [
-      { "campo": "fecha", "inicio": 20, "fin": 43 },
-      { "campo": "descripcion", "inicio": 44, "fin": 77 },
-      { "campo": "monto", "inicio": 78, "fin": 98 }
+      { "campo": "fecha", "inicio": 18, "fin": 25 },
+      { "campo": "descripcion", "inicio": 28, "fin": 81 },
+      { "campo": "monto", "inicio": 78, "fin": 95 },
+      { "campo": "signo", "inicio": 96, "fin": 115 }
     ],
     "convencionSigno": "SUFIJO",
-    "formatoFecha": "dd/MM/yyyy"
+    "formatoFecha": "yyyyMMdd",
+    "invertir": true
   },
   "continuacion": { "habilitada": false },
   "cuadre": { "habilitada": false }

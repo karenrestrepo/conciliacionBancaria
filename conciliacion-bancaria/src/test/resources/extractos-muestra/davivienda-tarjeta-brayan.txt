@@ -12,14 +12,14 @@
 
                          NIT. 860.034.313-7                                                                                                  Tarjeta de Cr?dito
 
-                                                                                                                                       #  0000 0000 0000 5264
+                                                                                                                                       #  0000 0000 0000 4690
 
            Apreciado Cliente
            EMPRESA EJEMPLO SAS
 
-           EMPLEADO CINCO
+           EMPLEADO CUATRO
 
-           empleado5@ejemplo.com
+           empleado4@ejemplo.com
            - 
 
            
@@ -30,25 +30,25 @@
             Periodo liquidado                             ABR.29/26 - MAY.30/26
             P?guese antes de                                          JUN.20 /26
 
-            Pago m?nimo                         $                         20,053
-            Pago total                          $                         20,053
+            Pago m?nimo                         $                              0
+            Pago total                          $                              0
                                                                                         
             Saldo en mora                       $                              0
 
 
              RESUMEN DE SU TARJETA
-           Saldo anterior                       $                       883,733
+           Saldo anterior                       $                       578,504
 
-           Consumos mes                         $                       211,644
+           Consumos mes                         $                         29,900
            Intereses corrientes                 $                              0
 
            Intereses de mora                    $                              0
            Cuota de manejo                      $                              0
 
-           Otros cargos                         $                           846
-           Pagos mes                            $                      1,076,171
+           Otros cargos                         $                           119
+           Pagos mes                            $                       608,525
 
-           Saldo total                          $                         20,053
+           Saldo total                          $                              0
 
 
 
@@ -58,7 +58,7 @@
                CUPO DE SU TARJETA
 
             Total                               $                      1,500,000
-            Disponible                          $                      1,479,947
+            Disponible                          $                      1,500,000
 
 
 
@@ -89,8 +89,8 @@
 
 
 
-       Comprobante de pago:  EMPLEADO CINCO                    JLmMR;w5Q9XNXiqCcYUspWMHQU9kIUaYpKRXIjkA6cpcKpgMjjlFCxCC8bM6C7F
-       Tarjeta de Cr?dito:  0000 0000 0000 5264                             (415)7707197268024(8020)0000000000005264(3900)020053(96)20260620
+       Comprobante de pago:  EMPLEADO CUATRO                     JLmMR;w5Q9XNXiqCcYUspWMHQU9kIVqxkG6gwjkA6cqVNxy5TkTdbpWMHaeP
+       Tarjeta de Cr?dito:  0000 0000 0000 4690                             (415)7707197268024(8020)0000000000004690(3900)00(96)20260620
        Fecha de pago             DD         MM         YYYY                   DETALLE DE LOS CHEQUES
 
                                                                                 Cod. Banco                 No. Cheque                       Valor a pagar
@@ -117,32 +117,32 @@
         Documento  Fecha                   Descripci?n                       Valor             Valor a Pagar       Saldo Pendiente    No.  Cuotas Tasa  Tasa
 
            No.                                                                                                                       CuotasPend.  E.A.   M.V.
-        1017646  20260504  IMP 4XMIL                                                 $114                $114+                    $0     0     0  0.00  0.00
+        0241019  20260520  PAGO DEBITO AUT                                        $578,505            $578,505-                   $0     0     0  0.00  0.00
 
-        2522845  20260504  IMP 4XMIL                                                 $160                $160+                    $0     0     0  0.00  0.00
-        2522846  20260504  FRISBY NO 26                                            $28,500                 $0+                    $0     1     0  28.02 2.08
+        5728262  20260520  IMP 4XMIL                                                 $119                $119+                    $0     0     0  0.00  0.00
+        5728263  20260520  SR WOK VICTORIA PEREIRA                                 $29,900                 $0+                    $0     1     0  28.02 2.08
 
-        2522847  20260504  COOP DE TRANSPORTES VELOTAX                             $40,000                 $0+                    $0     1     0  28.02 2.08
+        0144427  20260525  PAGO                                                    $30,020             $30,020-                   $0     0     0  0.00  0.00
 
-        4419243  20260505  IMP 4XMIL                                                 $115                $115+                    $0     0     0  0.00  0.00
-        4419244  20260505  FRISBY NO 26                                            $28,900                 $0+                    $0     1     0  28.02 2.08
 
-        0722640  20260508  IMP 4XMIL                                                 $160                $160+                    $0     0     0  0.00  0.00
 
-        0722641  20260508  COOP DE TRANSPORTES VELOTAX                             $40,000                 $0+                    $0     1     0  28.02 2.08
-        0241020  20260520  PAGO DEBITO AUT                                        $883,734            $883,734-                   $0     0     0  0.00  0.00
 
-        4516746  20260521  TRIANGULO DE ARENALES                                   $33,663                 $0+                    $0     1     0  28.02 2.08
 
-        4516747  20260521  IMP 4XMIL                                                 $134                $134+                    $0     0     0  0.00  0.00
-        8749259  20260522  EDS CUERVO I                                            $20,608                 $0+                    $0     1     0  28.02 2.08
 
-        8749260  20260522  IMP 4XMIL                                                  $82                 $82+                    $0     0     0  0.00  0.00
 
-        5617546  20260523  TRIANGULO DE ARENALES                                   $19,973             $19,206+                   $0     1     0  28.02 2.08
-        5617547  20260523  IMP 4XMIL                                                  $79                 $79+                    $0     0     0  0.00  0.00
 
-        0143266  20260525  PAGO                                                   $192,437            $192,437-                   $0     0     0  0.00  0.00
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

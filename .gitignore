@@ -1,0 +1,4 @@
+# Extractos bancarios reales (datos financieros y personales de clientes) --
+# nunca deben comitearse. Usar fixtures anonimizadas en
+# conciliacion-bancaria/src/test/resources/extractos-muestra/ en su lugar.
+/extractos-*/

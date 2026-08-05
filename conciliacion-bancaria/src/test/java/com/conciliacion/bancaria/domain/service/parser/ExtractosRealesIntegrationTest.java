@@ -14,9 +14,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -109,14 +112,19 @@ class ExtractosRealesIntegrationTest {
     }
 
     @Test
-    @DisplayName("C2. Davivienda tarjeta de credito con movimientos reales: invertir=true asigna DEBITO a cargos y CREDITO a pagos")
+    @DisplayName("C2. Davivienda tarjeta de credito con movimientos reales: invertir=true asigna DEBITO a cargos y CREDITO a pagos, "
+            + "y el monto real (columna 'Valor') se lee aunque 'Valor a Pagar' venga en $0 (compras a cuotas)")
     void daviviendaTarjetaConMovimientos() throws IOException {
         byte[] archivo = leerMuestra("davivienda-tarjeta-con-movimientos.txt");
         ConfiguracionExtractoDetalle config = leerConfig("davivienda-tarjeta-con-movimientos.json");
 
         List<Movimiento> movimientos = dispatcher.parsear(archivo, config, "2026-05");
 
-        assertThat(movimientos).hasSize(10);
+        // 16 transacciones reales en el archivo -- antes del fix del monto/signo en
+        // columnas separadas, sólo 10 sobrevivían: las 6 compras a cuotas (Valor a Pagar
+        // = "$0+" ese período, aunque Valor sí traía el monto real) se descartaban en
+        // silencio por parsear a BigDecimal.ZERO.
+        assertThat(movimientos).hasSize(16);
         assertThat(movimientos).allMatch(m -> !m.getDescripcion().isBlank());
         // Cargos ("+") deben quedar como DEBITO tras invertir; pagos ("-") como CREDITO.
         assertThat(movimientos.stream().filter(m -> m.getDescripcion().contains("PAGO")))
@@ -128,6 +136,58 @@ class ExtractosRealesIntegrationTest {
         // El encabezado trae "#  5474 8200 4603 5264" -- todo movimiento de este archivo
         // debe quedar etiquetado con los últimos 4 dígitos de ESA tarjeta.
         assertThat(movimientos).allMatch(m -> "5264".equals(m.getUltimosDigitosTarjeta()));
+
+        // Prueba fuerte de regresión: la suma de los cargos reales de consumo debe
+        // coincidir con "Consumos mes" que el propio encabezado del extracto reporta de
+        // forma independiente ($211,644) -- esto es lo que habría atrapado el bug
+        // original (el conteo de movimientos por sí solo podría cuadrar por casualidad).
+        BigDecimal sumaConsumos = sumaConsumosDelPeriodo(movimientos);
+        assertThat(sumaConsumos).isEqualByComparingTo("211644");
+    }
+
+    /**
+     * "Consumos mes" (tal como lo reporta el propio encabezado del extracto) es la suma
+     * de los cargos DEBITO que no son ni el pago recibido ni cargos que no son consumo:
+     * el impuesto 4x1000 (descripción exacta "IMP 4XMIL") ni los intereses corrientes
+     * (descripción "INTERES CORRIEN..."). Los pagos (PAGO / PAGO DEBITO AUT) NO se
+     * filtran por texto: ya quedan fuera porque su tipo es CREDITO tras invertir. Un
+     * primer intento de filtrar por "la descripción no contiene 'PAGO'" daba resultados
+     * incorrectos en 2 de los 5 extractos reales de validación (Gustavo, Javier) porque
+     * esa subcadena también aparece en compras legítimas: comercios "MERPAGO*..."
+     * (Mercado Pago) y "COMCEL PAGOS DE FACTURAS MOVIL".
+     */
+    private BigDecimal sumaConsumosDelPeriodo(List<Movimiento> movimientos) {
+        return movimientos.stream()
+                .filter(m -> "DEBITO".equals(m.getTipo()))
+                .filter(m -> !m.getDescripcion().trim().equals("IMP 4XMIL"))
+                .filter(m -> !m.getDescripcion().trim().startsWith("INTERES CORRIEN"))
+                .map(Movimiento::getMonto)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    @ParameterizedTest(name = "{0}: tarjeta ...{1}, Consumos mes esperado ${2}")
+    @CsvSource({
+            "davivienda-tarjeta-johan.txt,             4924, 346400",
+            "davivienda-tarjeta-gustavo.txt,            5042, 1878130",
+            "davivienda-tarjeta-javier.txt,             3127, 1462035",
+            "davivienda-tarjeta-con-movimientos.txt,    5264, 211644",
+            "davivienda-tarjeta-brayan.txt,             4690, 29900",
+    })
+    @DisplayName("F. Davivienda tarjeta de credito -- 5 extractos reales: la suma de consumos "
+            + "reconcilia con 'Consumos mes' del encabezado de CADA archivo (dato anonimizado: "
+            + "nombre, correo y número de tarjeta -- fechas, comercios y montos son los reales)")
+    void daviviendaTarjetaSumaConsumosReconciliaConEncabezado(
+            String archivo, String ultimosDigitos, String consumosEsperados) throws IOException {
+        byte[] contenido = leerMuestra(archivo);
+        ConfiguracionExtractoDetalle config = leerConfig("davivienda-tarjeta-con-movimientos.json");
+
+        List<Movimiento> movimientos = dispatcher.parsear(contenido, config, "2026-05");
+
+        assertThat(movimientos).isNotEmpty();
+        assertThat(movimientos).allMatch(m -> ultimosDigitos.equals(m.getUltimosDigitosTarjeta()));
+
+        BigDecimal sumaConsumos = sumaConsumosDelPeriodo(movimientos);
+        assertThat(sumaConsumos).as("archivo " + archivo).isEqualByComparingTo(consumosEsperados);
     }
 
     @Test

@@ -173,6 +173,29 @@ public class AnchoFijoBankStatementParser {
                 return new MontoConTipo(monto.abs(), signoResolver.tipoDe(esCredito));
             }
             default -> { // SUFIJO / PREFIJO
+                String textoSigno = valores.get("signo");
+                if (textoSigno != null && !textoSigno.isBlank()) {
+                    // Monto y signo en columnas separadas (ej. tarjetas de crédito
+                    // Davivienda: "Valor" trae el monto real de la transacción, "Valor a
+                    // Pagar" trae lo que se carga a la cuenta ESTE período -- que para
+                    // compras a cuotas es $0, pero el signo +/- sigue apareciendo pegado a
+                    // ese cero ("$0+"). Si se leyera todo de "Valor a Pagar" como hace la
+                    // rama de abajo, el monto real ($28.500 de una compra financiada,
+                    // por ejemplo) nunca se capturaría -- se leería 0 y la línea se
+                    // descartaría como si no existiera. El signo sí es correcto tomarlo de
+                    // "Valor a Pagar": ese es el que indica cargo/pago, independientemente
+                    // de cuánto se difiera al período siguiente.
+                    String textoMonto = valores.get("monto");
+                    if (textoMonto == null || textoMonto.isBlank()) return null;
+                    boolean esCredito = signoResolver.esCreditoPorSigno(textoSigno, c.getConvencionSigno());
+                    if (c.isInvertir()) esCredito = !esCredito;
+                    BigDecimal monto = montoParser.parsear(textoMonto, sepMiles, sepDecimales, factor);
+                    if (monto.compareTo(BigDecimal.ZERO) == 0) return null;
+                    return new MontoConTipo(monto.abs(), signoResolver.tipoDe(esCredito));
+                }
+
+                // Sin columna "signo" configurada: comportamiento original, signo pegado
+                // al propio monto (cuenta de ahorros, corriente, fondo, etc.).
                 String textoMonto = valores.get("monto");
                 if (textoMonto == null || textoMonto.isBlank()) return null;
                 boolean esCredito = signoResolver.esCreditoPorSigno(textoMonto, c.getConvencionSigno());
