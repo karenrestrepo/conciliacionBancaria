@@ -185,6 +185,43 @@ class CargaCsvUseCaseImplTest {
             verify(eventLog).contableRevertido(eq(CONCILIACION_ID), eq(10L), any(), any(), any(), any(),
                     eq(20L), eq("ACEPTADA"));
         }
+
+        @Test
+        @DisplayName("CRUZADA (cruce manual) sin sugerencia: al anular el contable se disuelve el grupo -- "
+                + "su bancario emparejado vuelve a PENDIENTE, no queda resuelto sin contraparte")
+        void cruzadaAnuladaDisuelveGrupoYRevierteBancario() {
+            // El contable 10 fue cruzado manualmente contra el bancario 20 (grupo_cruce "G1"):
+            // el cruce marcó ambos movimientos CONCILIADO y ambas partidas CRUZADA. Ahora el
+            // contable se anula (desaparece del auxiliar re-subido). Como el cruce ya no es
+            // válido, el bancario 20 no puede quedar CONCILIADO/CRUZADA sin contraparte: debe
+            // volver a PENDIENTE. El emparejamiento se resuelve por grupo_cruce, no por el
+            // texto de justificación (que se repite entre cruces distintos).
+            Movimiento c1 = contable(10L, LocalDate.of(2026, 6, 1), "500", "DEBITO", "Cruzado", EstadoMovimiento.CONCILIADO);
+            PartidaConciliatoria partidaContable = PartidaConciliatoria.builder()
+                    .id(700L).idConciliacion(CONCILIACION_ID).idMovimiento(10L).tipoOrigen("CONTABLE")
+                    .estado("CRUZADA").grupoCruce("G1").build();
+            PartidaConciliatoria partidaBancaria = PartidaConciliatoria.builder()
+                    .id(701L).idConciliacion(CONCILIACION_ID).idMovimiento(20L).tipoOrigen("BANCARIO")
+                    .estado("CRUZADA").grupoCruce("G1").build();
+
+            when(movimientoRepo.buscarTodosContablesPorConciliacion(CONCILIACION_ID)).thenReturn(List.of(c1));
+            when(sugerenciaRepo.buscarActivaPorMovimientoContable(10L)).thenReturn(Optional.empty());
+            when(partidaRepo.buscarPorMovimiento(10L, "CONTABLE")).thenReturn(List.of(partidaContable));
+            when(partidaRepo.buscarPorGrupoCruce("G1")).thenReturn(List.of(partidaBancaria, partidaContable));
+
+            ResumenCargaAuxiliar resumen = useCase.procesarRecargaAuxiliar(CONCILIACION_ID, List.of());
+
+            assertThat(resumen.getAnulados()).isEqualTo(1);
+            assertThat(resumen.getRevertidos()).isEqualTo(1);
+            // El bancario emparejado vuelve a PENDIENTE (movimiento y partida), limpiando el grupo.
+            verify(movimientoRepo).actualizarEstadoBancario(20L, EstadoMovimiento.PENDIENTE);
+            verify(partidaRepo).actualizar(argThat(p ->
+                    p.getIdMovimiento().equals(20L) && "PENDIENTE".equals(p.getEstado()) && p.getGrupoCruce() == null));
+            // El contable anulado y su partida (CRUZADA) se borran; el bancario no se revierte dos veces.
+            verify(partidaRepo).eliminarPartidasPorMovimiento(10L, "CONTABLE");
+            verify(movimientoRepo).eliminarContablesPorIds(List.of(10L));
+            verify(sugerenciaRepo, never()).eliminarPorId(any());
+        }
     }
 
     @Test
@@ -284,6 +321,38 @@ class CargaCsvUseCaseImplTest {
             verify(movimientoRepo).actualizarEstadoBancario(20L, EstadoMovimiento.PENDIENTE);
             verify(movimientoRepo).eliminarContablesPorIds(List.of(10L));
             verify(movimientoRepo).guardarContables(anyList(), eq(CONCILIACION_ID));
+        }
+
+        @Test
+        @DisplayName("bug partida huérfana: contable PENDIENTE sin sugerencia se anula y reingresa -> "
+                + "se borra el contable viejo, SU partida PENDIENTE, y entra el nuevo")
+        void pendienteSinSugerenciaAnuladoBorraSuPartida() {
+            // Bug real (Partida #10013): comprobante de egreso registrado con monto equivocado,
+            // PENDIENTE y sin cruzar con nada (sin sugerencia). Se anula y reingresa con el
+            // monto correcto (mismo comprobante "1001", monto 300 en vez de 500). El contable
+            // viejo se daba de baja pero su partida PENDIENTE (tipo_origen=CONTABLE, generada
+            // por el motor) quedaba huérfana apuntando a un id_mov ya inexistente -> tarjeta
+            // vacía en el frontend. El fix borra esa partida junto con el contable.
+            Movimiento viejoPendiente = contableConComprobante(10L, "1001", "500", "DEBITO", EstadoMovimiento.PENDIENTE);
+            Movimiento reingreso = contableConComprobante(null, "1001", "300", "DEBITO", EstadoMovimiento.PENDIENTE);
+
+            when(movimientoRepo.buscarTodosContablesPorConciliacion(CONCILIACION_ID)).thenReturn(List.of(viejoPendiente));
+            when(sugerenciaRepo.buscarActivaPorMovimientoContable(10L)).thenReturn(Optional.empty());
+            when(movimientoRepo.guardarContables(anyList(), eq(CONCILIACION_ID)))
+                    .thenReturn(List.of(reingreso.withId(60L)));
+            when(jobRepo.crearJob(CONCILIACION_ID)).thenReturn("job-huerfana");
+            sinBancariosLibres();
+
+            ResumenCargaAuxiliar resumen = useCase.procesarRecargaAuxiliar(CONCILIACION_ID, List.of(reingreso));
+
+            assertThat(resumen.getNuevos()).isEqualTo(1);
+            assertThat(resumen.getAnulados()).isEqualTo(1);
+            assertThat(resumen.getRevertidos()).isEqualTo(0); // no había sugerencia que revertir
+            // (a) el contable viejo se borra, (b) su partida (cualquier estado) también, (c) entra el nuevo.
+            verify(partidaRepo).eliminarPartidasPorMovimiento(10L, "CONTABLE");
+            verify(movimientoRepo).eliminarContablesPorIds(List.of(10L));
+            verify(movimientoRepo).guardarContables(anyList(), eq(CONCILIACION_ID));
+            verify(sugerenciaRepo, never()).eliminarPorId(any());
         }
 
         @Test

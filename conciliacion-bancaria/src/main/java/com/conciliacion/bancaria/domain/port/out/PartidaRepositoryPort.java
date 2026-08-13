@@ -26,6 +26,15 @@ public interface PartidaRepositoryPort {
 
     void eliminarPendientePorMovimiento(Long idMovimiento, String tipoOrigen);
 
+    /** Borra todas las partidas de un movimiento (cualquier estado); usado al eliminar el movimiento. */
+    void eliminarPartidasPorMovimiento(Long idMovimiento, String tipoOrigen);
+
+    /** Partida(s) asociadas a un movimiento (para leer su grupo de cruce, estado, etc.). */
+    List<PartidaConciliatoria> buscarPorMovimiento(Long idMovimiento, String tipoOrigen);
+
+    /** Todas las partidas que comparten un mismo grupo de cruce manual. */
+    List<PartidaConciliatoria> buscarPorGrupoCruce(String grupoCruce);
+
     List<PartidaConciliatoria> buscarPendientesDeOtrasConciliaciones(Long idCuenta, Long idConciliacionActual);
 
     /**

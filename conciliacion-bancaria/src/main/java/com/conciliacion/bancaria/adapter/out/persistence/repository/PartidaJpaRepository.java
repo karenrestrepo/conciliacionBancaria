@@ -32,6 +32,18 @@ public interface PartidaJpaRepository extends JpaRepository<PartidaEntity, Long>
     void deletePendienteByMovimiento(@Param("idMovimiento") Long idMovimiento,
                                      @Param("tipoOrigen") String tipoOrigen);
 
+    // Borra TODAS las partidas de un movimiento (cualquier estado) -- usado al dar de baja el
+    // movimiento en la recarga del auxiliar: si el movimiento se elimina, todas sus partidas
+    // quedarían huérfanas.
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM PartidaEntity p WHERE p.idMovimiento = :idMovimiento AND p.tipoOrigen = :tipoOrigen")
+    void deleteByMovimiento(@Param("idMovimiento") Long idMovimiento,
+                            @Param("tipoOrigen") String tipoOrigen);
+
+    List<PartidaEntity> findByIdMovimientoAndTipoOrigen(Long idMovimiento, String tipoOrigen);
+
+    List<PartidaEntity> findByGrupoCruce(String grupoCruce);
+
     // Sólo partidas ARRASTRADA cuyo periodoArrastre coincide EXACTAMENTE con el período de
     // la conciliación actual -- es decir, partidas que alguien mandó explícitamente a este
     // período con el botón "Próximo mes", no cualquier pendiente suelta de otra

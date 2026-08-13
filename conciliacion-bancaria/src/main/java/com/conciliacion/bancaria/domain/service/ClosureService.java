@@ -172,11 +172,18 @@ public class ClosureService {
                     justificacion = "Cruzado con diferencia trasladada a partida #" + partidaResto.getId();
                 }
 
+                // grupo_cruce: identificador único de ESTE cruce, compartido por todas sus
+                // partidas. Permite luego -- al anular un contable cruzado -- revertir
+                // exactamente a los bancarios de su mismo cruce, sin depender del texto de
+                // justificación (que se repite entre cruces distintos). La partidaResto NO lo
+                // lleva: es una partida PENDIENTE nueva, no parte de la resolución del cruce.
+                String grupoCruce = java.util.UUID.randomUUID().toString();
                 List<PartidaConciliatoria> guardadas = new ArrayList<>(todas.stream().map(p ->
                         partidaRepo.actualizar(p
                                 .withEstado("CRUZADA")
                                 .withJustificacion(justificacion)
-                                .withFechaJustificacion(LocalDate.now()))
+                                .withFechaJustificacion(LocalDate.now())
+                                .withGrupoCruce(grupoCruce))
                 ).toList());
 
                 // Marcar los movimientos subyacentes como CONCILIADO para que el

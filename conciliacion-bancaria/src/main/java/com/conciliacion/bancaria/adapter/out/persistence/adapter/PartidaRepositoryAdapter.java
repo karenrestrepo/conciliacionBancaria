@@ -70,6 +70,23 @@ public class PartidaRepositoryAdapter implements PartidaRepositoryPort {
     }
 
     @Override
+    public void eliminarPartidasPorMovimiento(Long idMovimiento, String tipoOrigen) {
+        jpaRepository.deleteByMovimiento(idMovimiento, tipoOrigen);
+    }
+
+    @Override
+    public List<PartidaConciliatoria> buscarPorMovimiento(Long idMovimiento, String tipoOrigen) {
+        return jpaRepository.findByIdMovimientoAndTipoOrigen(idMovimiento, tipoOrigen)
+                .stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public List<PartidaConciliatoria> buscarPorGrupoCruce(String grupoCruce) {
+        return jpaRepository.findByGrupoCruce(grupoCruce)
+                .stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public List<PartidaConciliatoria> buscarPendientesDeOtrasConciliaciones(
             Long idCuenta, Long idConciliacionActual) {
         return jpaRepository
@@ -94,6 +111,7 @@ public class PartidaRepositoryAdapter implements PartidaRepositoryPort {
                 .justificacion(p.getJustificacion())
                 .estado(p.getEstado())
                 .periodoArrastre(p.getPeriodoArrastre())
+                .grupoCruce(p.getGrupoCruce())
                 .build();
     }
 
@@ -111,6 +129,7 @@ public class PartidaRepositoryAdapter implements PartidaRepositoryPort {
                 .justificacion(e.getJustificacion())
                 .estado(e.getEstado())
                 .periodoArrastre(e.getPeriodoArrastre())
+                .grupoCruce(e.getGrupoCruce())
                 .esHistorica(esHistorica);
 
         if ("BANCARIO".equals(e.getTipoOrigen())) {

@@ -4,6 +4,7 @@ import com.conciliacion.bancaria.domain.exception.CsvValidationException;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
 import com.conciliacion.bancaria.domain.model.ConfiguracionExtracto;
 import com.conciliacion.bancaria.domain.model.Movimiento;
+import com.conciliacion.bancaria.domain.model.PartidaConciliatoria;
 import com.conciliacion.bancaria.domain.model.ResumenCargaAuxiliar;
 import com.conciliacion.bancaria.domain.model.Sugerencia;
 import com.conciliacion.bancaria.domain.model.extractoconfig.ConfiguracionExtractoDetalle;
@@ -283,8 +284,17 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
     private boolean procesarAnulado(Long idConciliacion, Movimiento contable) {
         Optional<Sugerencia> activa = sugerenciaRepo.buscarActivaPorMovimientoContable(contable.getId());
         if (activa.isEmpty()) {
+            // Sin sugerencia activa, el contable tenía su propia partida (el motor la generó
+            // por estar PENDIENTE, o quedó CRUZADA tras un cruce manual). Hay que:
+            //  - si venía de un cruce manual, disolver ese cruce: sus bancarios (y cualquier
+            //    contable sobreviviente) no pueden quedar CONCILIADO sin contraparte real;
+            //  - borrar la propia partida del contable (cualquier estado) junto con él, si no
+            //    queda huérfana apuntando a un id_mov inexistente y el detalle se renderiza
+            //    vacío (bug real, Partida #10013).
+            boolean revirtioCruce = disolverCruceSiCorresponde(idConciliacion, contable);
+            partidaRepo.eliminarPartidasPorMovimiento(contable.getId(), "CONTABLE");
             movimientoRepo.eliminarContablesPorIds(List.of(contable.getId()));
-            return false;
+            return revirtioCruce;
         }
 
         Sugerencia sugerencia = activa.get();
@@ -298,6 +308,57 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                 contable.getTipo(), contable.getDescripcion(), idBancario, sugerencia.getEstado().name());
 
         return true;
+    }
+
+    /**
+     * Si el contable dado de baja pertenecía a un cruce manual (su partida tiene
+     * {@code grupoCruce}), disuelve el cruce completo: cada partida del grupo (salvo la del
+     * propio contable, que se borra junto con su movimiento) vuelve a PENDIENTE y su
+     * movimiento subyacente pasa de CONCILIADO a PENDIENTE. Así los bancarios del cruce no
+     * quedan marcados como resueltos sin contraparte real, y cualquier contable sobreviviente
+     * vuelve a estar disponible para cruzarse de nuevo.
+     *
+     * El grupo se identifica por {@code grupoCruce} (UUID que asigna
+     * {@link com.conciliacion.bancaria.domain.service.ClosureService}), no por el texto de
+     * justificación — ese se repite entre cruces distintos. Cruces históricos previos a la
+     * columna {@code grupo_cruce} tienen grupo nulo y no se tratan aquí (su emparejamiento
+     * real ya no es reconstruible; la limpieza puntual de esos casos va en la migración V25).
+     *
+     * @return true si revirtió al menos un miembro del cruce (reversión real), false si el
+     *         contable no venía de un cruce manual.
+     */
+    private boolean disolverCruceSiCorresponde(Long idConciliacion, Movimiento contable) {
+        String grupo = partidaRepo.buscarPorMovimiento(contable.getId(), "CONTABLE").stream()
+                .map(PartidaConciliatoria::getGrupoCruce)
+                .filter(g -> g != null && !g.isBlank())
+                .findFirst().orElse(null);
+        if (grupo == null) return false;
+
+        boolean revirtioAlgo = false;
+        for (PartidaConciliatoria miembro : partidaRepo.buscarPorGrupoCruce(grupo)) {
+            boolean esElAnulado = "CONTABLE".equals(miembro.getTipoOrigen())
+                    && contable.getId().equals(miembro.getIdMovimiento());
+            if (esElAnulado) continue; // su partida y movimiento se eliminan aparte
+
+            partidaRepo.actualizar(miembro
+                    .withEstado("PENDIENTE")
+                    .withJustificacion(null)
+                    .withFechaJustificacion(null)
+                    .withGrupoCruce(null));
+
+            if ("BANCARIO".equals(miembro.getTipoOrigen())) {
+                movimientoRepo.actualizarEstadoBancario(miembro.getIdMovimiento(), EstadoMovimiento.PENDIENTE);
+            } else {
+                movimientoRepo.actualizarEstadoContable(miembro.getIdMovimiento(), EstadoMovimiento.PENDIENTE);
+            }
+            revirtioAlgo = true;
+        }
+
+        if (revirtioAlgo) {
+            log.info("Cruce disuelto (conciliacion={}): contable {} anulado; grupo_cruce {} revertido a PENDIENTE",
+                    idConciliacion, contable.getId(), grupo);
+        }
+        return revirtioAlgo;
     }
 
     /**

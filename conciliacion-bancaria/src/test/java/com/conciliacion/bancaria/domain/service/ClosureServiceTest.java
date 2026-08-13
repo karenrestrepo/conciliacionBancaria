@@ -192,7 +192,11 @@ class ClosureServiceTest {
             assertThat(resultado).allSatisfy(p -> {
                 assertThat(p.getEstado()).isEqualTo("CRUZADA");
                 assertThat(p.getJustificacion()).isEqualTo("Cruzado manualmente");
+                assertThat(p.getGrupoCruce()).isNotBlank();
             });
+            // Todas las partidas del cruce comparten EL MISMO grupo_cruce (clave de
+            // emparejamiento para revertir luego solo a este cruce, no a otros).
+            assertThat(resultado.stream().map(PartidaConciliatoria::getGrupoCruce).distinct()).hasSize(1);
             verify(partidaRepo, never()).guardar(any());
             verify(movimientoRepo, never()).guardarBancarios(any(), any());
             verify(movimientoRepo, never()).guardarContables(any(), any());
