@@ -8,6 +8,7 @@ import com.conciliacion.bancaria.domain.service.ClosureService;
 import com.conciliacion.bancaria.domain.service.ConciliationEngine;
 import com.conciliacion.bancaria.domain.service.CsvValidatorService;
 import com.conciliacion.bancaria.domain.service.MovimientoReversionService;
+import com.conciliacion.bancaria.domain.service.RevisorLecturaExtracto;
 import com.conciliacion.bancaria.domain.service.SiesaXlsParserService;
 import com.conciliacion.bancaria.domain.service.parser.AnchoFijoBankStatementParser;
 import com.conciliacion.bancaria.domain.service.parser.BankStatementParserDispatcher;
@@ -99,6 +100,11 @@ public class DomainConfig {
             DelimitadoBankStatementParser delimitadoParser, AnchoFijoBankStatementParser anchoFijoParser,
             ExcelBankStatementParser excelParser) {
         return new BankStatementParserDispatcher(delimitadoParser, anchoFijoParser, excelParser);
+    }
+
+    @Bean
+    public RevisorLecturaExtracto revisorLecturaExtracto() {
+        return new RevisorLecturaExtracto();
     }
 
     @Bean

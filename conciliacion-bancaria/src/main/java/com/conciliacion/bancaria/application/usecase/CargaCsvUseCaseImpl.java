@@ -116,29 +116,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
 
             List<Movimiento> bancarios = parsearExtractoBancario(idConciliacion, contenido);
 
-            // Tarjetas de crédito con auxiliar conjunto: múltiples extractos se acumulan.
-            // Cuentas normales: el extracto reemplaza al anterior.
-            boolean esAuxiliarConjunto = conciliacionRepo.esAuxiliarConjunto(idConciliacion);
-            if (!esAuxiliarConjunto) {
-                movimientoRepo.eliminarBancariosNoConciliadosPorConciliacion(idConciliacion);
-                sugerenciaRepo.eliminarPendientesPorConciliacion(idConciliacion);
-                partidaRepo.eliminarPendientesPorConciliacion(idConciliacion);
-            }
-
-            // Agrupar gastos bancarios configurados antes de persistir
-            List<Movimiento> bancariosConAgrupacion =
-                    aplicarAgrupacionGastos(idConciliacion, bancarios);
-
-            movimientoRepo.guardarBancarios(bancariosConAgrupacion, idConciliacion);
-
-            // Lanzar motor asíncrono y retornar job_id (TRD RT-03). Se publica un evento en
-            // vez de llamar self.ejecutarMotorAsync(...) directo -- el listener
-            // (@TransactionalEventListener AFTER_COMMIT) solo lo procesa después de que esta
-            // transacción haga commit, así el motor nunca lee una foto vacía de los
-            // bancarios que se acaban de guardar arriba (ver el comentario de "self").
-            String jobId = jobRepo.crearJob(idConciliacion);
-            eventPublisher.publishEvent(new MotorCompletoRequestedEvent(idConciliacion, jobId));
-            return jobId;
+            return guardarBancariosYLanzarMotor(idConciliacion, bancarios);
 
         } catch (CsvValidationException e) {
             eventLog.csvValidationFailed(idConciliacion, e.getMessage());
@@ -148,6 +126,40 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
             throw new CsvValidationException("Error procesando el archivo: "
                     + e.getMessage());
         }
+    }
+
+    @Override
+    @Transactional
+    public String confirmarExtractoLeido(Long idConciliacion, List<Movimiento> bancarios) {
+        eventLog.csvUpload(idConciliacion, null, "extracto-leido-con-ia");
+        return guardarBancariosYLanzarMotor(idConciliacion, bancarios);
+    }
+
+    /** Persistencia común a todas las formas de cargar un extracto. Corre en la transacción del llamador. */
+    private String guardarBancariosYLanzarMotor(Long idConciliacion, List<Movimiento> bancarios) {
+        // Tarjetas de crédito con auxiliar conjunto: múltiples extractos se acumulan.
+        // Cuentas normales: el extracto reemplaza al anterior.
+        boolean esAuxiliarConjunto = conciliacionRepo.esAuxiliarConjunto(idConciliacion);
+        if (!esAuxiliarConjunto) {
+            movimientoRepo.eliminarBancariosNoConciliadosPorConciliacion(idConciliacion);
+            sugerenciaRepo.eliminarPendientesPorConciliacion(idConciliacion);
+            partidaRepo.eliminarPendientesPorConciliacion(idConciliacion);
+        }
+
+        // Agrupar gastos bancarios configurados antes de persistir
+        List<Movimiento> bancariosConAgrupacion =
+                aplicarAgrupacionGastos(idConciliacion, bancarios);
+
+        movimientoRepo.guardarBancarios(bancariosConAgrupacion, idConciliacion);
+
+        // Lanzar motor asíncrono y retornar job_id (TRD RT-03). Se publica un evento en
+        // vez de llamar self.ejecutarMotorAsync(...) directo -- el listener
+        // (@TransactionalEventListener AFTER_COMMIT) solo lo procesa después de que esta
+        // transacción haga commit, así el motor nunca lee una foto vacía de los
+        // bancarios que se acaban de guardar arriba (ver el comentario de "self").
+        String jobId = jobRepo.crearJob(idConciliacion);
+        eventPublisher.publishEvent(new MotorCompletoRequestedEvent(idConciliacion, jobId));
+        return jobId;
     }
 
     /**
