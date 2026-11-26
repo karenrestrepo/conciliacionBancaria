@@ -39,6 +39,9 @@ public class MovimientoBancarioEntity {
     @Column(name = "estado_conciliacion", nullable = false)
     private EstadoMovimiento estadoConciliacion;
 
+    @Column(name = "ultimos_digitos_tarjeta", length = 4)
+    private String ultimosDigitosTarjeta;
+
     @PrePersist
     public void prePersist() {
         if (estadoConciliacion == null) estadoConciliacion = EstadoMovimiento.PENDIENTE;

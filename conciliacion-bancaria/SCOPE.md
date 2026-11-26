@@ -11,7 +11,7 @@
 
 | Requisito | Descripción | Estado |
 |-----------|-------------|--------|
-| RT-01 | Carga y validación de extracto CSV bancario | ✅ Implementado |
+| RT-01 | Motor genérico de extractos bancarios (CSV/TXT delimitado, TXT ancho fijo, XLS/XLSX), dirigido 100% por configuración — ver [docs/ALTA_NUEVO_BANCO.md](docs/ALTA_NUEVO_BANCO.md) | ✅ Implementado |
 | RT-01b | Carga y validación de libro auxiliar CSV (stub del sistema contable) | ✅ Implementado |
 | RT-03 | Motor de conciliación asíncrono (agrupación por monto, frecuencias, proximidad fecha ±3 días) | ✅ Implementado |
 | RT-03b | Patrón Polling: HTTP 202 + job_id + endpoint de status | ✅ Implementado |
@@ -41,6 +41,7 @@
 | TLS en desarrollo local | Se configura a nivel de Nginx en producción; desarrollo usa HTTP |
 | Docker secrets en desarrollo | Se usan variables de entorno; Docker secrets se documentan para producción |
 | Tests de performance con k6 | Scripts incluidos en `/k6`; ejecución requiere entorno de staging con datos reales |
+| Extractos en PDF | `TipoArchivoExtracto.PDF` existe en el enum (el wizard ya lo ofrecía) pero el motor no tiene estrategia de parseo para PDF; se rechaza explícitamente al crear/editar la configuración (ver `ConfiguracionExtractoUseCaseImpl`) en vez de dejarlo fallar silenciosamente al cargar un extracto |
 
 ---
 

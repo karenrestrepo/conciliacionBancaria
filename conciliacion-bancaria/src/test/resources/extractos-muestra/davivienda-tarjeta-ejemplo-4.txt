@@ -1,0 +1,23 @@
+
+                         NIT. 000.000.000-0                                                                                                  Tarjeta de Cr?dito
+
+                                                                                                                                       #  0000 0000 0000 1004
+
+           Apreciado Cliente
+           EMPRESA EJEMPLO SAS
+           TITULAR EJEMPLO
+           titular@ejemplo.com
+
+           Consumos mes                         $                        78,600
+
+                                                                          MOVIMIENTOS
+        Documento  Fecha                 Descripci?n                               Valor         Valor a Pagar
+
+        1000000  20260501  RESTAURANTE EJEMPLO                                     $78,600                  $0+                   $0     1
+        1000001  20260502  IMP 4XMIL                                                   $84                 $84+                   $0     0
+        1000002  20260503  IMP 4XMIL                                                   $91                 $91+                   $0     0
+        1000003  20260504  IMP 4XMIL                                                  $180                $180+                   $0     0
+        1000004  20260505  IMP 4XMIL                                                  $119                $119+                   $0     0
+        1000005  20260506  INTERES CORRIENTE                                        $1,385              $1,385+                   $0     0
+        1000006  20260507  PAGO DEBITO AUT                                        $100,000            $100,000-                   $0     0
+        1000007  20260508  PAGO                                                    $50,000             $50,000-                   $0     0

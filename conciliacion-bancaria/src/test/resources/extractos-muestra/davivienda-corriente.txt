@@ -1,0 +1,58 @@
+
+                                                                    CUENTA CORRIENTE
+                                                                            0000 0000 0002
+                                                                                                                INFORME DEL MES:  JUNIO /2026
+
+             Apreciado Cliente
+             EMPRESA EJEMPLO SAS
+             contacto@ejemplo.com
+
+             Saldo Anterior                        $50,000,000.00
+             M?s:Cr?ditos                           $8,501,995.00
+             Menos: D?bitos                         $5,586,420.00
+             Nuevo Saldo                           $52,915,575.00
+
+              Fecha                 Clase de M ovimiento                          O ficina            Do c.           V alor                     Saldo
+              D?a Mes
+
+              01   06  Abono ACH BANCO EJEMPLO 900000001 CLIENTE EJEMPLO                               2000                  $866,436.00+             $50,866,436.00+
+                       referencia-ejemplo SAS
+              02   06  Abono ACH BANCO EJEMPLO 900000002 CLIENTE EJEMPLO                               2001                  $112,814.00+             $50,979,250.00+
+              03   06  Descuento por Pago a Proveedor Ejemplo 02                                       2002                  $481,497.00-             $50,497,753.00+
+              04   06  Abono ACH BANCO EJEMPLO 900000004 CLIENTE EJEMPLO                               2003                   $22,046.00+             $50,519,799.00+
+              05   06  Abono ACH BANCO EJEMPLO 900000005 CLIENTE EJEMPLO                               2004                  $864,340.00+             $51,384,139.00+
+              06   06  Descuento por Pago a Proveedor Ejemplo 05                                       2005                  $728,461.00-             $50,655,678.00+
+              07   06  Abono ACH BANCO EJEMPLO 900000007 CLIENTE EJEMPLO                               2006                  $524,102.00+             $51,179,780.00+
+              08   06  Abono ACH BANCO EJEMPLO 900000008 CLIENTE EJEMPLO                               2007                  $722,390.00+             $51,902,170.00+
+              09   06  Descuento por Pago a Proveedor Ejemplo 08                                       2008                  $339,497.00-             $51,562,673.00+
+              10   06  Abono ACH BANCO EJEMPLO 900000010 CLIENTE EJEMPLO                               2009                  $230,436.00+             $51,793,109.00+
+              11   06  Abono ACH BANCO EJEMPLO 900000011 CLIENTE EJEMPLO                               2010                  $426,512.00+             $52,219,621.00+
+              12   06  Descuento por Pago a Proveedor Ejemplo 11                                       2011                  $273,730.00-             $51,945,891.00+
+              13   06  Abono ACH BANCO EJEMPLO 900000013 CLIENTE EJEMPLO                               2012                  $374,545.00+             $52,320,436.00+
+              14   06  Abono ACH BANCO EJEMPLO 900000014 CLIENTE EJEMPLO                               2013                  $383,960.00+             $52,704,396.00+
+              15   06  Descuento por Pago a Proveedor Ejemplo 14                                       2014                  $854,246.00-             $51,850,150.00+
+
+            Documento ficticio generado para pruebas automaticas.
+
+                                                                       CUENTA CORRIENTE
+
+              Fecha                 Clase de M ovimiento                          O ficina            Do c.           V alor                     Saldo
+              D?a Mes
+
+              16   06  Abono ACH BANCO EJEMPLO 900000016 CLIENTE EJEMPLO                               2015                  $404,625.00+             $52,254,775.00+
+              17   06  Abono ACH BANCO EJEMPLO 900000017 CLIENTE EJEMPLO                               2016                  $792,206.00+             $53,046,981.00+
+              18   06  Descuento por Pago a Proveedor Ejemplo 17                                       2017                  $548,535.00-             $52,498,446.00+
+              19   06  Abono ACH BANCO EJEMPLO 900000019 CLIENTE EJEMPLO                               2018                  $678,695.00+             $53,177,141.00+
+              20   06  Abono ACH BANCO EJEMPLO 900000020 CLIENTE EJEMPLO                               2019                   $90,027.00+             $53,267,168.00+
+              21   06  Descuento por Pago a Proveedor Ejemplo 20                                       2020                  $768,237.00-             $52,498,931.00+
+              22   06  Abono ACH BANCO EJEMPLO 900000022 CLIENTE EJEMPLO                               2021                  $366,929.00+             $52,865,860.00+
+              23   06  Abono ACH BANCO EJEMPLO 900000023 CLIENTE EJEMPLO                               2022                  $104,020.00+             $52,969,880.00+
+              24   06  Descuento por Pago a Proveedor Ejemplo 23                                       2023                  $594,529.00-             $52,375,351.00+
+              25   06  Abono ACH BANCO EJEMPLO 900000025 CLIENTE EJEMPLO                               2024                  $574,201.00+             $52,949,552.00+
+              26   06  Abono ACH BANCO EJEMPLO 900000026 CLIENTE EJEMPLO                               2025                  $316,311.00+             $53,265,863.00+
+              27   06  Descuento por Pago a Proveedor Ejemplo 26                                       2026                  $311,572.00-             $52,954,291.00+
+              28   06  Abono ACH BANCO EJEMPLO 900000028 CLIENTE EJEMPLO                               2027                  $489,668.00+             $53,443,959.00+
+              28   06  Abono ACH BANCO EJEMPLO 900000029 CLIENTE EJEMPLO                               2028                  $157,732.00+             $53,601,691.00+
+              28   06  Descuento por Pago a Proveedor Ejemplo 29                                       2029                  $686,116.00-             $52,915,575.00+
+
+            Documento ficticio generado para pruebas automaticas.

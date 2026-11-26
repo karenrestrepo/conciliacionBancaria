@@ -1,5 +1,6 @@
 package com.conciliacion.bancaria.application.usecase;
 
+import com.conciliacion.bancaria.domain.exception.RecursoNoEncontradoException;
 import com.conciliacion.bancaria.domain.model.Cuenta;
 import com.conciliacion.bancaria.domain.port.in.BancoUseCase;
 import com.conciliacion.bancaria.domain.port.in.CuentaUseCase;
@@ -52,7 +53,7 @@ public class CuentaUseCaseImpl implements CuentaUseCase {
     @Transactional(readOnly = true)
     public Cuenta obtenerPorId(Long id) {
         return cuentaRepo.buscarPorId(id)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Cuenta no encontrada: " + id));
     }
 

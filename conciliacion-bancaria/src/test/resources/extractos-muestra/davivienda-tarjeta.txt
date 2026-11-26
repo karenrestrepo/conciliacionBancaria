@@ -1,0 +1,15 @@
+
+                         NIT. 000.000.000-0                                                                                                  Tarjeta de Cr?dito
+
+                                                                                                                                       #  0000 0000 0000 1000
+
+           Apreciado Cliente
+           EMPRESA EJEMPLO SAS
+           TITULAR EJEMPLO
+           titular@ejemplo.com
+
+           Consumos mes                         $                             0
+
+                                                                          MOVIMIENTOS
+        Documento  Fecha                 Descripci?n                               Valor         Valor a Pagar
+

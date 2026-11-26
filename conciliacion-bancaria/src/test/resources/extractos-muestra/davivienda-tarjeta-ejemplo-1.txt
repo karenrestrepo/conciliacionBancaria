@@ -1,0 +1,28 @@
+
+                         NIT. 000.000.000-0                                                                                                  Tarjeta de Cr?dito
+
+                                                                                                                                       #  0000 0000 0000 1001
+
+           Apreciado Cliente
+           EMPRESA EJEMPLO SAS
+           TITULAR EJEMPLO
+           titular@ejemplo.com
+
+           Consumos mes                         $                       320,800
+
+                                                                          MOVIMIENTOS
+        Documento  Fecha                 Descripci?n                               Valor         Valor a Pagar
+
+        1000000  20260501  RESTAURANTE EJEMPLO                                     $53,200                  $0+                   $0     1
+        1000001  20260502  MERPAGO*COMERCIO EJEMPLO                                $19,200                  $0+                   $0     1
+        1000002  20260503  PAGOS DE FACTURAS MOVIL                                 $50,800                  $0+                   $0     1
+        1000003  20260504  ESTACION DE SERVICIO EJEMPLO                            $69,900                  $0+                   $0     1
+        1000004  20260505  SUPERMERCADO EJEMPLO                                    $66,700                  $0+                   $0     1
+        1000005  20260506  RESTAURANTE EJEMPLO                                     $61,000                  $0+                   $0     1
+        1000006  20260507  IMP 4XMIL                                                   $84                 $84+                   $0     0
+        1000007  20260508  IMP 4XMIL                                                   $91                 $91+                   $0     0
+        1000008  20260509  IMP 4XMIL                                                  $180                $180+                   $0     0
+        1000009  20260510  IMP 4XMIL                                                  $119                $119+                   $0     0
+        1000010  20260511  INTERES CORRIENTE                                        $1,385              $1,385+                   $0     0
+        1000011  20260512  PAGO DEBITO AUT                                        $100,000            $100,000-                   $0     0
+        1000012  20260513  PAGO                                                    $50,000             $50,000-                   $0     0

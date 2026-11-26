@@ -7,6 +7,7 @@ import com.conciliacion.bancaria.adapter.out.persistence.entity.UsuarioPermisoEn
 import com.conciliacion.bancaria.adapter.out.persistence.repository.EmpresaJpaRepository;
 import com.conciliacion.bancaria.adapter.out.persistence.repository.UsuarioJpaRepository;
 import com.conciliacion.bancaria.config.JwtService;
+import com.conciliacion.bancaria.domain.exception.CredencialesInvalidasException;
 import com.conciliacion.bancaria.shared.Permiso;
 import com.conciliacion.bancaria.shared.Rol;
 import jakarta.validation.Valid;
@@ -36,10 +37,10 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request) {
 
         var usuario = usuarioRepo.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Credenciales inválidas"));
+                .orElseThrow(() -> new CredencialesInvalidasException("Credenciales inválidas"));
 
         if (!passwordEncoder.matches(request.getPassword(), usuario.getPasswordHash())) {
-            throw new IllegalArgumentException("Credenciales inválidas");
+            throw new CredencialesInvalidasException("Credenciales inválidas");
         }
 
         if (!usuario.getActivo()) {

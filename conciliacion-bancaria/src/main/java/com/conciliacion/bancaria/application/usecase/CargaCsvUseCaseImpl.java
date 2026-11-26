@@ -4,8 +4,14 @@ import com.conciliacion.bancaria.domain.exception.CsvValidationException;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
 import com.conciliacion.bancaria.domain.model.ConfiguracionExtracto;
 import com.conciliacion.bancaria.domain.model.Movimiento;
+import com.conciliacion.bancaria.domain.model.PartidaConciliatoria;
+import com.conciliacion.bancaria.domain.model.ResumenCargaAuxiliar;
+import com.conciliacion.bancaria.domain.model.Sugerencia;
+import com.conciliacion.bancaria.domain.model.extractoconfig.ConfiguracionExtractoDetalle;
 import com.conciliacion.bancaria.domain.port.in.CargaCsvUseCase;
+import com.conciliacion.bancaria.domain.port.out.BankStatementParserPort;
 import com.conciliacion.bancaria.domain.port.out.ConciliacionRepositoryPort;
+import com.conciliacion.bancaria.domain.port.out.ConfiguracionExtractoCodec;
 import com.conciliacion.bancaria.domain.port.out.ConfiguracionExtractoRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.ConfiguracionGastoBancarioRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.EventLogPort;
@@ -13,29 +19,30 @@ import com.conciliacion.bancaria.domain.port.out.JobRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.MovimientoRepositoryPort;
 import com.conciliacion.bancaria.domain.service.ConciliationEngine;
 import com.conciliacion.bancaria.domain.service.CsvValidatorService;
-import com.conciliacion.bancaria.domain.service.ExtractoBancarioTxtAnchoFijoParserService;
-import com.conciliacion.bancaria.domain.service.ExtractoBancarioXlsxParserService;
+import com.conciliacion.bancaria.domain.service.MovimientoReversionService;
 import com.conciliacion.bancaria.domain.service.SiesaXlsParserService;
-import com.conciliacion.bancaria.shared.TipoArchivoExtracto;
 import com.conciliacion.bancaria.domain.port.out.SugerenciaRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.PartidaRepositoryPort;
+import com.conciliacion.bancaria.application.usecase.event.MotorCompletoRequestedEvent;
+import com.conciliacion.bancaria.application.usecase.event.MotorIncrementalRequestedEvent;
 import com.conciliacion.bancaria.shared.EstadoMovimiento;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -46,8 +53,8 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
 
     private final CsvValidatorService csvValidator;
     private final SiesaXlsParserService siesaParser;
-    private final ExtractoBancarioXlsxParserService extractoXlsxParser;
-    private final ExtractoBancarioTxtAnchoFijoParserService extractoTxtAnchoFijoParser;
+    private final BankStatementParserPort bankStatementParserPort;
+    private final ConfiguracionExtractoCodec configuracionExtractoCodec;
     private final ConciliationEngine conciliationEngine;
     private final MovimientoRepositoryPort movimientoRepo;
     private final SugerenciaRepositoryPort sugerenciaRepo;
@@ -57,10 +64,40 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
     private final ConciliacionRepositoryPort conciliacionRepo;
     private final ConfiguracionGastoBancarioRepositoryPort gastoRepo;
     private final ConfiguracionExtractoRepositoryPort configuracionExtractoRepo;
+    private final MovimientoReversionService reversionService;
+    private final ApplicationEventPublisher eventPublisher;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    /**
+     * Auto-referencia al proxy Spring de este mismo bean, usada para que las llamadas a los
+     * métodos {@code @Transactional} de persistencia del resultado del motor
+     * ({@code persistirResultadoMotorCompleto} y compañía) sí pasen por el proxy AOP de
+     * Spring -- una llamada interna dentro de la MISMA clase (p. ej. {@code this.metodo(...)}
+     * o, peor, sin prefijo) NO pasa por ese proxy, así que {@code @Transactional} nunca
+     * surtiría efecto.
+     *
+     * Los propios motores ({@code ejecutarMotorAsync}/{@code ejecutarMotorIncrementalAsync})
+     * ya NO se disparan vía {@code self.} desde un método {@code @Transactional} -- ese
+     * patrón es justamente el que causaba la condición de carrera transacción/async (el
+     * motor podía arrancar, en otro hilo/conexión, antes de que la transacción externa
+     * hiciera commit, y leer una foto vacía de los datos recién guardados; bug real:
+     * conciliación #29 con 22 bancarios pendientes sin ninguna partida). Ahora se disparan
+     * publicando un evento ({@link MotorCompletoRequestedEvent}/
+     * {@link MotorIncrementalRequestedEvent}) que un listener
+     * {@code @TransactionalEventListener(phase = AFTER_COMMIT)} solo procesa después de que
+     * Spring confirma el commit de la transacción que lo publicó -- sin importar desde qué
+     * método se publique, ni qué tan rápido gane la carrera el hilo async.
+     *
+     * No es {@code final} ni participa del constructor (Lombok @RequiredArgsConstructor solo
+     * incluye campos {@code final}) porque no puede auto-inyectarse durante su propia
+     * construcción; @Lazy difiere la resolución al primer uso real. En tests unitarios (fuera
+     * de un contenedor Spring) se asigna manualmente a la misma instancia tras construirla.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    CargaCsvUseCaseImpl self;
 
-    // Mapeo estándar — columnas genéricas
+    // Mapeo estándar — columnas genéricas. Solo usado por cargarLibroAuxiliar (auxiliar
+    // contable), que no pasa por ConfiguracionExtracto ni por el motor de extractos bancarios.
     private static final Map<String, String> MAPEO_ESTANDAR = Map.of(
             "fecha", "fecha",
             "descripcion", "descripcion",
@@ -77,17 +114,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
             eventLog.csvUpload(idConciliacion, null, archivo.getOriginalFilename());
             byte[] contenido = archivo.getBytes();
 
-            List<Movimiento> bancarios;
-            ConfiguracionExtracto configActiva = buscarConfiguracionActiva(idConciliacion).orElse(null);
-
-            if (configActiva != null && configActiva.getTipoArchivo() == TipoArchivoExtracto.TXT
-                    && esFormatoTxtAnchoFijo(configActiva)) {
-                bancarios = parsearExtractoTxtAnchoFijo(idConciliacion, contenido, configActiva);
-            } else if (esArchivoXls(archivo.getOriginalFilename())) {
-                bancarios = parsearExtractoXlsx(idConciliacion, contenido);
-            } else {
-                bancarios = csvValidator.parsear(contenido, MAPEO_ESTANDAR);
-            }
+            List<Movimiento> bancarios = parsearExtractoBancario(idConciliacion, contenido);
 
             // Tarjetas de crédito con auxiliar conjunto: múltiples extractos se acumulan.
             // Cuentas normales: el extracto reemplaza al anterior.
@@ -104,9 +131,13 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
 
             movimientoRepo.guardarBancarios(bancariosConAgrupacion, idConciliacion);
 
-            // Lanzar motor asíncrono y retornar job_id (TRD RT-03)
+            // Lanzar motor asíncrono y retornar job_id (TRD RT-03). Se publica un evento en
+            // vez de llamar self.ejecutarMotorAsync(...) directo -- el listener
+            // (@TransactionalEventListener AFTER_COMMIT) solo lo procesa después de que esta
+            // transacción haga commit, así el motor nunca lee una foto vacía de los
+            // bancarios que se acaban de guardar arriba (ver el comentario de "self").
             String jobId = jobRepo.crearJob(idConciliacion);
-            ejecutarMotorAsync(jobId, idConciliacion);
+            eventPublisher.publishEvent(new MotorCompletoRequestedEvent(idConciliacion, jobId));
             return jobId;
 
         } catch (CsvValidationException e) {
@@ -139,73 +170,34 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                 .findFirst();
     }
 
-    private boolean esFormatoTxtAnchoFijo(ConfiguracionExtracto config) {
-        Map<String, Object> detalle = parseConfigJson(config.getConfiguracionDetalle());
-        return "ANCHO_FIJO".equals(String.valueOf(detalle.getOrDefault("formatoTxt", "")));
-    }
-
     /**
-     * Busca la ConfiguracionExtracto activa para la conciliación y parsea el XLSX
-     * usando esa configuración. Si no se encuentra configuración, lanza excepción.
+     * Único camino de parseo de extractos bancarios: resuelve la configuración activa
+     * del banco/cuenta y delega al motor genérico (BankStatementParserPort), que despacha
+     * internamente por el tipoOrigen declarado en la propia configuración. Sin ramas por
+     * tipo de archivo ni por nombre de banco.
      */
-    private List<Movimiento> parsearExtractoXlsx(Long idConciliacion, byte[] contenido) {
+    private List<Movimiento> parsearExtractoBancario(Long idConciliacion, byte[] contenido) {
         Conciliacion conciliacion = conciliacionRepo.buscarPorId(idConciliacion)
                 .orElseThrow(() -> new CsvValidationException(
                         "No se encontró la conciliación " + idConciliacion));
-
-        if (conciliacion.getIdBanco() == null) {
-            throw new CsvValidationException(
-                    "La conciliación no tiene banco asociado; "
-                    + "configure primero la cuenta bancaria.");
-        }
-
-        String periodo = conciliacion.getPeriodo();
 
         ConfiguracionExtracto config = buscarConfiguracionActiva(idConciliacion)
                 .orElseThrow(() -> new CsvValidationException(
-                        "No se encontró configuración de extracto XLSX activa para este banco/cuenta. "
+                        "No se encontró configuración de extracto activa para este banco/cuenta. "
                         + "Configure el extracto en Bancos → Configuración de extractos."));
 
-        Map<String, Object> detalleMap = parseConfigJson(config.getConfiguracionDetalle());
-
-        log.info("Parseando extracto XLSX con configuración '{}' (id={}), periodo={}",
-                config.getNombre(), config.getId(), periodo);
-
-        return extractoXlsxParser.parsear(contenido, detalleMap, periodo);
-    }
-
-    /**
-     * Parsea un extracto de texto plano de ancho fijo (ej. Davivienda) usando la
-     * configuración activa ya resuelta.
-     */
-    private List<Movimiento> parsearExtractoTxtAnchoFijo(Long idConciliacion, byte[] contenido,
-                                                          ConfiguracionExtracto config) {
-        Conciliacion conciliacion = conciliacionRepo.buscarPorId(idConciliacion)
-                .orElseThrow(() -> new CsvValidationException(
-                        "No se encontró la conciliación " + idConciliacion));
+        ConfiguracionExtractoDetalle detalle = configuracionExtractoCodec.leer(config.getConfiguracionDetalle());
         String periodo = conciliacion.getPeriodo();
 
-        Map<String, Object> detalleMap = parseConfigJson(config.getConfiguracionDetalle());
+        log.info("Parseando extracto con configuración '{}' (id={}, tipoOrigen={}), periodo={}",
+                config.getNombre(), config.getId(), detalle.getTipoOrigen(), periodo);
 
-        log.info("Parseando extracto TXT ancho fijo con configuración '{}' (id={}), periodo={}",
-                config.getNombre(), config.getId(), periodo);
-
-        return extractoTxtAnchoFijoParser.parsear(contenido, detalleMap, periodo);
-    }
-
-    private Map<String, Object> parseConfigJson(String json) {
-        if (json == null || json.isBlank()) return Collections.emptyMap();
-        try {
-            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-        } catch (Exception e) {
-            log.warn("No se pudo parsear configuracionDetalle JSON: {}", e.getMessage());
-            return Collections.emptyMap();
-        }
+        return bankStatementParserPort.parsear(contenido, detalle, periodo);
     }
 
     @Override
     @Transactional
-    public String cargarLibroAuxiliar(Long idConciliacion, MultipartFile archivo) {
+    public ResumenCargaAuxiliar cargarLibroAuxiliar(Long idConciliacion, MultipartFile archivo) {
         try {
             eventLog.csvUpload(idConciliacion, null, archivo.getOriginalFilename());
             byte[] contenido = archivo.getBytes();
@@ -214,30 +206,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                     ? siesaParser.parsear(contenido)
                     : csvValidator.parsear(contenido, MAPEO_ESTANDAR);
 
-            // Huellas de TODOS los contables existentes (incluyendo CONCILIADO) para que
-            // los movimientos ya conciliados no vuelvan a insertarse como "nuevos".
-            Set<String> huellas = movimientoRepo.buscarTodosContablesPorConciliacion(idConciliacion)
-                    .stream()
-                    .map(this::huella)
-                    .collect(Collectors.toSet());
-
-            List<Movimiento> soloNuevos = delArchivo.stream()
-                    .filter(m -> !huellas.contains(huella(m)))
-                    .toList();
-
-            if (soloNuevos.isEmpty()) {
-                log.info("Re-carga de auxiliar sin movimientos nuevos (conciliacion={})", idConciliacion);
-                return "sin-cambios";
-            }
-
-            log.info("Re-carga incremental de auxiliar: {} nuevos de {} en archivo (conciliacion={})",
-                    soloNuevos.size(), delArchivo.size(), idConciliacion);
-
-            List<Movimiento> persistidos = movimientoRepo.guardarContables(soloNuevos, idConciliacion);
-
-            String jobId = jobRepo.crearJob(idConciliacion);
-            ejecutarMotorIncrementalAsync(jobId, idConciliacion, persistidos);
-            return jobId;
+            return procesarRecargaAuxiliar(idConciliacion, delArchivo);
         } catch (CsvValidationException e) {
             eventLog.csvValidationFailed(idConciliacion, e.getMessage());
             throw e;
@@ -248,11 +217,207 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
         }
     }
 
+    /**
+     * Diff + reversión + persistencia de una recarga del auxiliar, separado del parseo
+     * del archivo para poder testearse con listas de {@link Movimiento} construidas a
+     * mano (ver {@code CargaCsvUseCaseImplTest}).
+     *
+     * Compara por multiconjunto (cuenta ocurrencias de cada huella en vez de solo
+     * verificar membresía) para no descartar en silencio duplicados legítimos —dos
+     * movimientos reales con la misma huella— como si fueran el mismo renglón.
+     */
+    ResumenCargaAuxiliar procesarRecargaAuxiliar(Long idConciliacion, List<Movimiento> delArchivo) {
+        List<Movimiento> todosContables = movimientoRepo.buscarTodosContablesPorConciliacion(idConciliacion);
+
+        Map<String, List<Movimiento>> existentesPorHuella = todosContables.stream()
+                .collect(Collectors.groupingBy(this::huella));
+        Map<String, Long> conteoArchivoNuevo = delArchivo.stream()
+                .collect(Collectors.groupingBy(this::huella, Collectors.counting()));
+
+        // Nuevos: cada fila del archivo consume, si existe, un "cupo" de una fila
+        // existente con la misma huella. Lo que sobra sin cupo es genuinamente nuevo.
+        Map<String, Integer> disponibles = existentesPorHuella.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+        List<Movimiento> nuevos = new ArrayList<>();
+        for (Movimiento m : delArchivo) {
+            String h = huella(m);
+            int cupo = disponibles.getOrDefault(h, 0);
+            if (cupo > 0) {
+                disponibles.put(h, cupo - 1);
+            } else {
+                nuevos.add(m);
+            }
+        }
+
+        // Desaparecidos: por cada huella existente, lo que sobra sobre lo que trae el
+        // archivo nuevo. Ante ambigüedad (varios existentes, misma huella) se prioriza
+        // dar de baja el que no tiene sugerencia activa, para no revertir sin necesidad
+        // un cruce ya resuelto cuando basta con quitar el duplicado no tocado.
+        List<Movimiento> desaparecidos = new ArrayList<>();
+        for (Map.Entry<String, List<Movimiento>> entry : existentesPorHuella.entrySet()) {
+            List<Movimiento> grupo = new ArrayList<>(entry.getValue());
+            long enArchivoNuevo = conteoArchivoNuevo.getOrDefault(entry.getKey(), 0L);
+            long sobran = grupo.size() - enArchivoNuevo;
+            if (sobran <= 0) continue;
+
+            if (grupo.size() > 1) {
+                log.warn("Huella '{}' repetida en conciliacion={}: {} existentes, {} en archivo nuevo, "
+                                + "{} se dan de baja",
+                        entry.getKey(), idConciliacion, grupo.size(), enArchivoNuevo, sobran);
+            }
+            grupo.sort(Comparator.comparing(mv ->
+                    sugerenciaRepo.buscarActivaPorMovimientoContable(mv.getId()).isPresent() ? 1 : 0));
+            desaparecidos.addAll(grupo.subList(0, (int) sobran));
+        }
+
+        int revertidos = 0;
+        for (Movimiento m : desaparecidos) {
+            if (procesarAnulado(idConciliacion, m)) revertidos++;
+        }
+
+        log.info("Re-carga de auxiliar (conciliacion={}): {} nuevos, {} anulados ({} revertidos)",
+                idConciliacion, nuevos.size(), desaparecidos.size(), revertidos);
+
+        String jobId = null;
+        if (!nuevos.isEmpty()) {
+            List<Movimiento> persistidos = movimientoRepo.guardarContables(nuevos, idConciliacion);
+            jobId = jobRepo.crearJob(idConciliacion);
+            // Mismo motivo que en cargarExtractoBancario: publicar el evento en vez de
+            // self.ejecutarMotorIncrementalAsync(...) directo, para que el listener
+            // AFTER_COMMIT espere a que esta transacción (cargarLibroAuxiliar) haga commit
+            // antes de que el motor lea los contables recién guardados.
+            eventPublisher.publishEvent(new MotorIncrementalRequestedEvent(idConciliacion, jobId, persistidos));
+        }
+
+        return ResumenCargaAuxiliar.builder()
+                .jobId(jobId)
+                .nuevos(nuevos.size())
+                .anulados(desaparecidos.size())
+                .revertidos(revertidos)
+                .build();
+    }
+
+    /**
+     * Da de baja un contable que desapareció del archivo re-subido. Si tiene una
+     * sugerencia activa (PENDIENTE_REVISION o ACEPTADA) — sin importar que el propio
+     * contable siga figurando como PENDIENTE en base de datos, ya que SUGERIDO nunca
+     * se persiste (ver {@link com.conciliacion.bancaria.domain.service.ConciliationEngine})—
+     * hay que revertir esa sugerencia primero: si no, borrar el contable directo viola
+     * la FK de {@code sugerencias_conciliacion} (no tiene ON DELETE CASCADE).
+     *
+     * @return true si hubo una reversión real (sugerencia activa revertida), false si
+     *         fue una baja simple sin ningún emparejamiento que deshacer.
+     */
+    private boolean procesarAnulado(Long idConciliacion, Movimiento contable) {
+        Optional<Sugerencia> activa = sugerenciaRepo.buscarActivaPorMovimientoContable(contable.getId());
+        if (activa.isEmpty()) {
+            // Sin sugerencia activa, el contable tenía su propia partida (el motor la generó
+            // por estar PENDIENTE, o quedó CRUZADA tras un cruce manual). Hay que:
+            //  - si venía de un cruce manual, disolver ese cruce: sus bancarios (y cualquier
+            //    contable sobreviviente) no pueden quedar CONCILIADO sin contraparte real;
+            //  - borrar la propia partida del contable (cualquier estado) junto con él, si no
+            //    queda huérfana apuntando a un id_mov inexistente y el detalle se renderiza
+            //    vacío (bug real, Partida #10013).
+            boolean revirtioCruce = disolverCruceSiCorresponde(idConciliacion, contable);
+            partidaRepo.eliminarPartidasPorMovimiento(contable.getId(), "CONTABLE");
+            movimientoRepo.eliminarContablesPorIds(List.of(contable.getId()));
+            return revirtioCruce;
+        }
+
+        Sugerencia sugerencia = activa.get();
+        Long idBancario = sugerencia.getMovimientoBancario().getId();
+
+        sugerenciaRepo.eliminarPorId(sugerencia.getId());
+        reversionService.revertirAPendiente(idConciliacion, idBancario, "BANCARIO");
+        movimientoRepo.eliminarContablesPorIds(List.of(contable.getId()));
+
+        eventLog.contableRevertido(idConciliacion, contable.getId(), contable.getFecha(), contable.getMonto(),
+                contable.getTipo(), contable.getDescripcion(), idBancario, sugerencia.getEstado().name());
+
+        return true;
+    }
+
+    /**
+     * Si el contable dado de baja pertenecía a un cruce manual (su partida tiene
+     * {@code grupoCruce}), disuelve el cruce completo: cada partida del grupo (salvo la del
+     * propio contable, que se borra junto con su movimiento) vuelve a PENDIENTE y su
+     * movimiento subyacente pasa de CONCILIADO a PENDIENTE. Así los bancarios del cruce no
+     * quedan marcados como resueltos sin contraparte real, y cualquier contable sobreviviente
+     * vuelve a estar disponible para cruzarse de nuevo.
+     *
+     * El grupo se identifica por {@code grupoCruce} (UUID que asigna
+     * {@link com.conciliacion.bancaria.domain.service.ClosureService}), no por el texto de
+     * justificación — ese se repite entre cruces distintos. Cruces históricos previos a la
+     * columna {@code grupo_cruce} tienen grupo nulo y no se tratan aquí (su emparejamiento
+     * real ya no es reconstruible; la limpieza puntual de esos casos va en la migración V25).
+     *
+     * @return true si revirtió al menos un miembro del cruce (reversión real), false si el
+     *         contable no venía de un cruce manual.
+     */
+    private boolean disolverCruceSiCorresponde(Long idConciliacion, Movimiento contable) {
+        String grupo = partidaRepo.buscarPorMovimiento(contable.getId(), "CONTABLE").stream()
+                .map(PartidaConciliatoria::getGrupoCruce)
+                .filter(g -> g != null && !g.isBlank())
+                .findFirst().orElse(null);
+        if (grupo == null) return false;
+
+        boolean revirtioAlgo = false;
+        for (PartidaConciliatoria miembro : partidaRepo.buscarPorGrupoCruce(grupo)) {
+            boolean esElAnulado = "CONTABLE".equals(miembro.getTipoOrigen())
+                    && contable.getId().equals(miembro.getIdMovimiento());
+            if (esElAnulado) continue; // su partida y movimiento se eliminan aparte
+
+            partidaRepo.actualizar(miembro
+                    .withEstado("PENDIENTE")
+                    .withJustificacion(null)
+                    .withFechaJustificacion(null)
+                    .withGrupoCruce(null));
+
+            if ("BANCARIO".equals(miembro.getTipoOrigen())) {
+                movimientoRepo.actualizarEstadoBancario(miembro.getIdMovimiento(), EstadoMovimiento.PENDIENTE);
+            } else {
+                movimientoRepo.actualizarEstadoContable(miembro.getIdMovimiento(), EstadoMovimiento.PENDIENTE);
+            }
+            revirtioAlgo = true;
+        }
+
+        if (revirtioAlgo) {
+            log.info("Cruce disuelto (conciliacion={}): contable {} anulado; grupo_cruce {} revertido a PENDIENTE",
+                    idConciliacion, contable.getId(), grupo);
+        }
+        return revirtioAlgo;
+    }
+
+    /**
+     * Identidad de un movimiento contable entre recargas del auxiliar. Cuando el archivo
+     * trae número de comprobante (ej. auxiliar SIESA, columna "Documento") se usa junto
+     * con monto y tipo — nunca el comprobante solo. Un mismo número de comprobante puede
+     * reaparecer en una recarga real con un monto distinto (anulación + reingreso por otro
+     * valor, reutilizando el mismo Documento en SIESA); si la huella ignorara el monto, ese
+     * caso colapsaría con el registro viejo en el diff por multiconjunto y la reversión
+     * nunca se dispararía (bug real encontrado en producción). El monto de
+     * {@link SiesaXlsParserService} siempre es positivo — la dirección va en {@code tipo},
+     * no en el signo — así que no hace falta un monto con signo aparte, basta con incluir
+     * ambos. El caso feliz (mismo comprobante + mismo monto + mismo tipo en una
+     * re-exportación sin cambios) sigue tratándose como "ya existe", no como nuevo.
+     *
+     * Sin comprobante (auxiliar CSV genérico) se cae a un hash de texto normalizado
+     * agresivamente (sin tildes, sin espacios múltiples, mayúsculas) para reducir falsos
+     * "nuevos" causados por variaciones triviales de formato.
+     */
     private String huella(Movimiento m) {
-        return m.getFecha()
-                + "|" + m.getMonto().stripTrailingZeros().toPlainString()
-                + "|" + m.getTipo()
-                + "|" + (m.getDescripcion() != null ? m.getDescripcion().trim().toLowerCase() : "");
+        String montoTipo = m.getMonto().stripTrailingZeros().toPlainString() + "|" + m.getTipo();
+        if (m.getNumeroComprobante() != null && !m.getNumeroComprobante().isBlank()) {
+            return "NC:" + m.getNumeroComprobante().trim() + "|" + montoTipo;
+        }
+        return "TXT:" + m.getFecha() + "|" + montoTipo + "|" + normalizarDescripcion(m.getDescripcion());
+    }
+
+    private String normalizarDescripcion(String descripcion) {
+        if (descripcion == null) return "";
+        String sinTildes = java.text.Normalizer.normalize(descripcion, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return sinTildes.trim().replaceAll("\\s+", " ").toUpperCase();
     }
 
     /**
@@ -327,7 +492,9 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
         movimientoRepo.resetEstadosBancariosSugeridos(idConciliacion);
         movimientoRepo.resetEstadosContablesSugeridos(idConciliacion);
         String jobId = jobRepo.crearJob(idConciliacion);
-        ejecutarMotorAsync(jobId, idConciliacion);
+        // Mismo patrón riesgoso que cargarExtractoBancario tenía (@Transactional llamando
+        // self.ejecutarMotorAsync directo) -- mismo fix: publicar el evento.
+        eventPublisher.publishEvent(new MotorCompletoRequestedEvent(idConciliacion, jobId));
         return jobId;
     }
 
@@ -354,13 +521,170 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
         }
     }
 
+    /**
+     * Reconciliación final de partidas pendientes: borra cualquier partida PENDIENTE cuyo
+     * movimiento ya tenga, EN ESTE MOMENTO, una sugerencia activa (PENDIENTE_REVISION o
+     * ACEPTADA) — sin importar si esa sugerencia la generó este mismo job o el otro.
+     *
+     * Necesaria porque {@code ejecutarMotorAsync} (disparado al subir el extracto) y
+     * {@code ejecutarMotorIncrementalAsync} (disparado al subir el auxiliar) corren de
+     * verdad en paralelo en el mismo pool ({@code conciliacionExecutor}) desde que se
+     * corrigió el bug de auto-invocación de {@code @Async}. Cada uno calcula su propio
+     * resultado sobre una FOTO de bancarios/contables leída en su propio momento — si
+     * el motor del extracto lee 0 contables porque el auxiliar todavía no había hecho
+     * commit, genera partidas pendientes para TODOS los bancarios; si esa inserción
+     * ocurre después de que el motor del auxiliar ya intentó limpiar la partida del
+     * bancario que sí emparejó (intento que no borra nada porque la partida todavía no
+     * existía), esa partida queda huérfana para siempre — bug real reproducido con 328
+     * bancarios, 321 sugerencias generadas correctamente y 328 pendientes fantasma.
+     *
+     * Al llamarse SIEMPRE al final de ambos jobs, cualquiera de los dos que termine
+     * después vuelve a limpiar contra el estado más reciente de sugerencias, cerrando la
+     * carrera sin importar el orden real en que terminen.
+     */
+    private void limpiarPendientesConSugerenciaActiva(Long idConciliacion) {
+        sugerenciaRepo.buscarBancarioIdsConSugerenciaActiva(idConciliacion)
+                .forEach(id -> partidaRepo.eliminarPendientePorMovimiento(id, "BANCARIO"));
+        sugerenciaRepo.buscarContableIdsConSugerenciaActiva(idConciliacion)
+                .forEach(id -> partidaRepo.eliminarPendientePorMovimiento(id, "CONTABLE"));
+    }
+
     private boolean esArchivoXls(String nombre) {
         if (nombre == null) return false;
         String lower = nombre.toLowerCase();
         return lower.endsWith(".xls") || lower.endsWith(".xlsx");
     }
 
-    // Motor incremental — sólo compara nuevos contables contra bancarios sin sugerencia activa
+    /**
+     * Persistencia atómica del resultado del motor incremental: sugerencias, limpieza de
+     * la partida pendiente de cada bancario emparejado, partidas de contables sin par, y
+     * la reconciliación final -- todo en una sola transacción. Si cualquier paso falla, se
+     * revierte TODO en vez de quedar a medias.
+     *
+     * Necesario porque este método corre dentro de {@code ejecutarMotorIncrementalAsync},
+     * que es {@code @Async} y por lo tanto NO hereda ninguna transacción ambiental del
+     * método que lo invocó -- las consultas {@code @Modifying} de aquí adentro (como
+     * {@code eliminarPendientePorMovimiento}, usada tanto en la limpieza explícita como en
+     * {@link #limpiarPendientesConSugerenciaActiva}) requieren una transacción activa para
+     * ejecutar, algo que {@code save}/{@code saveAll} obtienen automáticamente pero
+     * {@code @Modifying @Query} no. Sin esta transacción, la corrida real que motivó este
+     * fix llegó a guardar 321 sugerencias con éxito (guardarTodas corre en su propia
+     * transacción implícita) pero falló con {@code TransactionRequiredException} justo al
+     * intentar la primera limpieza, dejando 328 partidas pendientes intactas -- exactamente
+     * el estado a medias que esta transacción única evita hacia adelante.
+     *
+     * Es {@code public} (no {@code private}) y se invoca vía {@code self.} por la misma
+     * razón que {@code ejecutarMotorIncrementalAsync}: el proxy de Spring que aplica
+     * {@code @Transactional} sólo intercepta llamadas que pasan por él, no invocaciones
+     * directas dentro de la misma instancia.
+     */
+    @Transactional
+    public void persistirResultadoMotorIncremental(Long idConciliacion,
+                                                    ConciliationEngine.ResultadoMotor resultado) {
+        sugerenciaRepo.guardarTodas(resultado.sugerencias());
+
+        // Los bancarios que obtuvieron sugerencia ya no son pendientes; eliminar su partida
+        resultado.sugerencias().stream()
+                .map(s -> s.getMovimientoBancario().getId())
+                .distinct()
+                .forEach(id -> partidaRepo.eliminarPendientePorMovimiento(id, "BANCARIO"));
+
+        // Guardar sólo partidas de contables nuevos que no encontraron par
+        partidaRepo.guardarTodas(sinPendienteExistente(idConciliacion, resultado.partidasContables(), "CONTABLE"));
+
+        limpiarPendientesConSugerenciaActiva(idConciliacion);
+    }
+
+    /** Misma razón de ser que {@link #persistirResultadoMotorIncremental} para la rama sin bancarios libres. */
+    @Transactional
+    public void persistirSoloContablesIncremental(Long idConciliacion, List<Movimiento> nuevosContables) {
+        List<com.conciliacion.bancaria.domain.model.PartidaConciliatoria> partidas =
+                nuevosContables.stream()
+                        .map(c -> com.conciliacion.bancaria.domain.model.PartidaConciliatoria.builder()
+                                .idConciliacion(idConciliacion)
+                                .idMovimiento(c.getId())
+                                .tipoOrigen("CONTABLE")
+                                .estado("PENDIENTE")
+                                .build())
+                        .toList();
+        partidaRepo.guardarTodas(sinPendienteExistente(idConciliacion, partidas, "CONTABLE"));
+        limpiarPendientesConSugerenciaActiva(idConciliacion);
+    }
+
+    /**
+     * Persistencia atómica del resultado del motor completo -- misma razón de ser que
+     * {@link #persistirResultadoMotorIncremental}, para {@code ejecutarMotorAsync}.
+     */
+    @Transactional
+    public void persistirResultadoMotorCompleto(Long idConciliacion,
+                                                 ConciliationEngine.ResultadoMotor resultado) {
+        sugerenciaRepo.guardarTodas(resultado.sugerencias());
+        partidaRepo.guardarTodas(sinPendienteExistente(idConciliacion, resultado.partidasBancarias(), "BANCARIO"));
+        partidaRepo.guardarTodas(sinPendienteExistente(idConciliacion, resultado.partidasContables(), "CONTABLE"));
+        limpiarPendientesConSugerenciaActiva(idConciliacion);
+    }
+
+    /**
+     * Filtra los movimientos que YA tienen una partida PENDIENTE para esta conciliación y
+     * este tipoOrigen, antes de insertar. Necesario porque {@code ejecutarMotorAsync} relee
+     * TODOS los bancarios/contables no conciliados de la conciliación en cada corrida (no
+     * sólo los nuevos) -- en una conciliación con auxiliar_conjunto (tarjetas de crédito),
+     * cada extracto adicional que se sube dispara el motor completo sobre lo ya acumulado,
+     * y {@link ConciliationEngine#ejecutar} genera una partida PENDIENTE por cada bancario
+     * sin par SIN saber que ya existe una de una corrida anterior -- guardarTodas() hace
+     * saveAll() sobre entidades sin id, así que JPA siempre inserta filas nuevas. Bug real:
+     * subir 5 extractos de tarjeta antes de cargar el auxiliar dejaba al movimiento del
+     * primer archivo con hasta 4 partidas PENDIENTE duplicadas.
+     */
+    private List<com.conciliacion.bancaria.domain.model.PartidaConciliatoria> sinPendienteExistente(
+            Long idConciliacion,
+            List<com.conciliacion.bancaria.domain.model.PartidaConciliatoria> partidas,
+            String tipoOrigen) {
+        if (partidas.isEmpty()) return partidas;
+        Set<Long> yaPendientes = partidaRepo.buscarIdsMovimientoConPendiente(idConciliacion, tipoOrigen);
+        if (yaPendientes.isEmpty()) return partidas;
+        return partidas.stream()
+                .filter(p -> !yaPendientes.contains(p.getIdMovimiento()))
+                .toList();
+    }
+
+    /**
+     * Punto de entrada real (en producción) del motor incremental: solo se dispara cuando
+     * Spring confirma que la transacción que publicó {@link MotorIncrementalRequestedEvent}
+     * (la de {@code cargarLibroAuxiliar}) ya hizo commit -- {@code phase = AFTER_COMMIT}
+     * es justamente lo que impide la carrera transacción/async (ver el comentario de
+     * {@code self} arriba). {@code @Async} vuelve a aplicar aquí porque, a diferencia de la
+     * llamada directa que reemplaza, esta SÍ pasa por el proxy de Spring (es una invocación
+     * de framework a un método público del bean, no una auto-invocación).
+     */
+    @Async("conciliacionExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onMotorIncrementalRequested(MotorIncrementalRequestedEvent event) {
+        ejecutarMotorIncrementalAsync(event.jobId(), event.idConciliacion(), event.nuevosContables());
+    }
+
+    /**
+     * Punto de entrada real (en producción) del motor completo -- misma razón de ser que
+     * {@link #onMotorIncrementalRequested} para {@link MotorCompletoRequestedEvent}
+     * (publicado desde {@code cargarExtractoBancario} y {@code reprocesarMotor}).
+     */
+    @Async("conciliacionExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onMotorCompletoRequested(MotorCompletoRequestedEvent event) {
+        ejecutarMotorAsync(event.jobId(), event.idConciliacion());
+    }
+
+    // Motor incremental — sólo compara nuevos contables contra bancarios sin sugerencia activa.
+    // Sigue siendo invocable directo (@Async, mismo pool) para tests de integración y para
+    // onMotorIncrementalRequested arriba, que es quien lo dispara en producción.
+    //
+    // Deliberadamente NO lleva @Transactional en este método -- las llamadas a
+    // jobRepo.actualizarProgreso deben seguir comiteando cada una por separado (como ya
+    // hacen save/saveAll) para que el polling del frontend vea progreso incremental en vivo;
+    // envolver todo el método en una sola transacción dejaría esos updates invisibles para
+    // otras conexiones hasta el commit final. Sólo los pasos que escriben resultado del
+    // motor (self.persistirResultadoMotorIncremental/persistirSoloContablesIncremental) son
+    // transaccionales, y punto: el resto son lecturas o saves que ya son atómicos por sí solos.
     @Async("conciliacionExecutor")
     public void ejecutarMotorIncrementalAsync(String jobId, Long idConciliacion,
                                               List<Movimiento> nuevosContables) {
@@ -381,15 +705,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
 
             if (bancariosLibres.isEmpty()) {
                 // Sin bancarios libres: los nuevos contables van directo a partidas
-                partidaRepo.guardarTodas(
-                        nuevosContables.stream()
-                                .map(c -> com.conciliacion.bancaria.domain.model.PartidaConciliatoria.builder()
-                                        .idConciliacion(idConciliacion)
-                                        .idMovimiento(c.getId())
-                                        .tipoOrigen("CONTABLE")
-                                        .estado("PENDIENTE")
-                                        .build())
-                                .toList());
+                self.persistirSoloContablesIncremental(idConciliacion, nuevosContables);
                 jobRepo.completar(jobId);
                 return;
             }
@@ -398,16 +714,7 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                     conciliationEngine.ejecutar(idConciliacion, bancariosLibres, nuevosContables);
             jobRepo.actualizarProgreso(jobId, 75);
 
-            sugerenciaRepo.guardarTodas(resultado.sugerencias());
-
-            // Los bancarios que obtuvieron sugerencia ya no son pendientes; eliminar su partida
-            resultado.sugerencias().stream()
-                    .map(s -> s.getMovimientoBancario().getId())
-                    .distinct()
-                    .forEach(id -> partidaRepo.eliminarPendientePorMovimiento(id, "BANCARIO"));
-
-            // Guardar sólo partidas de contables nuevos que no encontraron par
-            partidaRepo.guardarTodas(resultado.partidasContables());
+            self.persistirResultadoMotorIncremental(idConciliacion, resultado);
 
             jobRepo.actualizarProgreso(jobId, 90);
 
@@ -423,7 +730,10 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
         }
     }
 
-    // Motor asíncrono — se ejecuta en el pool "conciliacionExecutor"
+    // Motor asíncrono — se ejecuta en el pool "conciliacionExecutor". Ver el comentario sobre
+    // @Transactional en ejecutarMotorIncrementalAsync -- misma razón para no anotar este método.
+    // Sigue siendo invocable directo (tests de integración) y es lo que dispara en
+    // producción onMotorCompletoRequested arriba, ya protegido contra la carrera con AFTER_COMMIT.
     @Async("conciliacionExecutor")
     public void ejecutarMotorAsync(String jobId, Long idConciliacion) {
         long inicio = System.currentTimeMillis();
@@ -442,9 +752,8 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                     conciliationEngine.ejecutar(idConciliacion, bancarios, contables);
             jobRepo.actualizarProgreso(jobId, 75);
 
-            sugerenciaRepo.guardarTodas(resultado.sugerencias());
-            partidaRepo.guardarTodas(resultado.partidasBancarias());
-            partidaRepo.guardarTodas(resultado.partidasContables());
+            self.persistirResultadoMotorCompleto(idConciliacion, resultado);
+
             jobRepo.actualizarProgreso(jobId, 90);
 
             long duracion = System.currentTimeMillis() - inicio;

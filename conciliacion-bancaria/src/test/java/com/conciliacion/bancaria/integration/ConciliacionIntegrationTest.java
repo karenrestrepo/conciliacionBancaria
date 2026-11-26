@@ -135,7 +135,7 @@ class ConciliacionIntegrationTest {
     }
 
     @Test
-    @DisplayName("login con credenciales inválidas retorna 404")
+    @DisplayName("login con credenciales inválidas retorna 401")
     void loginInvalido() throws Exception {
         String body = objectMapper.writeValueAsString(
                 Map.of("email", "contador@test.com", "password", "wrongpassword"));
@@ -143,7 +143,7 @@ class ConciliacionIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

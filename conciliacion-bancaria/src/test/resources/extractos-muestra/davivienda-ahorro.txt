@@ -1,0 +1,49 @@
+
+                                                                  CUENTA DE AHORRO
+                                                                         0000  0000  0001
+                                                                                                              INFORME DEL MES:  JUNIO /2026
+
+             Apreciado Cliente
+             EMPRESA EJEMPLO SAS
+             contacto@ejemplo.com
+
+                                                                Saldo Anterior                   $9,000,000.00
+                                                                M?s Cr?ditos                     $755,857.00
+                                                                Menos D?bitos                    $4,649,785.00
+                                                                Nuevo Saldo                      $5,106,072.00
+
+              Fecha               Valor              Doc.     Clase de Movimiento                                            Oficina
+
+              01   06                   $ 67,453.00-  1000    Compra COMERCIO EJEMPLO 01                                     OFICINA EJEMPLO
+              02   06                  $ 172,501.00-  1001    Compra COMERCIO EJEMPLO 02                                     OFICINA EJEMPLO
+              03   06                  $ 268,462.00-  1002    Compra COMERCIO EJEMPLO 03                                     OFICINA EJEMPLO
+              04   06                  $ 273,342.00-  1003    Compra COMERCIO EJEMPLO 04                                     OFICINA EJEMPLO
+              05   06                  $ 344,318.00-  1004    Compra COMERCIO EJEMPLO 05                                     OFICINA EJEMPLO
+              06   06                   $ 58,811.00+  1005    Abono COMERCIO EJEMPLO 06                                      OFICINA EJEMPLO
+              07   06                  $ 122,065.00-  1006    Compra COMERCIO EJEMPLO 07                                     OFICINA EJEMPLO
+              08   06                  $ 320,113.00-  1007    Compra COMERCIO EJEMPLO 08                                     OFICINA EJEMPLO
+              09   06                  $ 330,836.00-  1008    Compra COMERCIO EJEMPLO 09                                     OFICINA EJEMPLO
+              10   06                  $ 296,797.00-  1009    Compra COMERCIO EJEMPLO 10                                     OFICINA EJEMPLO
+              11   06                  $ 225,523.00-  1010    Compra COMERCIO EJEMPLO 11                                     OFICINA EJEMPLO
+              12   06                  $ 305,190.00+  1011    Abono COMERCIO EJEMPLO 12                                      OFICINA EJEMPLO
+
+            Documento ficticio generado para pruebas automaticas.
+
+                                                                     CUENTA DE AHORROS
+
+              Fecha               Valor              Doc.     Clase de Movimiento                                            Oficina
+
+              13   06                  $ 292,210.00-  1012    Compra COMERCIO EJEMPLO 13                                     OFICINA EJEMPLO
+              14   06                  $ 388,012.00-  1013    Compra COMERCIO EJEMPLO 14                                     OFICINA EJEMPLO
+              15   06                  $ 262,375.00-  1014    Compra COMERCIO EJEMPLO 15                                     OFICINA EJEMPLO
+              16   06                  $ 398,753.00-  1015    Compra COMERCIO EJEMPLO 16                                     OFICINA EJEMPLO
+              17   06                  $ 312,505.00-  1016    Compra COMERCIO EJEMPLO 17                                     OFICINA EJEMPLO
+              18   06                  $ 236,260.00+  1017    Abono COMERCIO EJEMPLO 18                                      OFICINA EJEMPLO
+              19   06                  $ 130,794.00-  1018    Compra COMERCIO EJEMPLO 19                                     OFICINA EJEMPLO
+              20   06                    $ 6,328.00-  1019    Compra COMERCIO EJEMPLO 20                                     OFICINA EJEMPLO
+              21   06                  $ 327,019.00-  1020    Compra COMERCIO EJEMPLO 21                                     OFICINA EJEMPLO
+              22   06                   $ 47,322.00-  1021    Compra COMERCIO EJEMPLO 22                                     OFICINA EJEMPLO
+              23   06                   $ 63,057.00-  1022    Compra COMERCIO EJEMPLO 23                                     OFICINA EJEMPLO
+              24   06                  $ 155,596.00+  1023    Abono COMERCIO EJEMPLO 24                                      OFICINA EJEMPLO
+
+            Documento ficticio generado para pruebas automaticas.

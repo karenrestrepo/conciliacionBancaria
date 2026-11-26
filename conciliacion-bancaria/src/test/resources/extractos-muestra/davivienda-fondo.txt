@@ -1,0 +1,14 @@
+
+         Apreciado/a cliente
+         EMPRESA EJEMPLO SAS
+                                                                                       Periodo:                                            2026-06-01 a 2026-06-30
+         900000000-0
+
+           Saldo al inicio del mes                  $              2,500,000.00
+           Rendimientos abonados                    $                 12,345.67
+           Total Ingresos del mes                   $                 12,345.67
+                                                                                       Rendimientos exentos de renta                     .00                 .00Total egresos del mes$.00
+           Saldo al final del mes                   $              2,512,345.67
+
+         RELACI?N DE MOVIMIENTOS
+           FECHA                                                        Descripci?n                                        Valor

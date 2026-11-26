@@ -1,5 +1,6 @@
 package com.conciliacion.bancaria.adapter.in.web.dto;
 
+import com.conciliacion.bancaria.domain.model.extractoconfig.ConfiguracionExtractoDetalle;
 import com.conciliacion.bancaria.shared.TipoArchivoExtracto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -23,5 +24,5 @@ public class ConfiguracionExtractoRequest {
 
     private List<Long> idsCuentas;
 
-    private ConfiguracionDetalleDTO configuracionDetalle;
+    private ConfiguracionExtractoDetalle configuracionDetalle;
 }
