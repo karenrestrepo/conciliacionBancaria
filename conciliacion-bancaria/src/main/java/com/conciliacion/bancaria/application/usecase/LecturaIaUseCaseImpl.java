@@ -5,46 +5,89 @@ import com.conciliacion.bancaria.domain.exception.RecursoNoEncontradoException;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
 import com.conciliacion.bancaria.domain.model.LecturaExtracto;
 import com.conciliacion.bancaria.domain.model.Movimiento;
+import com.conciliacion.bancaria.domain.model.ResultadoLectura;
 import com.conciliacion.bancaria.domain.model.RevisionLectura;
+import com.conciliacion.bancaria.domain.model.RevisionLectura.EstadoCuadre;
 import com.conciliacion.bancaria.domain.port.in.CargaCsvUseCase;
 import com.conciliacion.bancaria.domain.port.in.LecturaIaUseCase;
 import com.conciliacion.bancaria.domain.port.out.ConciliacionRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.LectorExtractoIaPort;
+import com.conciliacion.bancaria.domain.port.out.MovimientoRepositoryPort;
 import com.conciliacion.bancaria.domain.service.RevisorLecturaExtracto;
 import com.conciliacion.bancaria.shared.EstadoMovimiento;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+/**
+ * La IA interpreta el documento; este caso de uso decide con reglas fijas si se puede guardar.
+ * No es transaccional a propósito: la llamada a la IA puede tardar minutos.
+ */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LecturaIaUseCaseImpl implements LecturaIaUseCase {
 
+    private static final BigDecimal TOLERANCIA = new BigDecimal("0.01");
+
     private final LectorExtractoIaPort lector;
     private final RevisorLecturaExtracto revisor;
     private final ConciliacionRepositoryPort conciliacionRepo;
+    private final MovimientoRepositoryPort movimientoRepo;
     private final CargaCsvUseCase cargaCsvUseCase;
 
     @Override
-    public RevisionLectura previsualizar(Long idConciliacion, byte[] pdf) {
+    public ResultadoLectura procesar(Long idConciliacion, byte[] pdf) {
         Conciliacion conciliacion = buscar(idConciliacion);
         if (pdf == null || pdf.length < 5
                 || !"%PDF-".equals(new String(pdf, 0, 5, StandardCharsets.US_ASCII))) {
             throw new CsvValidationException("El archivo no es un PDF");
         }
-        RevisionLectura revision = revisor.revisar(
-                lector.leer(pdf, conciliacion.getPeriodo()), conciliacion.getPeriodo());
-        if (!lector.esSimulado()) {
-            return revision;
+        String periodo = conciliacion.getPeriodo();
+        RevisionLectura revision = revisor.revisar(lector.leer(pdf, periodo), periodo);
+
+        if (convieneReintentar(revision) && lector.tieneRespaldo()) {
+            revision = reintentar(pdf, periodo, revision);
         }
-        List<String> advertencias = new ArrayList<>();
-        advertencias.add("DATOS SIMULADOS: no corresponden al archivo subido. No los apruebe en una conciliación real");
-        advertencias.addAll(revision.getAdvertencias());
-        return revision.toBuilder().advertencias(advertencias).build();
+
+        if (!revision.getErrores().isEmpty()) {
+            return rechazado(revision, "La lectura del extracto está incompleta. No se cargó nada");
+        }
+        if (revision.getEstadoCuadre() == EstadoCuadre.NO_CUADRA) {
+            return rechazado(revision, mensajeDescuadre(revision));
+        }
+        if (lector.esSimulado()) {
+            return porConfirmar(conAdvertenciaDeSimulacion(revision),
+                    "Modo de prueba: los datos son inventados");
+        }
+        List<Movimiento> movimientos = aMovimientos(revision.getLectura());
+        if (yaCargado(idConciliacion, movimientos)) {
+            return rechazado(revision, "Este extracto ya está cargado en la conciliación. No se agregó nada");
+        }
+        if (revision.getEstadoCuadre() == EstadoCuadre.NO_VERIFICABLE) {
+            return porConfirmar(revision, "No se pudo verificar el cuadre de este extracto");
+        }
+        if (pareceDeOtroPeriodo(revision.getLectura(), periodo)) {
+            return porConfirmar(revision,
+                    "La mayoría de los movimientos no son del período " + periodo + ". Verifique el archivo");
+        }
+
+        String jobId = cargaCsvUseCase.confirmarExtractoLeido(idConciliacion, movimientos);
+        return ResultadoLectura.builder()
+                .estado(ResultadoLectura.Estado.CARGADO)
+                .mensaje("Se cargaron " + movimientos.size() + " movimientos y el extracto cuadra")
+                .revision(revision)
+                .jobId(jobId)
+                .build();
     }
 
     @Override
@@ -55,20 +98,90 @@ public class LecturaIaUseCaseImpl implements LecturaIaUseCase {
         if (!revision.getErrores().isEmpty()) {
             throw new CsvValidationException("No se puede aprobar: " + String.join("; ", revision.getErrores()));
         }
-        if (revision.getEstadoCuadre() == RevisionLectura.EstadoCuadre.NO_CUADRA) {
+        if (revision.getEstadoCuadre() == EstadoCuadre.NO_CUADRA) {
             throw new CsvValidationException("No se puede aprobar: el extracto no cuadra");
         }
-        if (revision.getEstadoCuadre() == RevisionLectura.EstadoCuadre.NO_VERIFICABLE && !aceptaSinCuadre) {
+        if (revision.getEstadoCuadre() == EstadoCuadre.NO_VERIFICABLE && !aceptaSinCuadre) {
             throw new CsvValidationException(
-                    "El cuadre no se puede verificar. Revise los movimientos y confirme que desea cargarlos");
+                    "El cuadre no se puede verificar. Confirme que desea cargar el extracto");
         }
 
+        List<Movimiento> movimientos = aMovimientos(lectura);
+        if (yaCargado(idConciliacion, movimientos)) {
+            throw new CsvValidationException("Este extracto ya está cargado en la conciliación");
+        }
+        return cargaCsvUseCase.confirmarExtractoLeido(idConciliacion, movimientos);
+    }
+
+    /** Errores o saldos que no coinciden pueden deberse a una mala lectura. */
+    private boolean convieneReintentar(RevisionLectura revision) {
+        return !revision.getErrores().isEmpty()
+                || revision.getEstadoCuadre() == EstadoCuadre.NO_CUADRA
+                || (revision.getEstadoCuadre() == EstadoCuadre.NO_VERIFICABLE
+                    && revision.getDiferencia() != null
+                    && revision.getDiferencia().compareTo(TOLERANCIA) > 0);
+    }
+
+    private RevisionLectura reintentar(byte[] pdf, String periodo, RevisionLectura primera) {
+        log.info("La primera lectura no superó la verificación; se reintenta con el modelo de respaldo");
+        try {
+            RevisionLectura segunda = revisor.revisar(lector.leerConRespaldo(pdf, periodo), periodo);
+            return calidad(segunda) >= calidad(primera) ? segunda : primera;
+        } catch (CsvValidationException e) {
+            log.warn("El reintento falló: {}", e.getMessage());
+            return primera;
+        }
+    }
+
+    private int calidad(RevisionLectura revision) {
+        if (!revision.getErrores().isEmpty()) return 0;
+        return switch (revision.getEstadoCuadre()) {
+            case CUADRA -> 3;
+            case NO_VERIFICABLE -> 2;
+            case NO_CUADRA -> 1;
+        };
+    }
+
+    /** En tarjetas es normal que el corte abarque dos meses. */
+    private boolean pareceDeOtroPeriodo(LecturaExtracto lectura, String periodo) {
+        if ("TARJETA_CREDITO".equals(lectura.getTipoProducto())) return false;
+        long fuera = lectura.getMovimientos().stream()
+                .filter(m -> !YearMonth.from(LocalDate.parse(m.getFecha())).toString().equals(periodo))
+                .count();
+        return fuera * 2 > lectura.getMovimientos().size();
+    }
+
+    /**
+     * Solo las tarjetas con auxiliar conjunto acumulan extractos (en las demás, el nuevo reemplaza
+     * al anterior). Se considera repetido si todos sus movimientos ya están guardados.
+     */
+    private boolean yaCargado(Long idConciliacion, List<Movimiento> nuevos) {
+        if (!conciliacionRepo.esAuxiliarConjunto(idConciliacion)) return false;
+        Map<String, Integer> existentes = new HashMap<>();
+        movimientoRepo.buscarTodosBancariosPorConciliacion(idConciliacion)
+                .forEach(m -> existentes.merge(huella(m), 1, Integer::sum));
+        for (Movimiento m : nuevos) {
+            String huella = huella(m);
+            int disponibles = existentes.getOrDefault(huella, 0);
+            if (disponibles == 0) return false;
+            existentes.put(huella, disponibles - 1);
+        }
+        return true;
+    }
+
+    /** Sin la descripción: la IA puede transcribirla distinto en dos lecturas. */
+    private String huella(Movimiento m) {
+        return m.getFecha() + "|" + m.getMonto().stripTrailingZeros().toPlainString()
+                + "|" + m.getTipo() + "|" + m.getUltimosDigitosTarjeta();
+    }
+
+    private List<Movimiento> aMovimientos(LecturaExtracto lectura) {
         String tarjeta = "TARJETA_CREDITO".equals(lectura.getTipoProducto())
                 && lectura.getUltimosDigitosTarjeta() != null
                 && lectura.getUltimosDigitosTarjeta().matches("\\d{4}")
                 ? lectura.getUltimosDigitosTarjeta() : null;
 
-        List<Movimiento> movimientos = lectura.getMovimientos().stream()
+        return lectura.getMovimientos().stream()
                 .map(m -> Movimiento.builder()
                         .fecha(LocalDate.parse(m.getFecha()))
                         .descripcion(m.getDescripcion().trim())
@@ -78,8 +191,33 @@ public class LecturaIaUseCaseImpl implements LecturaIaUseCase {
                         .ultimosDigitosTarjeta(tarjeta)
                         .build())
                 .toList();
+    }
 
-        return cargaCsvUseCase.confirmarExtractoLeido(idConciliacion, movimientos);
+    private String mensajeDescuadre(RevisionLectura revision) {
+        BigDecimal diferencia = revision.getDiferencia();
+        String detalle = diferencia != null && diferencia.compareTo(TOLERANCIA) > 0
+                ? " La diferencia es de " + diferencia.toPlainString() + "."
+                : "";
+        return "La lectura no coincide con los saldos o totales del extracto." + detalle + " No se cargó nada";
+    }
+
+    private RevisionLectura conAdvertenciaDeSimulacion(RevisionLectura revision) {
+        List<String> advertencias = new ArrayList<>();
+        advertencias.add("DATOS SIMULADOS: no corresponden al archivo subido. No los apruebe en una conciliación real");
+        advertencias.addAll(revision.getAdvertencias());
+        return revision.toBuilder().advertencias(advertencias).build();
+    }
+
+    private ResultadoLectura rechazado(RevisionLectura revision, String mensaje) {
+        return resultado(ResultadoLectura.Estado.RECHAZADO, revision, mensaje);
+    }
+
+    private ResultadoLectura porConfirmar(RevisionLectura revision, String mensaje) {
+        return resultado(ResultadoLectura.Estado.REQUIERE_CONFIRMACION, revision, mensaje);
+    }
+
+    private ResultadoLectura resultado(ResultadoLectura.Estado estado, RevisionLectura revision, String mensaje) {
+        return ResultadoLectura.builder().estado(estado).revision(revision).mensaje(mensaje).build();
     }
 
     private Conciliacion buscar(Long idConciliacion) {

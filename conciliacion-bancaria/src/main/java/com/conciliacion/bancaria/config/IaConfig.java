@@ -20,6 +20,7 @@ public class IaConfig {
             @Value("${app.ia.proveedor:simulado}") String proveedor,
             @Value("${app.ia.api-key:}") String apiKey,
             @Value("${app.ia.modelo:claude-haiku-5-5}") String modelo,
+            @Value("${app.ia.modelo-respaldo:claude-sonnet-5-5}") String modeloRespaldo,
             @Value("${app.ia.url:https://api.anthropic.com}") String url,
             ObjectMapper objectMapper) {
         return switch (proveedor) {
@@ -29,7 +30,7 @@ public class IaConfig {
                 fabrica.setConnectTimeout(Duration.ofSeconds(10));
                 fabrica.setReadTimeout(Duration.ofMinutes(5));
                 RestClient cliente = RestClient.builder().baseUrl(url).requestFactory(fabrica).build();
-                yield new ClaudeLectorExtractoAdapter(cliente, objectMapper, apiKey, modelo);
+                yield new ClaudeLectorExtractoAdapter(cliente, objectMapper, apiKey, modelo, modeloRespaldo);
             }
             default -> throw new IllegalStateException(
                     "app.ia.proveedor debe ser 'simulado' o 'claude', no '" + proveedor + "'");

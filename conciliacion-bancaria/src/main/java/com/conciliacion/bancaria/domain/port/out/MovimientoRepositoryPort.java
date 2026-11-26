@@ -13,6 +13,9 @@ public interface MovimientoRepositoryPort {
 
     List<Movimiento> buscarContablesPorConciliacion(Long idConciliacion);
 
+    /** Todos los bancarios en cualquier estado — usado para no cargar dos veces el mismo extracto. */
+    List<Movimiento> buscarTodosBancariosPorConciliacion(Long idConciliacion);
+
     Movimiento actualizar(Movimiento movimiento, Long idConciliacion, String tipo);
 
     void resetEstadosBancarios(Long idConciliacion);

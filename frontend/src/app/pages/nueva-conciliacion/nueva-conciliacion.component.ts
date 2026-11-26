@@ -16,6 +16,7 @@ import { ApiService } from '../../core/api.service';
 import { Banco, Cuenta, Conciliacion, ConfiguracionExtracto, ResumenCargaAuxiliar } from '../../core/models';
 import { interval, Subscription } from 'rxjs';
 import { switchMap, takeWhile } from 'rxjs/operators';
+import { LecturaIaComponent } from './lectura-ia.component';
 
 interface GrupoTarjetas {
   idRepresentante: number;
@@ -29,7 +30,7 @@ interface GrupoTarjetas {
     CommonModule, RouterModule, ReactiveFormsModule, MatCardModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatIconModule,
     MatProgressBarModule, MatProgressSpinnerModule, MatStepperModule,
-    MatDividerModule
+    MatDividerModule, LecturaIaComponent
   ],
   template: `
     <div class="page-container">
@@ -154,58 +155,78 @@ interface GrupoTarjetas {
                 {{ conciliacion?.auxiliarConjunto ? 'Agregar extractos bancarios' : 'Cargar extracto bancario' }}
               </mat-card-title>
               <mat-card-subtitle>
-                {{ configuracionExtracto
+                {{ modoExtracto === 'archivo' && configuracionExtracto
                     ? 'Configuración: ' + configuracionExtracto.nombre + ' — ' + configuracionExtracto.tipoArchivo
                     : 'Archivo con los movimientos del banco' }}
               </mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
-              <!-- Aviso tarjeta de crédito con auxiliar conjunto -->
-              <div class="csv-format-info" *ngIf="conciliacion?.auxiliarConjunto">
-                <mat-icon>credit_card</mat-icon>
-                <span>
-                  Esta cuenta tiene <strong>auxiliar conjunto</strong>. Puede subir múltiples extractos
-                  (uno por tarjeta). Cada extracto se agrega sin borrar los anteriores.
-                </span>
+              <div class="modo-extracto">
+                <button mat-stroked-button type="button" [class.activo]="modoExtracto === 'ia'"
+                        (click)="modoExtracto = 'ia'" [disabled]="motorOcupado || !conciliacion">
+                  <mat-icon>auto_awesome</mat-icon> Subir PDF (sin configurar)
+                </button>
+                <button mat-stroked-button type="button" [class.activo]="modoExtracto === 'archivo'"
+                        (click)="modoExtracto = 'archivo'" [disabled]="motorOcupado">
+                  <mat-icon>upload_file</mat-icon> Archivo con configuración
+                </button>
               </div>
 
-              <!-- Con configuración XLSX/XLS -->
-              <div class="csv-format-info" *ngIf="configuracionExtracto">
-                <mat-icon>check_circle</mat-icon>
-                <span>
-                  Se usará la configuración <strong>{{ configuracionExtracto.nombre }}</strong>
-                  para parsear el archivo <strong>{{ configuracionExtracto.tipoArchivo }}</strong>.
-                </span>
-              </div>
-              <!-- Sin configuración: formato CSV estándar -->
-              <div class="csv-format-info csv-format-warn" *ngIf="!configuracionExtracto && conciliacion">
-                <mat-icon>warning_amber</mat-icon>
-                <span>
-                  No se encontró configuración de extracto para este banco.
-                  Se esperará un CSV con columnas: <strong>fecha, descripcion, monto, tipo_movimiento</strong>.
-                </span>
-              </div>
-              <div class="csv-format-info" *ngIf="!conciliacion">
-                <mat-icon>info_outline</mat-icon>
-                <span>Columnas requeridas (CSV): <strong>fecha, descripcion, monto, tipo_movimiento</strong></span>
-              </div>
+              <app-lectura-ia *ngIf="modoExtracto === 'ia' && conciliacion"
+                  [idConciliacion]="conciliacion.id"
+                  [acumula]="!!conciliacion.auxiliarConjunto"
+                  [bloqueado]="motorOcupado || loadingExtracto || (extractoCargado && !conciliacion.auxiliarConjunto)"
+                  (aprobado)="onLecturaIaAprobada($event)">
+              </app-lectura-ia>
 
-              <div class="upload-area" (click)="extractoInput.click()"
-                   [class.has-file]="extractoFile || extractoFilesPendientes.length > 0">
-                <mat-icon>{{ (extractoFile || extractoFilesPendientes.length > 0) ? 'description' : 'upload_file' }}</mat-icon>
-                <span *ngIf="!extractoFile && extractoFilesPendientes.length === 0">
-                  Haga clic para seleccionar
-                  {{ configuracionExtracto ? 'el archivo ' + configuracionExtracto.tipoArchivo : 'el archivo CSV' }}
-                  <ng-container *ngIf="conciliacion?.auxiliarConjunto"> (puede seleccionar varios)</ng-container>
-                </span>
-                <span *ngIf="extractoFile && !conciliacion?.auxiliarConjunto">{{ extractoFile.name }}</span>
-                <span *ngIf="conciliacion?.auxiliarConjunto && extractoFilesPendientes.length > 0">
-                  {{ extractoFilesPendientes.length }} archivo(s) seleccionado(s)
-                </span>
-              </div>
-              <input #extractoInput type="file" [attr.accept]="acceptExtracto"
-                     [attr.multiple]="conciliacion?.auxiliarConjunto ? true : null"
-                     (change)="onExtractoSelected($event, extractoInput)" hidden>
+              <ng-container *ngIf="modoExtracto === 'archivo'">
+                <!-- Aviso tarjeta de crédito con auxiliar conjunto -->
+                <div class="csv-format-info" *ngIf="conciliacion?.auxiliarConjunto">
+                  <mat-icon>credit_card</mat-icon>
+                  <span>
+                    Esta cuenta tiene <strong>auxiliar conjunto</strong>. Puede subir múltiples extractos
+                    (uno por tarjeta). Cada extracto se agrega sin borrar los anteriores.
+                  </span>
+                </div>
+
+                <!-- Con configuración XLSX/XLS -->
+                <div class="csv-format-info" *ngIf="configuracionExtracto">
+                  <mat-icon>check_circle</mat-icon>
+                  <span>
+                    Se usará la configuración <strong>{{ configuracionExtracto.nombre }}</strong>
+                    para parsear el archivo <strong>{{ configuracionExtracto.tipoArchivo }}</strong>.
+                  </span>
+                </div>
+                <!-- Sin configuración: formato CSV estándar -->
+                <div class="csv-format-info csv-format-warn" *ngIf="!configuracionExtracto && conciliacion">
+                  <mat-icon>warning_amber</mat-icon>
+                  <span>
+                    No se encontró configuración de extracto para este banco.
+                    Se esperará un CSV con columnas: <strong>fecha, descripcion, monto, tipo_movimiento</strong>.
+                  </span>
+                </div>
+                <div class="csv-format-info" *ngIf="!conciliacion">
+                  <mat-icon>info_outline</mat-icon>
+                  <span>Columnas requeridas (CSV): <strong>fecha, descripcion, monto, tipo_movimiento</strong></span>
+                </div>
+
+                <div class="upload-area" (click)="extractoInput.click()"
+                     [class.has-file]="extractoFile || extractoFilesPendientes.length > 0">
+                  <mat-icon>{{ (extractoFile || extractoFilesPendientes.length > 0) ? 'description' : 'upload_file' }}</mat-icon>
+                  <span *ngIf="!extractoFile && extractoFilesPendientes.length === 0">
+                    Haga clic para seleccionar
+                    {{ configuracionExtracto ? 'el archivo ' + configuracionExtracto.tipoArchivo : 'el archivo CSV' }}
+                    <ng-container *ngIf="conciliacion?.auxiliarConjunto"> (puede seleccionar varios)</ng-container>
+                  </span>
+                  <span *ngIf="extractoFile && !conciliacion?.auxiliarConjunto">{{ extractoFile.name }}</span>
+                  <span *ngIf="conciliacion?.auxiliarConjunto && extractoFilesPendientes.length > 0">
+                    {{ extractoFilesPendientes.length }} archivo(s) seleccionado(s)
+                  </span>
+                </div>
+                <input #extractoInput type="file" [attr.accept]="acceptExtracto"
+                       [attr.multiple]="conciliacion?.auxiliarConjunto ? true : null"
+                       (change)="onExtractoSelected($event, extractoInput)" hidden>
+              </ng-container>
 
               <div class="job-progress" *ngIf="jobProgreso > 0 || jobEstado === 'IN_PROGRESS'">
                 <div class="job-header">
@@ -236,6 +257,7 @@ interface GrupoTarjetas {
 
               <div class="step-actions">
                 <button mat-flat-button class="primary-btn"
+                        *ngIf="modoExtracto === 'archivo'"
                         (click)="cargarExtracto()"
                         [disabled]="(conciliacion?.auxiliarConjunto ? extractoFilesPendientes.length === 0 : !extractoFile) || loadingExtracto || (extractoCargado && !conciliacion?.auxiliarConjunto)">
                   <mat-spinner diameter="18" *ngIf="loadingExtracto"></mat-spinner>
@@ -393,6 +415,9 @@ interface GrupoTarjetas {
     .csv-format-info mat-icon { font-size: 18px; color: #3d7ebf; }
     .csv-format-warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
     .csv-format-warn mat-icon { color: #d97706; }
+
+    .modo-extracto { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .modo-extracto .activo { background: #f0f7ff; border-color: #3d7ebf; color: #1e40af; }
 
     .tc-aviso {
       display: flex; align-items: flex-start; gap: 8px;
@@ -554,6 +579,8 @@ export class NuevaConciliacionComponent implements OnInit, OnDestroy {
   errorAuxiliar = '';
   jobProgreso = 0;
   jobEstado = '';
+  modoExtracto: 'archivo' | 'ia' = 'ia';
+  motorOcupado = false;
   private pollSub?: Subscription;
   auxiliarJobProgreso = 0;
   auxiliarJobEstado = '';
@@ -726,8 +753,18 @@ export class NuevaConciliacionComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** El usuario aprobó una lectura con IA: el backend ya la guardó y lanzó el motor. */
+  onLecturaIaAprobada(jobId: string): void {
+    this.errorExtracto = '';
+    this.extractoFilesPendientes = [];
+    this.jobProgreso = 0;
+    this.iniciarPolling(jobId);
+  }
+
   iniciarPolling(jobId: string): void {
     this.jobEstado = 'PENDING';
+    this.motorOcupado = true;
+    this.pollSub?.unsubscribe();
     this.pollSub = interval(2000).pipe(
       switchMap(() => this.api.jobStatus(jobId)),
       takeWhile(res => res.data.estado !== 'COMPLETED' && res.data.estado !== 'FAILED', true)
@@ -736,6 +773,7 @@ export class NuevaConciliacionComponent implements OnInit, OnDestroy {
         this.jobProgreso = res.data.progreso;
         this.jobEstado = res.data.estado;
         if (res.data.estado === 'COMPLETED') {
+          this.motorOcupado = false;
           this.extractoCargado = true;
           this.extractosAgregados++;
           this.pollSub?.unsubscribe();
@@ -751,9 +789,14 @@ export class NuevaConciliacionComponent implements OnInit, OnDestroy {
           }
         }
         if (res.data.estado === 'FAILED') {
+          this.motorOcupado = false;
           this.errorExtracto = res.data.mensajeError ?? 'Error en el motor de conciliación';
           this.pollSub?.unsubscribe();
         }
+      },
+      error: () => {
+        this.motorOcupado = false;
+        this.errorExtracto = 'No se pudo consultar el estado del motor';
       }
     });
   }

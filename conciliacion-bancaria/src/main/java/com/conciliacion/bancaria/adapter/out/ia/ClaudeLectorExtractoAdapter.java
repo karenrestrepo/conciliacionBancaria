@@ -17,6 +17,8 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * Envía el PDF (con texto o escaneado) a la API de Claude y pide la respuesta con un
@@ -26,6 +28,7 @@ import java.util.Map;
 public class ClaudeLectorExtractoAdapter implements LectorExtractoIaPort {
 
     private static final int MAX_TOKENS = 32000;
+    private static final int PAGINAS_POR_BLOQUE = 3;
 
     private static final String INSTRUCCIONES = """
             Eres un lector de extractos bancarios colombianos. Extrae los datos del documento adjunto.
@@ -37,7 +40,11 @@ public class ClaudeLectorExtractoAdapter implements LectorExtractoIaPort {
             - monto siempre positivo, con punto decimal y sin separadores de miles.
             - En cuentas: el dinero que entra es CREDITO y el que sale es DEBITO.
             - En tarjetas de crédito: compras, avances, intereses y comisiones son DEBITO; pagos y abonos son CREDITO.
+            - saldoAnterior y saldoFinal son los de todo el período. Los saldos de arrastre entre páginas
+              ("pasan", "vienen", subtotales por página) no cuentan.
             - Si un saldo o total no aparece en el documento, devuelve null. No lo calcules.
+            - Los valores pueden usar punto o coma como separador de miles o de decimales, y llevar
+              el signo antes o después. Deduce la convención a partir del propio documento.
             - ultimosDigitosTarjeta: solo los 4 últimos dígitos, y solo si es una tarjeta de crédito.
             """;
 
@@ -46,21 +53,45 @@ public class ClaudeLectorExtractoAdapter implements LectorExtractoIaPort {
     private final String apiKey;
     private final String modelo;
 
+    private final String modeloRespaldo;
+
     public ClaudeLectorExtractoAdapter(RestClient restClient, ObjectMapper objectMapper,
-                                       String apiKey, String modelo) {
+                                       String apiKey, String modelo, String modeloRespaldo) {
         this.restClient = restClient;
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.modelo = modelo;
+        this.modeloRespaldo = modeloRespaldo;
     }
 
     @Override
     public LecturaExtracto leer(byte[] pdf, String periodo) {
+        return leerPorBloques(pdf, periodo, modelo);
+    }
+
+    @Override
+    public boolean tieneRespaldo() {
+        return modeloRespaldo != null && !modeloRespaldo.isBlank() && !modeloRespaldo.equals(modelo);
+    }
+
+    @Override
+    public LecturaExtracto leerConRespaldo(byte[] pdf, String periodo) {
+        return leerPorBloques(pdf, periodo, tieneRespaldo() ? modeloRespaldo : modelo);
+    }
+
+    private LecturaExtracto leerPorBloques(byte[] pdf, String periodo, String modeloUsado) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new CsvValidationException(
                     "No está configurada la clave de la API (variable de entorno ANTHROPIC_API_KEY)");
         }
 
+        List<LecturaExtracto> partes = DivisorPdf.dividir(pdf, PAGINAS_POR_BLOQUE).stream()
+                .map(bloque -> leerBloque(bloque, periodo, modeloUsado))
+                .toList();
+        return unir(partes);
+    }
+
+    private LecturaExtracto leerBloque(DivisorPdf.Bloque bloque, String periodo, String modeloUsado) {
         JsonNode respuesta;
         try {
             respuesta = restClient.post()
@@ -68,7 +99,7 @@ public class ClaudeLectorExtractoAdapter implements LectorExtractoIaPort {
                     .header("x-api-key", apiKey)
                     .header("anthropic-version", "2023-06-01")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(solicitud(pdf, periodo))
+                    .body(solicitud(bloque, periodo, modeloUsado))
                     .retrieve()
                     .body(JsonNode.class);
         } catch (RestClientResponseException e) {
@@ -80,15 +111,42 @@ public class ClaudeLectorExtractoAdapter implements LectorExtractoIaPort {
                     "No se pudo comunicar con el servicio de IA. Intente de nuevo más tarde");
         }
 
-        return interpretar(respuesta);
+        return interpretar(respuesta, modeloUsado);
     }
 
-    private LecturaExtracto interpretar(JsonNode respuesta) {
+    /** Junta las lecturas parciales respetando el orden de las páginas. */
+    private LecturaExtracto unir(List<LecturaExtracto> partes) {
+        if (partes.size() == 1) {
+            return partes.get(0);
+        }
+        return LecturaExtracto.builder()
+                .tipoProducto(primero(partes, LecturaExtracto::getTipoProducto))
+                .ultimosDigitosTarjeta(primero(partes, LecturaExtracto::getUltimosDigitosTarjeta))
+                .saldoAnterior(primero(partes, LecturaExtracto::getSaldoAnterior))
+                .saldoFinal(ultimo(partes, LecturaExtracto::getSaldoFinal))
+                .totalCreditos(ultimo(partes, LecturaExtracto::getTotalCreditos))
+                .totalDebitos(ultimo(partes, LecturaExtracto::getTotalDebitos))
+                .movimientos(partes.stream()
+                        .filter(p -> p.getMovimientos() != null)
+                        .flatMap(p -> p.getMovimientos().stream())
+                        .toList())
+                .build();
+    }
+
+    private <T> T primero(List<LecturaExtracto> partes, Function<LecturaExtracto, T> campo) {
+        return partes.stream().map(campo).filter(Objects::nonNull).findFirst().orElse(null);
+    }
+
+    private <T> T ultimo(List<LecturaExtracto> partes, Function<LecturaExtracto, T> campo) {
+        return partes.stream().map(campo).filter(Objects::nonNull).reduce((a, b) -> b).orElse(null);
+    }
+
+    private LecturaExtracto interpretar(JsonNode respuesta, String modeloUsado) {
         if (respuesta == null) {
             throw new CsvValidationException("El servicio de IA no devolvió respuesta");
         }
         // Consumo de cada lectura, para controlar el gasto.
-        log.info("Lectura con IA modelo={} tokensEntrada={} tokensSalida={}", modelo,
+        log.info("Lectura con IA modelo={} tokensEntrada={} tokensSalida={}", modeloUsado,
                 respuesta.path("usage").path("input_tokens").asLong(),
                 respuesta.path("usage").path("output_tokens").asLong());
 
@@ -124,19 +182,28 @@ public class ClaudeLectorExtractoAdapter implements LectorExtractoIaPort {
         };
     }
 
-    private Map<String, Object> solicitud(byte[] pdf, String periodo) {
+    private Map<String, Object> solicitud(DivisorPdf.Bloque bloque, String periodo, String modeloUsado) {
         Map<String, Object> documento = Map.of(
                 "type", "document",
                 "source", Map.of(
                         "type", "base64",
                         "media_type", "application/pdf",
-                        "data", Base64.getEncoder().encodeToString(pdf)));
+                        "data", Base64.getEncoder().encodeToString(bloque.pdf())));
+        String indicacion = "Extrae este extracto. El período que se está conciliando es " + periodo + ".";
+        if (bloque.totalPaginas() > bloque.hasta() - bloque.desde() + 1) {
+            indicacion += " Es un fragmento: páginas " + bloque.desde() + " a " + bloque.hasta()
+                    + " de " + bloque.totalPaginas() + ".";
+        }
+        if (bloque.llevaPaginaDeReferencia()) {
+            indicacion += " La primera página del fragmento es la página 1 del extracto y se incluye solo"
+                    + " como referencia (encabezados, período y saldos): NO incluyas sus movimientos.";
+        }
         Map<String, Object> pregunta = Map.of(
                 "type", "text",
-                "text", "Extrae este extracto. El período que se está conciliando es " + periodo + ".");
+                "text", indicacion);
 
         return Map.of(
-                "model", modelo,
+                "model", modeloUsado,
                 "max_tokens", MAX_TOKENS,
                 "system", INSTRUCCIONES,
                 "messages", List.of(Map.of("role", "user", "content", List.of(documento, pregunta))),

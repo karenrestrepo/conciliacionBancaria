@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
-import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, ResumenCargaAuxiliar, MetricasResumen, ConfiguracionExtracto, ConfiguracionExtractoDetalle, PruebaConfiguracionResultado, GastoBancario, MovimientoAgrupado, UsuarioResponse, UsuarioCreateRequest, UsuarioUpdateRequest, Permiso, RolUsuario } from './models';
+import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, ResumenCargaAuxiliar, MetricasResumen, ConfiguracionExtracto, ConfiguracionExtractoDetalle, PruebaConfiguracionResultado, GastoBancario, MovimientoAgrupado, UsuarioResponse, UsuarioCreateRequest, UsuarioUpdateRequest, Permiso, RolUsuario, LecturaExtracto, ResultadoLectura } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -79,6 +79,21 @@ export class ApiService {
     form.append('archivo', archivo);
     return this.http.post<ApiResponse<string>>(
       `${this.API}/conciliaciones/${id}/extracto`, form, { headers: new HttpHeaders({ Authorization: `Bearer ${this.auth.getToken()}` }) });
+  }
+
+  /** La IA lee el PDF; si el backend puede verificarlo, lo guarda y lanza el motor. */
+  procesarExtractoIa(id: number, archivo: File): Observable<ApiResponse<ResultadoLectura>> {
+    const form = new FormData();
+    form.append('archivo', archivo);
+    return this.http.post<ApiResponse<ResultadoLectura>>(
+      `${this.API}/conciliaciones/${id}/extracto-ia/procesar`, form, { headers: this.headers() });
+  }
+
+  /** Guarda una lectura aprobada por el usuario y devuelve el id del job del motor. */
+  confirmarExtractoIa(id: number, lectura: LecturaExtracto, aceptaSinCuadre: boolean): Observable<ApiResponse<string>> {
+    return this.http.post<ApiResponse<string>>(
+      `${this.API}/conciliaciones/${id}/extracto-ia/confirmar?aceptaSinCuadre=${aceptaSinCuadre}`,
+      lectura, { headers: this.headers() });
   }
 
   cargarAuxiliar(id: number, archivo: File): Observable<ApiResponse<ResumenCargaAuxiliar>> {

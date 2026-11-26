@@ -334,3 +334,39 @@ export interface MetricasResumen {
   sugerenciasPendientes: number;
   diferenciaPromedio: number;
 }
+
+// Lectura de extractos PDF con IA
+export interface MovimientoLeido {
+  fecha: string;
+  descripcion: string;
+  monto: number;
+  tipo: string;
+}
+
+export interface LecturaExtracto {
+  tipoProducto: 'CUENTA' | 'TARJETA_CREDITO';
+  ultimosDigitosTarjeta: string | null;
+  saldoAnterior: number | null;
+  saldoFinal: number | null;
+  totalCreditos: number | null;
+  totalDebitos: number | null;
+  movimientos: MovimientoLeido[];
+}
+
+export interface RevisionLectura {
+  lectura: LecturaExtracto;
+  sumaCreditos: number | null;
+  sumaDebitos: number | null;
+  saldoCalculado: number | null;
+  diferencia: number | null;
+  estadoCuadre: 'CUADRA' | 'NO_CUADRA' | 'NO_VERIFICABLE';
+  errores: string[];
+  advertencias: string[];
+}
+
+export interface ResultadoLectura {
+  estado: 'CARGADO' | 'REQUIERE_CONFIRMACION' | 'RECHAZADO';
+  mensaje: string;
+  revision: RevisionLectura;
+  jobId: string | null;
+}

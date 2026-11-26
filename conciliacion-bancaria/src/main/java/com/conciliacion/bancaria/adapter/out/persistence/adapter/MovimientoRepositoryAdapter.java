@@ -48,6 +48,13 @@ public class MovimientoRepositoryAdapter implements MovimientoRepositoryPort {
     }
 
     @Override
+    public List<Movimiento> buscarTodosBancariosPorConciliacion(Long idConciliacion) {
+        return bancarioRepo.findByIdConciliacion(idConciliacion).stream()
+                .map(MovimientoMapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<Movimiento> buscarContablesPorConciliacion(Long idConciliacion) {
         return contableRepo.findByIdConciliacion(idConciliacion).stream()
                 .filter(e -> e.getEstadoConciliacion() != com.conciliacion.bancaria.shared.EstadoMovimiento.CONCILIADO)
