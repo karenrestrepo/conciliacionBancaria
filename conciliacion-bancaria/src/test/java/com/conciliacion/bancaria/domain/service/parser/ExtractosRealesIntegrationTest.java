@@ -124,8 +124,12 @@ class ExtractosRealesIntegrationTest {
         assertThat(movimientos).hasSize(16);
         assertThat(movimientos).allMatch(m -> !m.getDescripcion().isBlank());
         // Cargos ("+") deben quedar como DEBITO tras invertir; pagos ("-") como CREDITO.
-        assertThat(movimientos.stream().filter(m -> m.getDescripcion().contains("PAGO")))
+        // No se filtra por contains("PAGO"): hay compras que traen esa palabra (ej. "MERPAGO*...").
+        assertThat(movimientos.stream()
+                .filter(m -> m.getDescripcion().trim().equals("PAGO")
+                        || m.getDescripcion().trim().equals("PAGO DEBITO AUT")))
                 .as("los pagos deben quedar como CREDITO")
+                .hasSize(2)
                 .allMatch(m -> m.getTipo().equals("CREDITO"));
         assertThat(movimientos.stream().filter(m -> m.getDescripcion().contains("IMP 4XMIL")))
                 .as("los cargos (impuesto 4x1000) deben quedar como DEBITO")
