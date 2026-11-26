@@ -1,5 +1,6 @@
 package com.conciliacion.bancaria.adapter.out.ia;
 
+import com.conciliacion.bancaria.domain.model.ArchivoLeido;
 import com.conciliacion.bancaria.domain.model.LecturaExtracto;
 import com.conciliacion.bancaria.domain.port.out.LectorExtractoIaPort;
 
@@ -10,7 +11,7 @@ import java.util.List;
 public class LectorSimuladoAdapter implements LectorExtractoIaPort {
 
     @Override
-    public LecturaExtracto leer(byte[] pdf, String periodo) {
+    public LecturaExtracto leer(ArchivoLeido.Documento documento, String periodo) {
         return LecturaExtracto.builder()
                 .tipoProducto("CUENTA")
                 .saldoAnterior(new BigDecimal("1000000.00"))

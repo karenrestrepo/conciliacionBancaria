@@ -1,7 +1,7 @@
 package com.conciliacion.bancaria.adapter.out.ia;
 
-import com.conciliacion.bancaria.domain.model.ArchivoAuxiliar.Documento;
-import com.conciliacion.bancaria.domain.model.ArchivoAuxiliar.Tipo;
+import com.conciliacion.bancaria.domain.model.ArchivoLeido.Documento;
+import com.conciliacion.bancaria.domain.model.ArchivoLeido.Tipo;
 import com.conciliacion.bancaria.domain.model.AuxiliarLeido;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.hamcrest.Matchers;

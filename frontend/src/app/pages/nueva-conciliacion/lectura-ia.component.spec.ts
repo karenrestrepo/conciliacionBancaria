@@ -76,11 +76,18 @@ describe('LecturaIaComponent', () => {
     expect(api.confirmarExtractoIa).toHaveBeenCalledTimes(1);
   });
 
-  it('rechaza un archivo que no es PDF', () => {
-    component.seleccionar(new File(['a'], 'extracto.xlsx'));
+  it('acepta extractos en distintos formatos', () => {
+    for (const nombre of ['e.xlsx', 'e.XLS', 'e.csv', 'e.txt', 'foto.jpg']) {
+      component.seleccionar(new File(['a'], nombre));
+      expect(component.archivo?.name).toBe(nombre);
+    }
+  });
+
+  it('rechaza un tipo de archivo no admitido', () => {
+    component.seleccionar(new File(['a'], 'extracto.zip'));
 
     expect(component.archivo).toBeNull();
-    expect(component.error).toContain('PDF');
+    expect(component.error).toContain('Seleccione');
   });
 
   it('no muestra los movimientos hasta que el usuario los pide', () => {

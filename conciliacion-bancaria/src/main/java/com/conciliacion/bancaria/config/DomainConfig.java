@@ -8,6 +8,7 @@ import com.conciliacion.bancaria.domain.service.ClosureService;
 import com.conciliacion.bancaria.domain.service.ConciliationEngine;
 import com.conciliacion.bancaria.domain.service.CsvValidatorService;
 import com.conciliacion.bancaria.domain.service.InterpreteAuxiliar;
+import com.conciliacion.bancaria.domain.service.InterpreteExtracto;
 import com.conciliacion.bancaria.domain.service.MuestraTabla;
 import com.conciliacion.bancaria.domain.service.MovimientoReversionService;
 import com.conciliacion.bancaria.domain.service.RevisorLecturaExtracto;
@@ -117,6 +118,12 @@ public class DomainConfig {
     @Bean
     public InterpreteAuxiliar interpreteAuxiliar() {
         return new InterpreteAuxiliar();
+    }
+
+    @Bean
+    public InterpreteExtracto interpreteExtracto(InterpreteAuxiliar interpreteAuxiliar,
+                                                 RevisorLecturaExtracto revisorLecturaExtracto) {
+        return new InterpreteExtracto(interpreteAuxiliar, revisorLecturaExtracto);
     }
 
     @Bean

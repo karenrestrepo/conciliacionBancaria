@@ -8,9 +8,10 @@ import { ApiService } from '../../core/api.service';
 import { MovimientoLeido, ResultadoLectura } from '../../core/models';
 
 const TAMANO_MAXIMO = 10 * 1024 * 1024; // igual al límite de subida del backend
+const EXTENSIONES = ['.pdf', '.xlsx', '.xls', '.csv', '.txt', '.htm', '.html', '.xml', '.jpg', '.jpeg', '.png'];
 
 /**
- * Subida de un extracto PDF sin configuración. El backend lo carga solo cuando puede verificarlo;
+ * Subida de un extracto de cualquier banco y en cualquier formato, sin configuración. El backend lo carga solo cuando puede verificarlo;
  * el usuario únicamente interviene si el cuadre no se puede comprobar.
  */
 @Component({
@@ -21,22 +22,24 @@ const TAMANO_MAXIMO = 10 * 1024 * 1024; // igual al límite de subida del backen
     <div class="aviso">
       <mat-icon>privacy_tip</mat-icon>
       <span>
-        Suba el extracto en PDF, sin configurar nada. Si cuadra con sus saldos, se carga y se concilia solo.
-        Con la lectura con IA activa, el PDF se envía a un servicio externo y cada lectura tiene costo.
+        Suba el extracto de cualquier banco (PDF, Excel, CSV, texto o foto), sin configurar nada. Si cuadra
+        con sus saldos, se carga y se concilia solo. Con la lectura con IA activa, el archivo se envía a un
+        servicio externo: completo si es PDF, foto o reporte de texto; solo las primeras y últimas filas si
+        es Excel o CSV. Cada lectura tiene costo.
       </span>
     </div>
 
     <div class="aviso" *ngIf="bloqueado && !resultado">
       <mat-icon>info_outline</mat-icon>
-      <span>No se puede subir otro PDF en este momento: ya hay un extracto cargado o en proceso.</span>
+      <span>No se puede subir otro extracto en este momento: ya hay un extracto cargado o en proceso.</span>
     </div>
 
     <div class="selector">
       <button mat-stroked-button type="button" (click)="entrada.click()" [disabled]="leyendo || bloqueado">
-        <mat-icon>attach_file</mat-icon> Seleccionar PDF
+        <mat-icon>attach_file</mat-icon> Seleccionar archivo
       </button>
       <span class="nombre">{{ archivo ? archivo.name : 'Ningún archivo seleccionado' }}</span>
-      <input #entrada type="file" accept=".pdf,application/pdf" hidden
+      <input #entrada type="file" [accept]="aceptados" hidden
              (change)="onArchivo($event)">
       <button mat-flat-button class="leer" type="button" (click)="subir()"
               [disabled]="!archivo || leyendo || confirmando || bloqueado">
@@ -143,6 +146,7 @@ export class LecturaIaComponent implements OnDestroy {
   /** Emite el id del job del motor cuando el extracto quedó guardado. */
   @Output() aprobado = new EventEmitter<string>();
 
+  readonly aceptados = EXTENSIONES.join(',');
   archivo: File | null = null;
   resultado: ResultadoLectura | null = null;
   detalleAbierto = false;
@@ -164,10 +168,11 @@ export class LecturaIaComponent implements OnDestroy {
   seleccionar(archivo: File): void {
     this.descartar();
     this.archivo = null;
-    if (!archivo.name.toLowerCase().endsWith('.pdf')) {
-      this.error = 'Seleccione un archivo PDF';
+    const nombre = archivo.name.toLowerCase();
+    if (!EXTENSIONES.some(extension => nombre.endsWith(extension))) {
+      this.error = 'Seleccione un PDF, Excel, CSV, texto o foto del extracto';
     } else if (archivo.size > TAMANO_MAXIMO) {
-      this.error = 'El PDF supera el límite de 10 MB';
+      this.error = 'El archivo supera el límite de 10 MB';
     } else {
       this.archivo = archivo;
     }

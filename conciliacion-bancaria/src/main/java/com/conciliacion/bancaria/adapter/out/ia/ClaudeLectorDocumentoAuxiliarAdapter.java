@@ -1,16 +1,11 @@
 package com.conciliacion.bancaria.adapter.out.ia;
 
-import com.conciliacion.bancaria.domain.exception.CsvValidationException;
-import com.conciliacion.bancaria.domain.model.ArchivoAuxiliar.Documento;
-import com.conciliacion.bancaria.domain.model.ArchivoAuxiliar.Tipo;
+import com.conciliacion.bancaria.domain.model.ArchivoLeido.Documento;
 import com.conciliacion.bancaria.domain.model.AuxiliarLeido;
 import com.conciliacion.bancaria.domain.port.out.LectorDocumentoAuxiliarIaPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.client.RestClient;
 
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,12 +16,6 @@ import java.util.function.Function;
 public class ClaudeLectorDocumentoAuxiliarAdapter implements LectorDocumentoAuxiliarIaPort {
 
     private static final int MAX_TOKENS = 32000;
-    private static final int PAGINAS_POR_BLOQUE = 2;
-    private static final int LINEAS_POR_BLOQUE = 120;
-    /** Primeras líneas que se repiten en cada bloque de texto para que se entiendan las columnas. */
-    private static final int LINEAS_DE_REFERENCIA = 15;
-    /** Evita un gasto inesperado con un archivo equivocado. */
-    private static final int MAX_LINEAS = 12_000;
 
     private static final String INSTRUCCIONES = """
             Eres un lector de libros auxiliares contables de la cuenta de bancos, de cualquier software.
@@ -71,72 +60,13 @@ public class ClaudeLectorDocumentoAuxiliarAdapter implements LectorDocumentoAuxi
         return leerCon(documento, periodo, tieneRespaldo() ? modeloRespaldo : modelo);
     }
 
-    /** Un fragmento del documento listo para enviar. */
-    private record Parte(Map<String, Object> contenido, String nota) {}
-
     private AuxiliarLeido leerCon(Documento documento, String periodo, String modeloUsado) {
         cliente.exigirClave();
-        List<Parte> partes = switch (documento.tipo()) {
-            case PDF -> partesDePdf(documento.datos());
-            case TEXTO -> partesDeTexto(new String(documento.datos(), StandardCharsets.UTF_8));
-            case JPG, PNG -> List.of(parteDeImagen(documento));
-        };
-        return unir(EnParalelo.leer(partes, parte -> pedir(parte, periodo, modeloUsado)));
+        return unir(EnParalelo.leer(PartesDocumento.de(documento),
+                parte -> pedir(parte, periodo, modeloUsado)));
     }
 
-    private List<Parte> partesDePdf(byte[] pdf) {
-        return DivisorPdf.dividir(pdf, PAGINAS_POR_BLOQUE).stream()
-                .map(bloque -> {
-                    String nota = "";
-                    if (bloque.totalPaginas() > bloque.hasta() - bloque.desde() + 1) {
-                        nota = " Es un fragmento: páginas " + bloque.desde() + " a " + bloque.hasta()
-                                + " de " + bloque.totalPaginas() + ".";
-                    }
-                    if (bloque.llevaPaginaDeReferencia()) {
-                        nota += " La primera página del fragmento es la página 1 y se incluye solo como"
-                                + " referencia (encabezados y saldos): NO incluyas sus movimientos.";
-                    }
-                    return new Parte(archivo("document", "application/pdf", bloque.pdf()), nota);
-                })
-                .toList();
-    }
-
-    private Parte parteDeImagen(Documento documento) {
-        String mime = documento.tipo() == Tipo.PNG ? "image/png" : "image/jpeg";
-        return new Parte(archivo("image", mime, documento.datos()), "");
-    }
-
-    private List<Parte> partesDeTexto(String texto) {
-        List<String> lineas = texto.lines().filter(l -> !l.isBlank()).toList();
-        if (lineas.size() > MAX_LINEAS) {
-            throw new CsvValidationException("El archivo de texto es demasiado largo. Divídalo o expórtelo en Excel");
-        }
-        List<Parte> partes = new ArrayList<>();
-        for (int desde = 0; desde < lineas.size(); desde += LINEAS_POR_BLOQUE) {
-            int hasta = Math.min(desde + LINEAS_POR_BLOQUE, lineas.size());
-            String fragmento = String.join("\n", lineas.subList(desde, hasta));
-            if (desde > 0) {
-                fragmento = "--- REFERENCIA (no incluir sus movimientos) ---\n"
-                        + String.join("\n", lineas.subList(0, LINEAS_DE_REFERENCIA))
-                        + "\n--- FRAGMENTO A TRANSCRIBIR ---\n" + fragmento;
-            }
-            String nota = lineas.size() > LINEAS_POR_BLOQUE
-                    ? " Es un fragmento: líneas " + (desde + 1) + " a " + hasta + " de " + lineas.size() + "."
-                    : "";
-            partes.add(new Parte(Map.of("type", "text", "text", fragmento), nota));
-        }
-        if (partes.isEmpty()) {
-            throw new CsvValidationException("El archivo está vacío");
-        }
-        return partes;
-    }
-
-    private Map<String, Object> archivo(String tipo, String mime, byte[] datos) {
-        return Map.of("type", tipo, "source", Map.of(
-                "type", "base64", "media_type", mime, "data", Base64.getEncoder().encodeToString(datos)));
-    }
-
-    private AuxiliarLeido pedir(Parte parte, String periodo, String modeloUsado) {
+    private AuxiliarLeido pedir(PartesDocumento.Parte parte, String periodo, String modeloUsado) {
         Map<String, Object> pregunta = Map.of("type", "text", "text",
                 "Transcribe este auxiliar. El período que se está conciliando es " + periodo + "." + parte.nota());
         return cliente.pedir(modeloUsado, INSTRUCCIONES, List.of(parte.contenido(), pregunta), esquema(),

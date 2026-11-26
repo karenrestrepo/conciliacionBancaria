@@ -1,11 +1,11 @@
 package com.conciliacion.bancaria.adapter.out.ia;
 
+import com.conciliacion.bancaria.domain.model.ArchivoLeido.Documento;
 import com.conciliacion.bancaria.domain.model.LecturaExtracto;
 import com.conciliacion.bancaria.domain.port.out.LectorExtractoIaPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.client.RestClient;
 
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,14 +13,12 @@ import java.util.Objects;
 import java.util.function.Function;
 
 /**
- * Envía el PDF (con texto o escaneado) a la API de Claude y pide la respuesta con un
- * esquema JSON fijo. La IA solo interpreta; no ejecuta nada ni escribe en la base de datos.
+ * Envía un extracto en PDF (con texto o escaneado), foto o texto a la API de Claude y pide la
+ * respuesta con un esquema JSON fijo. La IA solo interpreta; no ejecuta nada ni escribe en la base de datos.
  */
 public class ClaudeLectorExtractoAdapter implements LectorExtractoIaPort {
 
     private static final int MAX_TOKENS = 32000;
-    /** Pocas páginas por bloque: la respuesta no se corta y la IA no se salta movimientos. */
-    private static final int PAGINAS_POR_BLOQUE = 2;
 
     private static final String INSTRUCCIONES = """
             Eres un lector de extractos bancarios colombianos. Extrae los datos del documento adjunto.
@@ -52,8 +50,8 @@ public class ClaudeLectorExtractoAdapter implements LectorExtractoIaPort {
     }
 
     @Override
-    public LecturaExtracto leer(byte[] pdf, String periodo) {
-        return leerPorBloques(pdf, periodo, modelo);
+    public LecturaExtracto leer(Documento documento, String periodo) {
+        return leerCon(documento, periodo, modelo);
     }
 
     @Override
@@ -62,36 +60,21 @@ public class ClaudeLectorExtractoAdapter implements LectorExtractoIaPort {
     }
 
     @Override
-    public LecturaExtracto leerConRespaldo(byte[] pdf, String periodo) {
-        return leerPorBloques(pdf, periodo, tieneRespaldo() ? modeloRespaldo : modelo);
+    public LecturaExtracto leerConRespaldo(Documento documento, String periodo) {
+        return leerCon(documento, periodo, tieneRespaldo() ? modeloRespaldo : modelo);
     }
 
-    private LecturaExtracto leerPorBloques(byte[] pdf, String periodo, String modeloUsado) {
+    private LecturaExtracto leerCon(Documento documento, String periodo, String modeloUsado) {
         cliente.exigirClave();
-        return unir(EnParalelo.leer(DivisorPdf.dividir(pdf, PAGINAS_POR_BLOQUE),
-                bloque -> leerBloque(bloque, periodo, modeloUsado)));
+        return unir(EnParalelo.leer(PartesDocumento.de(documento),
+                parte -> pedir(parte, periodo, modeloUsado)));
     }
 
-    private LecturaExtracto leerBloque(DivisorPdf.Bloque bloque, String periodo, String modeloUsado) {
-        Map<String, Object> documento = Map.of(
-                "type", "document",
-                "source", Map.of(
-                        "type", "base64",
-                        "media_type", "application/pdf",
-                        "data", Base64.getEncoder().encodeToString(bloque.pdf())));
-        String indicacion = "Extrae este extracto. El período que se está conciliando es " + periodo + ".";
-        if (bloque.totalPaginas() > bloque.hasta() - bloque.desde() + 1) {
-            indicacion += " Es un fragmento: páginas " + bloque.desde() + " a " + bloque.hasta()
-                    + " de " + bloque.totalPaginas() + ".";
-        }
-        if (bloque.llevaPaginaDeReferencia()) {
-            indicacion += " La primera página del fragmento es la página 1 del extracto y se incluye solo"
-                    + " como referencia (encabezados, período y saldos): NO incluyas sus movimientos.";
-        }
-        Map<String, Object> pregunta = Map.of("type", "text", "text", indicacion);
-
-        return cliente.pedir(modeloUsado, INSTRUCCIONES, List.of(documento, pregunta), esquema(), MAX_TOKENS,
-                LecturaExtracto.class,
+    private LecturaExtracto pedir(PartesDocumento.Parte parte, String periodo, String modeloUsado) {
+        Map<String, Object> pregunta = Map.of("type", "text", "text",
+                "Extrae este extracto. El período que se está conciliando es " + periodo + "." + parte.nota());
+        return cliente.pedir(modeloUsado, INSTRUCCIONES, List.of(parte.contenido(), pregunta), esquema(),
+                MAX_TOKENS, LecturaExtracto.class,
                 "El extracto es demasiado largo para leerlo de una vez. Divídalo en partes más pequeñas");
     }
 

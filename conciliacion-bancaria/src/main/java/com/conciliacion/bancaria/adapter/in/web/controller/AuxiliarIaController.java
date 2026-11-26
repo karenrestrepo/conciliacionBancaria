@@ -3,7 +3,7 @@ package com.conciliacion.bancaria.adapter.in.web.controller;
 import com.conciliacion.bancaria.adapter.in.web.dto.ApiResponse;
 import com.conciliacion.bancaria.domain.exception.CsvValidationException;
 import com.conciliacion.bancaria.domain.model.AuxiliarLeido;
-import com.conciliacion.bancaria.domain.model.MapeoAuxiliar;
+import com.conciliacion.bancaria.domain.model.MapeoColumnas;
 import com.conciliacion.bancaria.domain.model.ResultadoAuxiliar;
 import com.conciliacion.bancaria.domain.model.ResumenCargaAuxiliar;
 import com.conciliacion.bancaria.domain.port.in.LecturaAuxiliarIaUseCase;
@@ -44,7 +44,7 @@ public class AuxiliarIaController {
             @RequestParam(value = "lectura", required = false) String lectura) {
         return ResponseEntity.ok(ApiResponse.ok("Libro auxiliar cargado",
                 lecturaAuxiliarIaUseCase.confirmar(id, contenido(archivo),
-                        convertir(mapeo, MapeoAuxiliar.class), convertir(lectura, AuxiliarLeido.class))));
+                        convertir(mapeo, MapeoColumnas.class), convertir(lectura, AuxiliarLeido.class))));
     }
 
     private <T> T convertir(String json, Class<T> tipo) {

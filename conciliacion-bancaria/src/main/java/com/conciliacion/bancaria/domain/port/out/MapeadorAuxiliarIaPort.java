@@ -1,17 +1,17 @@
 package com.conciliacion.bancaria.domain.port.out;
 
-import com.conciliacion.bancaria.domain.model.MapeoAuxiliar;
+import com.conciliacion.bancaria.domain.model.MapeoColumnas;
 
 /** La IA recibe una muestra del archivo y dice dónde está cada dato. */
 public interface MapeadorAuxiliarIaPort {
 
-    MapeoAuxiliar mapear(String muestra);
+    MapeoColumnas mapear(String muestra);
 
     default boolean tieneRespaldo() {
         return false;
     }
 
-    default MapeoAuxiliar mapearConRespaldo(String muestra) {
+    default MapeoColumnas mapearConRespaldo(String muestra) {
         return mapear(muestra);
     }
 

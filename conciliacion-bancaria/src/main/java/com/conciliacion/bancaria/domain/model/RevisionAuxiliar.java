@@ -12,7 +12,7 @@ import java.util.List;
 @Builder(toBuilder = true)
 public class RevisionAuxiliar {
 
-    private final MapeoAuxiliar mapeo;
+    private final MapeoColumnas mapeo;
     /** Tal como se guardarían: el débito contable entra al banco (CREDITO). */
     private final List<LecturaExtracto.MovimientoLeido> movimientos;
     private final BigDecimal sumaDebitos;

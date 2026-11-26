@@ -1,6 +1,6 @@
 package com.conciliacion.bancaria.adapter.out.ia;
 
-import com.conciliacion.bancaria.domain.model.MapeoAuxiliar;
+import com.conciliacion.bancaria.domain.model.MapeoColumnas;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,7 +48,7 @@ class ClaudeMapeadorAuxiliarAdapterTest {
                 .andExpect(jsonPath("$.messages[0].content[0].text").value("Muestra del archivo:\nF0 | c0=1"))
                 .andRespond(withSuccess(respuesta(), MediaType.APPLICATION_JSON));
 
-        MapeoAuxiliar mapeo = adapter.mapear("F0 | c0=1");
+        MapeoColumnas mapeo = adapter.mapear("F0 | c0=1");
 
         assertThat(mapeo.getColumnaDebito()).isEqualTo(9);
         assertThat(mapeo.getTotalDebitos().getFila()).isEqualTo(30);

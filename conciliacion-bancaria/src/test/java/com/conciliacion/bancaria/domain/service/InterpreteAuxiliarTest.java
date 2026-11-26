@@ -1,6 +1,6 @@
 package com.conciliacion.bancaria.domain.service;
 
-import com.conciliacion.bancaria.domain.model.MapeoAuxiliar;
+import com.conciliacion.bancaria.domain.model.MapeoColumnas;
 import com.conciliacion.bancaria.domain.model.Movimiento;
 import com.conciliacion.bancaria.domain.model.RevisionLectura.EstadoCuadre;
 import com.conciliacion.bancaria.domain.model.TablaArchivo;
@@ -28,16 +28,16 @@ class InterpreteAuxiliarTest {
         return new TablaArchivo(List.of(new TablaArchivo.Hoja("auxiliar", celdas)));
     }
 
-    private static MapeoAuxiliar.MapeoAuxiliarBuilder dosColumnas() {
-        return MapeoAuxiliar.builder()
+    private static MapeoColumnas.MapeoColumnasBuilder dosColumnas() {
+        return MapeoColumnas.builder()
                 .hoja(0).primeraFilaDatos(1)
                 .columnaFecha(0).columnaComprobante(1).columnasDescripcion(List.of(2))
                 .esquemaMonto("DEBITO_CREDITO").columnaDebito(3).columnaCredito(4)
                 .separadorDecimal(",").ordenFecha("DMA");
     }
 
-    private static MapeoAuxiliar.Posicion en(int fila, int columna) {
-        return new MapeoAuxiliar.Posicion(fila, columna);
+    private static MapeoColumnas.Posicion en(int fila, int columna) {
+        return new MapeoColumnas.Posicion(fila, columna);
     }
 
     private static final String[] EJEMPLO = {
@@ -101,7 +101,7 @@ class InterpreteAuxiliarTest {
                 "Consignación|2,000.00+|1-dic-2026",
                 "Cheque|500.00-|Dec 3, 2026",
                 "Saldo final|2,500.00");
-        MapeoAuxiliar mapeo = MapeoAuxiliar.builder()
+        MapeoColumnas mapeo = MapeoColumnas.builder()
                 .hoja(0).primeraFilaDatos(2)
                 .columnaFecha(2).columnaComprobante(-1).columnasDescripcion(List.of(0))
                 .esquemaMonto("MONTO_CON_SIGNO").columnaMonto(1).positivoEsDebito(true)
@@ -126,7 +126,7 @@ class InterpreteAuxiliarTest {
                 "Fecha|Nat|Valor|Glosa",
                 "2026/12/05|D|100|Ingreso",
                 "20261206|C|40|Egreso");
-        MapeoAuxiliar mapeo = MapeoAuxiliar.builder()
+        MapeoColumnas mapeo = MapeoColumnas.builder()
                 .hoja(0).primeraFilaDatos(1)
                 .columnaFecha(0).columnasDescripcion(List.of(3))
                 .esquemaMonto("MONTO_Y_NATURALEZA").columnaMonto(2).columnaNaturaleza(1)

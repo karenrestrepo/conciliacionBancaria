@@ -1,6 +1,6 @@
 package com.conciliacion.bancaria.adapter.out.ia;
 
-import com.conciliacion.bancaria.domain.model.MapeoAuxiliar;
+import com.conciliacion.bancaria.domain.model.MapeoColumnas;
 import com.conciliacion.bancaria.domain.port.out.MapeadorAuxiliarIaPort;
 
 import java.util.List;
@@ -12,8 +12,8 @@ import java.util.List;
 public class MapeadorSimuladoAdapter implements MapeadorAuxiliarIaPort {
 
     @Override
-    public MapeoAuxiliar mapear(String muestra) {
-        return MapeoAuxiliar.builder()
+    public MapeoColumnas mapear(String muestra) {
+        return MapeoColumnas.builder()
                 .hoja(0).primeraFilaDatos(1)
                 .columnaFecha(0).columnaComprobante(1).columnasDescripcion(List.of(2))
                 .esquemaMonto("DEBITO_CREDITO").columnaDebito(3).columnaCredito(4)

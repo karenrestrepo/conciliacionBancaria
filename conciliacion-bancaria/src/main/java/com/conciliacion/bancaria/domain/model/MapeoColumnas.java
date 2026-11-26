@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * Cómo está organizado un auxiliar contable, según la IA. No contiene movimientos:
+ * Cómo está organizada una tabla de movimientos, según la IA (en términos contables del auxiliar). No contiene movimientos:
  * el código lee las filas con estas indicaciones y verifica el resultado.
  * Filas y columnas empiezan en 0; una columna ausente es -1 o nulo.
  */
@@ -16,7 +16,7 @@ import java.util.List;
 @Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
-public class MapeoAuxiliar {
+public class MapeoColumnas {
 
     private int hoja;
     private int primeraFilaDatos;

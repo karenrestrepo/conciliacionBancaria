@@ -165,7 +165,7 @@ interface GrupoTarjetas {
               <div class="modo-extracto">
                 <button mat-stroked-button type="button" [class.activo]="modoExtracto === 'ia'"
                         (click)="modoExtracto = 'ia'" [disabled]="motorOcupado || !conciliacion">
-                  <mat-icon>auto_awesome</mat-icon> Subir PDF (sin configurar)
+                  <mat-icon>auto_awesome</mat-icon> Subir archivo (sin configurar)
                 </button>
                 <button mat-stroked-button type="button" [class.activo]="modoExtracto === 'archivo'"
                         (click)="modoExtracto = 'archivo'" [disabled]="motorOcupado">

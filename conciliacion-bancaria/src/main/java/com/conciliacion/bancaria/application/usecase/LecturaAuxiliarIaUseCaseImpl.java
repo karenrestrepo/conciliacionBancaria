@@ -2,10 +2,10 @@ package com.conciliacion.bancaria.application.usecase;
 
 import com.conciliacion.bancaria.domain.exception.CsvValidationException;
 import com.conciliacion.bancaria.domain.exception.RecursoNoEncontradoException;
-import com.conciliacion.bancaria.domain.model.ArchivoAuxiliar;
+import com.conciliacion.bancaria.domain.model.ArchivoLeido;
 import com.conciliacion.bancaria.domain.model.AuxiliarLeido;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
-import com.conciliacion.bancaria.domain.model.MapeoAuxiliar;
+import com.conciliacion.bancaria.domain.model.MapeoColumnas;
 import com.conciliacion.bancaria.domain.model.Movimiento;
 import com.conciliacion.bancaria.domain.model.ResultadoAuxiliar;
 import com.conciliacion.bancaria.domain.model.ResultadoLectura.Estado;
@@ -58,7 +58,7 @@ public class LecturaAuxiliarIaUseCaseImpl implements LecturaAuxiliarIaUseCase {
     @Override
     public ResultadoAuxiliar procesar(Long idConciliacion, byte[] contenido) {
         Conciliacion conciliacion = buscar(idConciliacion);
-        ArchivoAuxiliar archivo = lectorArchivo.leer(contenido);
+        ArchivoLeido archivo = lectorArchivo.leer(contenido);
 
         Intento intento;
         boolean simulado;
@@ -71,7 +71,7 @@ public class LecturaAuxiliarIaUseCaseImpl implements LecturaAuxiliarIaUseCase {
                     () -> new Intento(interprete.interpretar(tabla, mapeador.mapearConRespaldo(muestra)), null));
             simulado = mapeador.esSimulado();
         } else {
-            ArchivoAuxiliar.Documento documento = archivo.documento();
+            ArchivoLeido.Documento documento = archivo.documento();
             String periodo = conciliacion.getPeriodo();
             intento = conRespaldo(
                     () -> transcrito(lectorDocumento.leer(documento, periodo)),
@@ -114,14 +114,14 @@ public class LecturaAuxiliarIaUseCaseImpl implements LecturaAuxiliarIaUseCase {
     }
 
     @Override
-    public ResumenCargaAuxiliar confirmar(Long idConciliacion, byte[] contenido, MapeoAuxiliar mapeo,
+    public ResumenCargaAuxiliar confirmar(Long idConciliacion, byte[] contenido, MapeoColumnas mapeo,
                                           AuxiliarLeido transcripcion) {
         buscar(idConciliacion);
         Interpretacion lectura;
         if (transcripcion != null) {
             lectura = interprete.interpretar(transcripcion);
         } else {
-            ArchivoAuxiliar archivo = lectorArchivo.leer(contenido);
+            ArchivoLeido archivo = lectorArchivo.leer(contenido);
             if (!archivo.esTabla()) {
                 throw new CsvValidationException("Faltan los datos de la lectura. Suba el archivo de nuevo");
             }

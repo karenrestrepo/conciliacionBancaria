@@ -1,6 +1,6 @@
 package com.conciliacion.bancaria.adapter.out.ia;
 
-import com.conciliacion.bancaria.domain.model.ArchivoAuxiliar;
+import com.conciliacion.bancaria.domain.model.ArchivoLeido;
 import com.conciliacion.bancaria.domain.model.AuxiliarLeido;
 import com.conciliacion.bancaria.domain.port.out.LectorDocumentoAuxiliarIaPort;
 
@@ -11,7 +11,7 @@ import java.util.List;
 public class LectorDocumentoSimuladoAdapter implements LectorDocumentoAuxiliarIaPort {
 
     @Override
-    public AuxiliarLeido leer(ArchivoAuxiliar.Documento documento, String periodo) {
+    public AuxiliarLeido leer(ArchivoLeido.Documento documento, String periodo) {
         return AuxiliarLeido.builder()
                 .totalDebitos(new BigDecimal("500000"))
                 .totalCreditos(new BigDecimal("200000"))

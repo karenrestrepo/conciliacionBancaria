@@ -1,10 +1,10 @@
 package com.conciliacion.bancaria.application.usecase;
 
 import com.conciliacion.bancaria.domain.exception.CsvValidationException;
-import com.conciliacion.bancaria.domain.model.ArchivoAuxiliar;
+import com.conciliacion.bancaria.domain.model.ArchivoLeido;
 import com.conciliacion.bancaria.domain.model.AuxiliarLeido;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
-import com.conciliacion.bancaria.domain.model.MapeoAuxiliar;
+import com.conciliacion.bancaria.domain.model.MapeoColumnas;
 import com.conciliacion.bancaria.domain.model.Movimiento;
 import com.conciliacion.bancaria.domain.model.ResultadoAuxiliar;
 import com.conciliacion.bancaria.domain.model.ResultadoLectura.Estado;
@@ -55,7 +55,7 @@ class LecturaAuxiliarIaUseCaseImplTest {
     void preparar() {
         when(conciliacionRepo.buscarPorId(1L))
                 .thenReturn(Optional.of(Conciliacion.builder().id(1L).periodo("2026-12").build()));
-        when(lectorArchivo.leer(ARCHIVO)).thenReturn(ArchivoAuxiliar.deTabla(tabla(
+        when(lectorArchivo.leer(ARCHIVO)).thenReturn(ArchivoLeido.deTabla(tabla(
                 "Fecha|Documento|Detalle|Débito|Crédito",
                 "01/12/2026|RC-1|Abono cliente|100.00|",
                 "02/12/2026|CE-7|Pago proveedor||40.00",
@@ -71,18 +71,18 @@ class LecturaAuxiliarIaUseCaseImplTest {
                 .toList())));
     }
 
-    private static MapeoAuxiliar.MapeoAuxiliarBuilder mapeo() {
-        return MapeoAuxiliar.builder()
+    private static MapeoColumnas.MapeoColumnasBuilder mapeo() {
+        return MapeoColumnas.builder()
                 .hoja(0).primeraFilaDatos(1)
                 .columnaFecha(0).columnaComprobante(1).columnasDescripcion(List.of(2))
                 .esquemaMonto("DEBITO_CREDITO").columnaDebito(3).columnaCredito(4)
                 .separadorDecimal(".").ordenFecha("DMA");
     }
 
-    private static MapeoAuxiliar conTotales() {
+    private static MapeoColumnas conTotales() {
         return mapeo()
-                .totalDebitos(new MapeoAuxiliar.Posicion(3, 3))
-                .totalCreditos(new MapeoAuxiliar.Posicion(3, 4))
+                .totalDebitos(new MapeoColumnas.Posicion(3, 3))
+                .totalCreditos(new MapeoColumnas.Posicion(3, 4))
                 .build();
     }
 
@@ -192,7 +192,7 @@ class LecturaAuxiliarIaUseCaseImplTest {
 
     private void esUnPdf() {
         when(lectorArchivo.leer(ARCHIVO))
-                .thenReturn(ArchivoAuxiliar.deDocumento(ArchivoAuxiliar.Tipo.PDF, ARCHIVO));
+                .thenReturn(ArchivoLeido.deDocumento(ArchivoLeido.Tipo.PDF, ARCHIVO));
     }
 
     @Test

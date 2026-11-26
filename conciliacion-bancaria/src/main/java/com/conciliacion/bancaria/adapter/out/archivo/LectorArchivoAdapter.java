@@ -1,8 +1,8 @@
 package com.conciliacion.bancaria.adapter.out.archivo;
 
 import com.conciliacion.bancaria.domain.exception.CsvValidationException;
-import com.conciliacion.bancaria.domain.model.ArchivoAuxiliar;
-import com.conciliacion.bancaria.domain.model.ArchivoAuxiliar.Tipo;
+import com.conciliacion.bancaria.domain.model.ArchivoLeido;
+import com.conciliacion.bancaria.domain.model.ArchivoLeido.Tipo;
 import com.conciliacion.bancaria.domain.model.TablaArchivo;
 import com.conciliacion.bancaria.domain.model.TablaArchivo.Celda;
 import com.conciliacion.bancaria.domain.port.out.LectorArchivoPort;
@@ -49,15 +49,15 @@ public class LectorArchivoAdapter implements LectorArchivoPort {
     private static final Pattern ENTIDAD_NUMERICA = Pattern.compile("&#(x?)([0-9a-fA-F]{1,6});");
 
     @Override
-    public ArchivoAuxiliar leer(byte[] contenido) {
+    public ArchivoLeido leer(byte[] contenido) {
         if (contenido == null || contenido.length == 0) {
             throw new CsvValidationException("El archivo está vacío");
         }
         if (empiezaCon(contenido, 0xD0, 0xCF, 0x11, 0xE0) || empiezaCon(contenido, 'P', 'K')) {
-            return ArchivoAuxiliar.deTabla(leerExcel(contenido));
+            return ArchivoLeido.deTabla(leerExcel(contenido));
         }
         if (empiezaCon(contenido, '%', 'P', 'D', 'F')) {
-            return ArchivoAuxiliar.deDocumento(Tipo.PDF, contenido);
+            return ArchivoLeido.deDocumento(Tipo.PDF, contenido);
         }
         if (empiezaCon(contenido, 0xFF, 0xD8, 0xFF)) {
             return imagen(Tipo.JPG, contenido);
@@ -68,11 +68,11 @@ public class LectorArchivoAdapter implements LectorArchivoPort {
         return leerTexto(contenido);
     }
 
-    private ArchivoAuxiliar imagen(Tipo tipo, byte[] contenido) {
+    private ArchivoLeido imagen(Tipo tipo, byte[] contenido) {
         if (contenido.length > MAX_BYTES_IMAGEN) {
             throw new CsvValidationException("La imagen supera 5 MB. Reduzca su tamaño o súbala como PDF");
         }
-        return ArchivoAuxiliar.deDocumento(tipo, contenido);
+        return ArchivoLeido.deDocumento(tipo, contenido);
     }
 
     private boolean empiezaCon(byte[] contenido, int... firma) {
@@ -130,7 +130,7 @@ public class LectorArchivoAdapter implements LectorArchivoPort {
         return new Celda(numero.toPlainString(), numero, null);
     }
 
-    private ArchivoAuxiliar leerTexto(byte[] contenido) {
+    private ArchivoLeido leerTexto(byte[] contenido) {
         String texto = decodificar(contenido);
         if (texto.indexOf('\0') >= 0) {
             throw new CsvValidationException(
@@ -162,12 +162,12 @@ public class LectorArchivoAdapter implements LectorArchivoPort {
         }
     }
 
-    private ArchivoAuxiliar tablaDeTexto(String nombre, List<List<Celda>> filas) {
-        return ArchivoAuxiliar.deTabla(new TablaArchivo(List.of(new TablaArchivo.Hoja(nombre, filas))));
+    private ArchivoLeido tablaDeTexto(String nombre, List<List<Celda>> filas) {
+        return ArchivoLeido.deTabla(new TablaArchivo(List.of(new TablaArchivo.Hoja(nombre, filas))));
     }
 
-    private ArchivoAuxiliar documentoDeTexto(String texto) {
-        return ArchivoAuxiliar.deDocumento(Tipo.TEXTO, texto.getBytes(StandardCharsets.UTF_8));
+    private ArchivoLeido documentoDeTexto(String texto) {
+        return ArchivoLeido.deDocumento(Tipo.TEXTO, texto.getBytes(StandardCharsets.UTF_8));
     }
 
     private List<List<Celda>> filasHtml(String html) {

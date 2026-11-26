@@ -1,19 +1,28 @@
 package com.conciliacion.bancaria.application.usecase;
 
+import com.conciliacion.bancaria.adapter.out.archivo.LectorArchivoAdapter;
 import com.conciliacion.bancaria.adapter.out.ia.LectorSimuladoAdapter;
 import com.conciliacion.bancaria.domain.exception.CsvValidationException;
 import com.conciliacion.bancaria.domain.model.Conciliacion;
 import com.conciliacion.bancaria.domain.model.LecturaExtracto;
+import com.conciliacion.bancaria.domain.model.MapeoColumnas;
+import com.conciliacion.bancaria.domain.model.MapeoExtracto;
 import com.conciliacion.bancaria.domain.model.Movimiento;
+import com.conciliacion.bancaria.domain.model.ResultadoLectura;
 import com.conciliacion.bancaria.domain.model.ResultadoLectura.Estado;
 import com.conciliacion.bancaria.domain.port.in.CargaCsvUseCase;
 import com.conciliacion.bancaria.domain.port.out.ConciliacionRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.LectorExtractoIaPort;
+import com.conciliacion.bancaria.domain.port.out.MapeadorExtractoIaPort;
 import com.conciliacion.bancaria.domain.port.out.MovimientoRepositoryPort;
+import com.conciliacion.bancaria.domain.service.InterpreteAuxiliar;
+import com.conciliacion.bancaria.domain.service.InterpreteExtracto;
+import com.conciliacion.bancaria.domain.service.MuestraTabla;
 import com.conciliacion.bancaria.domain.service.RevisorLecturaExtracto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -32,19 +41,22 @@ class LecturaIaUseCaseImplTest {
 
     private final LectorSimuladoAdapter simulado = new LectorSimuladoAdapter();
     private final LectorExtractoIaPort lector = mock(LectorExtractoIaPort.class);
+    private final MapeadorExtractoIaPort mapeador = mock(MapeadorExtractoIaPort.class);
     private final ConciliacionRepositoryPort conciliacionRepo = mock(ConciliacionRepositoryPort.class);
     private final MovimientoRepositoryPort movimientoRepo = mock(MovimientoRepositoryPort.class);
     private final CargaCsvUseCase carga = mock(CargaCsvUseCase.class);
     private final LecturaIaUseCaseImpl useCase = useCaseCon(lector);
 
     private LecturaIaUseCaseImpl useCaseCon(LectorExtractoIaPort lectorUsado) {
-        return new LecturaIaUseCaseImpl(lectorUsado, new RevisorLecturaExtracto(),
+        RevisorLecturaExtracto revisor = new RevisorLecturaExtracto();
+        return new LecturaIaUseCaseImpl(new LectorArchivoAdapter(), lectorUsado, mapeador, new MuestraTabla(),
+                new InterpreteExtracto(new InterpreteAuxiliar(), revisor), revisor,
                 conciliacionRepo, movimientoRepo, carga);
     }
 
     /** Datos ficticios que cuadran. */
     private LecturaExtracto correcta() {
-        return simulado.leer(new byte[0], "2026-12");
+        return simulado.leer(null, "2026-12");
     }
 
     private LecturaExtracto descuadrada() {
@@ -118,7 +130,7 @@ class LecturaIaUseCaseImplTest {
     @Test
     @DisplayName("un extracto de otro mes no se carga solo")
     void otroPeriodo() {
-        when(lector.leer(any(), any())).thenReturn(simulado.leer(new byte[0], "2026-11"));
+        when(lector.leer(any(), any())).thenReturn(simulado.leer(null, "2026-11"));
 
         assertThat(useCase.procesar(1L, PDF).getEstado()).isEqualTo(Estado.REQUIERE_CONFIRMACION);
         verifyNoInteractions(carga);
@@ -157,10 +169,108 @@ class LecturaIaUseCaseImplTest {
     }
 
     @Test
-    @DisplayName("un archivo que no es PDF se rechaza")
-    void noEsPdf() {
-        assertThatThrownBy(() -> useCase.procesar(1L, "hola mundo".getBytes()))
+    @DisplayName("un archivo de un tipo desconocido se rechaza sin usar la IA")
+    void tipoDesconocido() {
+        assertThatThrownBy(() -> useCase.procesar(1L, new byte[]{1, 0, 2, 0}))
                 .isInstanceOf(CsvValidationException.class);
+        verifyNoInteractions(lector, mapeador, carga);
+    }
+
+    private static final byte[] CSV = """
+            ;;SALDO ANTERIOR;1.000,00
+            FECHA;REFERENCIA;DETALLE;VALOR
+            05/12;A1;ABONO EJEMPLO;500,00
+            10/12;B2;PAGO EJEMPLO;200,00-
+            ;;SALDO FINAL;1.300,00
+            """.getBytes();
+
+    private static MapeoExtracto.MapeoExtractoBuilder mapeo() {
+        return MapeoExtracto.builder()
+                .tipoProducto("CUENTA").hoja(0).primeraFilaDatos(2)
+                .columnaFecha(0).columnasDescripcion(List.of(2, 1))
+                .esquemaMonto("MONTO_CON_SIGNO").columnaMonto(3).positivoEsAbono(true)
+                .separadorDecimal(",").ordenFecha("DMA")
+                .saldoAnterior(new MapeoColumnas.Posicion(0, 3))
+                .saldoFinal(new MapeoColumnas.Posicion(4, 3));
+    }
+
+    @Test
+    @DisplayName("un CSV que cuadra se carga solo, completando el año de las fechas")
+    @SuppressWarnings("unchecked")
+    void tablaCuadra() {
+        when(mapeador.mapear(anyString(), eq("2026-12"))).thenReturn(mapeo().build());
+        when(carga.confirmarExtractoLeido(eq(1L), anyList())).thenReturn("job-1");
+
+        assertThat(useCase.procesar(1L, CSV).getEstado()).isEqualTo(Estado.CARGADO);
+
+        ArgumentCaptor<List<Movimiento>> captor = ArgumentCaptor.forClass(List.class);
+        verify(carga).confirmarExtractoLeido(eq(1L), captor.capture());
+        assertThat(captor.getValue()).extracting(Movimiento::getTipo).containsExactly("CREDITO", "DEBITO");
+        assertThat(captor.getValue().get(0).getFecha()).isEqualTo(LocalDate.of(2026, 12, 5));
+        assertThat(captor.getValue().get(0).getDescripcion()).isEqualTo("ABONO EJEMPLO — A1");
+        verifyNoInteractions(lector);
+    }
+
+    @Test
+    @DisplayName("el encabezado repetido en cada página no impide cargar el extracto")
+    void encabezadoRepetido() {
+        byte[] csv = """
+                ;;SALDO ANTERIOR;1.000,00
+                FECHA;REFERENCIA;DETALLE;VALOR
+                05/12;A1;ABONO EJEMPLO;500,00
+                DESDE;HASTA;TIPO;SUCURSAL
+                2026/11/30;2026/12/31;CUENTA;SUCURSAL DE EJEMPLO
+                10/12;B2;PAGO EJEMPLO;200,00-
+                ;;SALDO FINAL;1.300,00
+                """.getBytes();
+        when(mapeador.mapear(anyString(), anyString()))
+                .thenReturn(mapeo().saldoFinal(new MapeoColumnas.Posicion(6, 3)).build());
+        when(carga.confirmarExtractoLeido(eq(1L), anyList())).thenReturn("job-1");
+
+        ResultadoLectura resultado = useCase.procesar(1L, csv);
+
+        assertThat(resultado.getEstado()).isEqualTo(Estado.CARGADO);
+        assertThat(resultado.getRevision().getLectura().getMovimientos()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("una tabla mal interpretada se reintenta y, si sigue sin cuadrar, no se carga")
+    void tablaNoCuadra() {
+        MapeoExtracto invertido = mapeo().positivoEsAbono(false).build();
+        when(mapeador.mapear(anyString(), anyString())).thenReturn(invertido);
+        when(mapeador.tieneRespaldo()).thenReturn(true);
+        when(mapeador.mapearConRespaldo(anyString(), anyString())).thenReturn(invertido);
+
+        assertThat(useCase.procesar(1L, CSV).getEstado()).isEqualTo(Estado.RECHAZADO);
+        verify(mapeador).mapearConRespaldo(anyString(), anyString());
+        verifyNoInteractions(carga);
+    }
+
+    @Test
+    @DisplayName("datos ambiguos: una tarjeta en tabla con columnas de abonos y cargos usa el saldo como deuda")
+    void tarjetaEnTabla() {
+        byte[] csv = "100;;\n2026-12-03;COMPRA;50;\n2026-12-04;PAGO;;20\n130;;\n".getBytes();
+        when(mapeador.mapear(anyString(), anyString())).thenReturn(MapeoExtracto.builder()
+                .tipoProducto("TARJETA_CREDITO").ultimosDigitosTarjeta("1234").hoja(0).primeraFilaDatos(1)
+                .columnaFecha(0).columnasDescripcion(List.of(1))
+                .esquemaMonto("ABONO_CARGO").columnaCargos(2).columnaAbonos(3)
+                .separadorDecimal(".").ordenFecha("AMD")
+                .saldoAnterior(new MapeoColumnas.Posicion(0, 0)).saldoFinal(new MapeoColumnas.Posicion(3, 0))
+                .build());
+        when(carga.confirmarExtractoLeido(eq(1L), anyList())).thenReturn("job-1");
+
+        assertThat(useCase.procesar(1L, csv).getEstado()).isEqualTo(Estado.CARGADO);
+    }
+
+    @Test
+    @DisplayName("una foto la lee la IA como documento")
+    void foto() {
+        when(lector.leer(any(), eq("2026-12"))).thenReturn(correcta());
+        when(carga.confirmarExtractoLeido(eq(1L), anyList())).thenReturn("job-1");
+
+        assertThat(useCase.procesar(1L, new byte[]{(byte) 0x89, 'P', 'N', 'G'}).getEstado())
+                .isEqualTo(Estado.CARGADO);
+        verifyNoInteractions(mapeador);
     }
 
     @Test

@@ -1,7 +1,7 @@
 package com.conciliacion.bancaria.adapter.out.archivo;
 
 import com.conciliacion.bancaria.domain.exception.CsvValidationException;
-import com.conciliacion.bancaria.domain.model.ArchivoAuxiliar.Tipo;
+import com.conciliacion.bancaria.domain.model.ArchivoLeido.Tipo;
 import com.conciliacion.bancaria.domain.model.TablaArchivo;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.CellStyle;

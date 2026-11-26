@@ -2,7 +2,7 @@ package com.conciliacion.bancaria.domain.service;
 
 import com.conciliacion.bancaria.domain.model.AuxiliarLeido;
 import com.conciliacion.bancaria.domain.model.LecturaExtracto.MovimientoLeido;
-import com.conciliacion.bancaria.domain.model.MapeoAuxiliar;
+import com.conciliacion.bancaria.domain.model.MapeoColumnas;
 import com.conciliacion.bancaria.domain.model.Movimiento;
 import com.conciliacion.bancaria.domain.model.RevisionAuxiliar;
 import com.conciliacion.bancaria.domain.model.RevisionLectura.EstadoCuadre;
@@ -15,6 +15,7 @@ import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.time.DateTimeException;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -23,7 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Lee todas las filas de un auxiliar siguiendo el {@link MapeoAuxiliar} y verifica el
+ * Lee todas las filas de un auxiliar siguiendo el {@link MapeoColumnas} y verifica el
  * resultado contra los saldos y totales del propio archivo. No usa IA.
  */
 public class InterpreteAuxiliar {
@@ -32,6 +33,8 @@ public class InterpreteAuxiliar {
     private static final int MAX_ERRORES = 5;
     private static final Pattern FECHA = Pattern.compile(
             "^(\\d{1,4}|\\p{L}{3,10})[/\\-. ]+(?:de )?(\\d{1,2}|\\p{L}{3,10})\\.?[/\\-., ]+(?:de )?(\\d{1,4})(?:[ T].*)?$");
+    private static final Pattern FECHA_SIN_ANIO = Pattern.compile(
+            "^(\\d{1,2}|\\p{L}{3,10})[/\\-. ]+(?:de )?(\\d{1,2}|\\p{L}{3,10})\\.?$");
     private static final Pattern FECHA_COMPACTA = Pattern.compile("^(\\d{4})(\\d{2})(\\d{2})$");
     private static final List<String> MESES =
             List.of("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic");
@@ -47,7 +50,12 @@ public class InterpreteAuxiliar {
         }
     }
 
-    public Interpretacion interpretar(TablaArchivo tabla, MapeoAuxiliar mapeo) {
+    public Interpretacion interpretar(TablaArchivo tabla, MapeoColumnas mapeo) {
+        return interpretar(tabla, mapeo, null);
+    }
+
+    /** @param periodo permite completar el año en archivos cuyas fechas solo traen día y mes */
+    public Interpretacion interpretar(TablaArchivo tabla, MapeoColumnas mapeo, YearMonth periodo) {
         List<String> errores = validar(tabla, mapeo);
         if (!errores.isEmpty()) {
             return new Interpretacion(RevisionAuxiliar.builder()
@@ -65,16 +73,24 @@ public class InterpreteAuxiliar {
         BigDecimal sumaCreditos = BigDecimal.ZERO;
         int sinFecha = 0;
         int ilegibles = 0;
+        int rotulos = 0;
 
         for (int f = Math.max(0, mapeo.getPrimeraFilaDatos()); f < hoja.filas().size(); f++) {
             if (filasDeControl.contains(f)) continue;
-            LocalDate fecha = leerFecha(hoja.celda(f, mapeo.getColumnaFecha()), mapeo.getOrdenFecha());
+            Celda celdaFecha = hoja.celda(f, mapeo.getColumnaFecha());
+            LocalDate fecha = leerFecha(celdaFecha, mapeo.getOrdenFecha());
+            if (fecha == null && periodo != null) {
+                fecha = fechaSinAnio(celdaFecha.texto(), mapeo.getOrdenFecha(), periodo);
+            }
             Valores valores;
             try {
                 valores = leerValores(hoja, f, mapeo);
             } catch (NumberFormatException e) {
-                // Sin fecha suele ser un encabezado repetido; con fecha es un movimiento perdido.
-                if (fecha != null && ++ilegibles <= MAX_ERRORES) {
+                // Sin fecha, o con solo texto donde iría el valor, suele ser un encabezado repetido
+                // en cada página; con fecha y cifras es un movimiento que no se pudo leer.
+                if (fecha != null && !tieneCifras(hoja, f, mapeo)) {
+                    rotulos++;
+                } else if (fecha != null && ++ilegibles <= MAX_ERRORES) {
                     errores.add("Fila " + (f + 1) + ": " + e.getMessage());
                 }
                 continue;
@@ -110,6 +126,11 @@ public class InterpreteAuxiliar {
                 saldoInicial, saldoFinal, advertencias);
         if (sinFecha > 0 && estado != EstadoCuadre.CUADRA) {
             advertencias.add(sinFecha + " filas con valores pero sin fecha no se incluyeron (suelen ser totales)");
+        }
+
+        if (rotulos > 0 && estado != EstadoCuadre.CUADRA) {
+            advertencias.add(rotulos + " filas con texto en lugar de un valor no se incluyeron "
+                    + "(suelen ser encabezados repetidos)");
         }
 
         RevisionAuxiliar revision = RevisionAuxiliar.builder()
@@ -149,13 +170,13 @@ public class InterpreteAuxiliar {
                     numero(fila.getDebito()), numero(fila.getCredito())));
         }
 
-        MapeoAuxiliar mapeo = MapeoAuxiliar.builder()
+        MapeoColumnas mapeo = MapeoColumnas.builder()
                 .hoja(0).primeraFilaDatos(1)
                 .columnaFecha(0).columnaComprobante(1).columnasDescripcion(List.of(2))
                 .esquemaMonto("DEBITO_CREDITO").columnaDebito(3).columnaCredito(4)
                 .separadorDecimal(".").ordenFecha("AMD")
-                .saldoInicial(new MapeoAuxiliar.Posicion(0, 0)).saldoFinal(new MapeoAuxiliar.Posicion(0, 1))
-                .totalDebitos(new MapeoAuxiliar.Posicion(0, 2)).totalCreditos(new MapeoAuxiliar.Posicion(0, 3))
+                .saldoInicial(new MapeoColumnas.Posicion(0, 0)).saldoFinal(new MapeoColumnas.Posicion(0, 1))
+                .totalDebitos(new MapeoColumnas.Posicion(0, 2)).totalCreditos(new MapeoColumnas.Posicion(0, 3))
                 .build();
         Interpretacion base = interpretar(
                 new TablaArchivo(List.of(new TablaArchivo.Hoja("documento", celdas))), mapeo);
@@ -169,7 +190,7 @@ public class InterpreteAuxiliar {
         return valor == null ? Celda.VACIA : new Celda(valor.toPlainString(), valor, null);
     }
 
-    private List<String> validar(TablaArchivo tabla, MapeoAuxiliar m) {
+    private List<String> validar(TablaArchivo tabla, MapeoColumnas m) {
         List<String> errores = new ArrayList<>();
         if (m == null) {
             errores.add("No se pudo identificar la estructura del archivo");
@@ -202,16 +223,16 @@ public class InterpreteAuxiliar {
         return columna != null && columna >= 0;
     }
 
-    private Set<Integer> filasDeControl(MapeoAuxiliar m) {
+    private Set<Integer> filasDeControl(MapeoColumnas m) {
         Set<Integer> filas = new HashSet<>();
-        for (MapeoAuxiliar.Posicion p : new MapeoAuxiliar.Posicion[]{
+        for (MapeoColumnas.Posicion p : new MapeoColumnas.Posicion[]{
                 m.getSaldoInicial(), m.getSaldoFinal(), m.getTotalDebitos(), m.getTotalCreditos()}) {
             if (p != null) filas.add(p.getFila());
         }
         return filas;
     }
 
-    private Valores leerValores(TablaArchivo.Hoja hoja, int f, MapeoAuxiliar m) {
+    private Valores leerValores(TablaArchivo.Hoja hoja, int f, MapeoColumnas m) {
         String separador = m.getSeparadorDecimal();
         BigDecimal cero = BigDecimal.ZERO;
         if ("DEBITO_CREDITO".equals(m.getEsquemaMonto())) {
@@ -230,6 +251,15 @@ public class InterpreteAuxiliar {
         }
         boolean esDebito = m.getValoresDebito().stream().anyMatch(v -> v.trim().equalsIgnoreCase(naturaleza));
         return esDebito ? new Valores(monto, cero) : new Valores(cero, monto);
+    }
+
+    private boolean tieneCifras(TablaArchivo.Hoja hoja, int f, MapeoColumnas m) {
+        List<Integer> columnas = "DEBITO_CREDITO".equals(m.getEsquemaMonto())
+                ? List.of(m.getColumnaDebito(), m.getColumnaCredito())
+                : List.of(m.getColumnaMonto());
+        return columnas.stream()
+                .map(c -> hoja.celda(f, c))
+                .anyMatch(c -> c.numero() != null || c.texto().chars().anyMatch(Character::isDigit));
     }
 
     /** Acepta signo antes o después, paréntesis, símbolo de moneda y separadores de miles. */
@@ -280,6 +310,19 @@ public class InterpreteAuxiliar {
         return mesPrimero ? fecha(c, a, b) : fecha(c, b, a);
     }
 
+    /** "05/12" o "5 dic": toma el año del período, o el vecino si el movimiento cruza de año. */
+    private LocalDate fechaSinAnio(String texto, String orden, YearMonth periodo) {
+        Matcher m = FECHA_SIN_ANIO.matcher(texto.trim());
+        if (!m.matches()) return null;
+        String a = m.group(1), b = m.group(2);
+        boolean mesPrimero = !a.matches("\\d+") || !"DMA".equals(orden) && b.matches("\\d+");
+        String mes = mesPrimero ? a : b;
+        String dia = mesPrimero ? b : a;
+        int distancia = mes(mes) - periodo.getMonthValue();
+        int anio = periodo.getYear() + (distancia > 6 ? -1 : distancia < -6 ? 1 : 0);
+        return fecha(String.valueOf(anio), mes, dia);
+    }
+
     private LocalDate fecha(String anio, String mes, String dia) {
         if (!anio.matches("\\d{2}|\\d{4}") || !dia.matches("\\d{1,2}")) return null;
         int y = Integer.parseInt(anio);
@@ -301,7 +344,7 @@ public class InterpreteAuxiliar {
         return (es >= 0 ? es : MONTHS.indexOf(tres)) + 1;
     }
 
-    private String descripcion(TablaArchivo.Hoja hoja, int f, MapeoAuxiliar m, String comprobante) {
+    private String descripcion(TablaArchivo.Hoja hoja, int f, MapeoColumnas m, String comprobante) {
         List<String> partes = new ArrayList<>();
         if (!comprobante.isEmpty()) partes.add(comprobante);
         if (m.getColumnasDescripcion() != null) {
@@ -327,7 +370,7 @@ public class InterpreteAuxiliar {
                 .build());
     }
 
-    private BigDecimal leerControl(TablaArchivo.Hoja hoja, MapeoAuxiliar.Posicion p, MapeoAuxiliar m) {
+    private BigDecimal leerControl(TablaArchivo.Hoja hoja, MapeoColumnas.Posicion p, MapeoColumnas m) {
         if (p == null) return null;
         Celda celda = hoja.celda(p.getFila(), p.getColumna());
         if (celda.vacia()) return null;

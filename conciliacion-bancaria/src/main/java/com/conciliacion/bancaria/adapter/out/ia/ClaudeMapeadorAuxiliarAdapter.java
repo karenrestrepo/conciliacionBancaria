@@ -1,6 +1,6 @@
 package com.conciliacion.bancaria.adapter.out.ia;
 
-import com.conciliacion.bancaria.domain.model.MapeoAuxiliar;
+import com.conciliacion.bancaria.domain.model.MapeoColumnas;
 import com.conciliacion.bancaria.domain.port.out.MapeadorAuxiliarIaPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.client.RestClient;
@@ -52,7 +52,7 @@ public class ClaudeMapeadorAuxiliarAdapter implements MapeadorAuxiliarIaPort {
     }
 
     @Override
-    public MapeoAuxiliar mapear(String muestra) {
+    public MapeoColumnas mapear(String muestra) {
         return pedir(muestra, modelo);
     }
 
@@ -62,14 +62,14 @@ public class ClaudeMapeadorAuxiliarAdapter implements MapeadorAuxiliarIaPort {
     }
 
     @Override
-    public MapeoAuxiliar mapearConRespaldo(String muestra) {
+    public MapeoColumnas mapearConRespaldo(String muestra) {
         return pedir(muestra, tieneRespaldo() ? modeloRespaldo : modelo);
     }
 
-    private MapeoAuxiliar pedir(String muestra, String modeloUsado) {
+    private MapeoColumnas pedir(String muestra, String modeloUsado) {
         Map<String, Object> pregunta = Map.of("type", "text", "text", "Muestra del archivo:\n" + muestra);
         return cliente.pedir(modeloUsado, INSTRUCCIONES, List.of(pregunta), esquema(), MAX_TOKENS,
-                MapeoAuxiliar.class, "No se pudo identificar la estructura del archivo");
+                MapeoColumnas.class, "No se pudo identificar la estructura del archivo");
     }
 
     private Map<String, Object> esquema() {
