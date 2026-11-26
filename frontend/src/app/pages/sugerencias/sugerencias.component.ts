@@ -15,7 +15,8 @@ import { SelectionModel } from '@angular/cdk/collections';
 import { CurrencyPipe } from '@angular/common';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
-import { Conciliacion, Sugerencia, MovimientoAgrupado, GrupoGastoBancario } from '../../core/models';
+import { Conciliacion, Sugerencia, MovimientoAgrupado, GrupoGastoBancario, ResumenCargaAuxiliar } from '../../core/models';
+import { LecturaAuxiliarIaComponent } from '../nueva-conciliacion/lectura-auxiliar-ia.component';
 
 @Component({
   selector: 'app-sugerencias',
@@ -24,7 +25,7 @@ import { Conciliacion, Sugerencia, MovimientoAgrupado, GrupoGastoBancario } from
     CommonModule, RouterModule, MatCardModule, MatTableModule,
     MatIconModule, MatButtonModule, MatChipsModule,
     MatProgressSpinnerModule, MatTooltipModule, MatDividerModule,
-    MatSnackBarModule, MatCheckboxModule, CurrencyPipe
+    MatSnackBarModule, MatCheckboxModule, CurrencyPipe, LecturaAuxiliarIaComponent
   ],
   template: `
     <div class="page-container">
@@ -70,12 +71,11 @@ import { Conciliacion, Sugerencia, MovimientoAgrupado, GrupoGastoBancario } from
             {{ reprocesando ? 'Procesando...' : 'Reprocesar' }}
           </button>
           <!-- Subir nuevo auxiliar en EN_REVISION -->
-          <label *ngIf="conciliacion?.estado === 'EN_REVISION' && canReview()"
-                 class="upload-aux-btn" [class.uploading]="subiendoAuxiliar">
-            <mat-icon>upload_file</mat-icon>
-            {{ subiendoAuxiliar ? 'Procesando...' : 'Subir auxiliar' }}
-            <input type="file" accept=".csv,.xls,.xlsx" (change)="onAuxiliarChange($event)" hidden>
-          </label>
+          <button mat-stroked-button type="button" class="upload-aux-btn"
+                  *ngIf="conciliacion?.estado === 'EN_REVISION' && canReview()"
+                  (click)="alternarPanelAuxiliar()" [attr.aria-expanded]="auxiliarVisible">
+            <mat-icon>upload_file</mat-icon> Subir auxiliar
+          </button>
           <button mat-flat-button class="cerrar-btn"
                   *ngIf="conciliacion?.estado === 'EN_REVISION' && canClose()"
                   (click)="cerrar()">
@@ -84,6 +84,18 @@ import { Conciliacion, Sugerencia, MovimientoAgrupado, GrupoGastoBancario } from
           </button>
         </div>
       </div>
+
+      <!-- [hidden] y no *ngIf: ocultar el panel no debe cancelar una lectura en curso -->
+      <mat-card class="panel-auxiliar" [hidden]="!auxiliarVisible"
+                *ngIf="auxiliarAbierto && conciliacion?.estado === 'EN_REVISION' && canReview()">
+        <app-lectura-auxiliar-ia [idConciliacion]="idConciliacion" [bloqueado]="subiendoAuxiliar"
+                                 (cargado)="onAuxiliarCargado($event)">
+        </app-lectura-auxiliar-ia>
+        <label class="respaldo-csv">
+          Respaldo sin IA, solo CSV estándar:
+          <input type="file" accept=".csv" [disabled]="subiendoAuxiliar" (change)="onAuxiliarChange($event)">
+        </label>
+      </mat-card>
 
       <div *ngIf="loading" class="loading-container">
         <mat-spinner diameter="36"></mat-spinner>
@@ -395,15 +407,8 @@ import { Conciliacion, Sugerencia, MovimientoAgrupado, GrupoGastoBancario } from
       border-radius: 8px !important; height: 42px; gap: 6px;
     }
 
-    .upload-aux-btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      border: 1px solid #3d7ebf; color: #3d7ebf;
-      border-radius: 8px; height: 42px; padding: 0 16px;
-      font-size: 14px; font-weight: 500; cursor: pointer;
-      transition: background 0.2s;
-    }
-    .upload-aux-btn:hover { background: #eff6ff; }
-    .upload-aux-btn.uploading { opacity: 0.7; cursor: default; }
+    .panel-auxiliar { padding: 0 16px 16px; margin-bottom: 16px; }
+    .respaldo-csv { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; color: #6b7a8d; }
 
     .loading-container { display: flex; justify-content: center; padding: 60px; }
 
@@ -631,6 +636,8 @@ export class SugerenciasComponent implements OnInit {
   idConciliacion = 0;
   aceptandoLote = false;
   subiendoAuxiliar = false;
+  auxiliarAbierto = false;
+  auxiliarVisible = false;
   reprocesando = false;
   columns = ['select', 'confianza', 'criterio', 'movBancario', 'movContable', 'estado', 'acciones'];
 
@@ -758,29 +765,43 @@ export class SugerenciasComponent implements OnInit {
     setTimeout(poll, 1500);
   }
 
+  alternarPanelAuxiliar(): void {
+    this.auxiliarVisible = !this.auxiliarVisible;
+    this.auxiliarAbierto = true;
+  }
+
+  /** El backend ya guardó el auxiliar, por cualquiera de las dos formas de carga. */
+  onAuxiliarCargado(resumen: ResumenCargaAuxiliar): void {
+    this.auxiliarAbierto = false;
+    this.auxiliarVisible = false;
+    const partes = [`${resumen.nuevos} movimiento(s) nuevo(s)`];
+    if (resumen.anulados > 0) {
+      partes.push(`${resumen.anulados} anulado(s)` +
+        (resumen.revertidos > 0 ? ` (${resumen.revertidos} conciliación(es) revertida(s))` : ''));
+    }
+    this.snackBar.open(`Auxiliar cargado: ${partes.join(', ')}.`, 'Cerrar', { duration: 5000 });
+
+    if (resumen.jobId) {
+      this.pollJobAndReload(resumen.jobId);
+    } else {
+      // Sin renglones nuevos que enviar al motor — igual puede haber anulados
+      // que cambiaron el estado de sugerencias/movimientos; refrescar la vista.
+      this.api.obtenerConciliacion(this.idConciliacion).subscribe(r => { this.conciliacion = r.data; });
+      this.cargarSugerencias();
+    }
+  }
+
   onAuxiliarChange(event: Event): void {
-    const file = (event.target as HTMLInputElement).files?.[0];
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    // Permite volver a elegir el mismo archivo
+    input.value = '';
     if (!file || this.subiendoAuxiliar) return;
     this.subiendoAuxiliar = true;
     this.api.cargarAuxiliar(this.idConciliacion, file).subscribe({
       next: res => {
         this.subiendoAuxiliar = false;
-        const resumen = res.data;
-        const partes = [`${resumen.nuevos} movimiento(s) nuevo(s)`];
-        if (resumen.anulados > 0) {
-          partes.push(`${resumen.anulados} anulado(s)` +
-            (resumen.revertidos > 0 ? ` (${resumen.revertidos} conciliación(es) revertida(s))` : ''));
-        }
-        this.snackBar.open(`Auxiliar cargado: ${partes.join(', ')}.`, 'Cerrar', { duration: 5000 });
-
-        if (resumen.jobId) {
-          this.pollJobAndReload(resumen.jobId);
-        } else {
-          // Sin renglones nuevos que enviar al motor — igual puede haber anulados
-          // que cambiaron el estado de sugerencias/movimientos; refrescar la vista.
-          this.api.obtenerConciliacion(this.idConciliacion).subscribe(r => { this.conciliacion = r.data; });
-          this.cargarSugerencias();
-        }
+        this.onAuxiliarCargado(res.data);
       },
       error: err => {
         this.subiendoAuxiliar = false;

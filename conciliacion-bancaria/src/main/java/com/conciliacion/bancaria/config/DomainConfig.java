@@ -12,7 +12,6 @@ import com.conciliacion.bancaria.domain.service.InterpreteExtracto;
 import com.conciliacion.bancaria.domain.service.MuestraTabla;
 import com.conciliacion.bancaria.domain.service.MovimientoReversionService;
 import com.conciliacion.bancaria.domain.service.RevisorLecturaExtracto;
-import com.conciliacion.bancaria.domain.service.SiesaXlsParserService;
 import com.conciliacion.bancaria.domain.service.parser.AnchoFijoBankStatementParser;
 import com.conciliacion.bancaria.domain.service.parser.BankStatementParserDispatcher;
 import com.conciliacion.bancaria.domain.service.parser.DelimitadoBankStatementParser;
@@ -36,11 +35,6 @@ public class DomainConfig {
     @Bean
     public CsvValidatorService csvValidatorService() {
         return new CsvValidatorService();
-    }
-
-    @Bean
-    public SiesaXlsParserService siesaXlsParserService() {
-        return new SiesaXlsParserService();
     }
 
     // ── Motor genérico de extractos bancarios (BankStatementParserPort) ────

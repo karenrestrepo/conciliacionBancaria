@@ -19,7 +19,7 @@ public class Movimiento {
     private final String tipo;           // "DEBITO" o "CREDITO"
     private final EstadoMovimiento estado;
     /** Número de comprobante/documento del sistema contable de origen. Solo lo llenan
-     * ciertos formatos de auxiliar (ej. SIESA); nulo para bancarios y para auxiliares
+     * algunos auxiliares; nulo para bancarios y para auxiliares
      * genéricos sin esa columna. Cuando está presente es una identidad más estable
      * que un hash de texto formateado para detectar duplicados entre recargas. */
     private final String numeroComprobante;

@@ -20,7 +20,6 @@ import com.conciliacion.bancaria.domain.port.out.MovimientoRepositoryPort;
 import com.conciliacion.bancaria.domain.service.ConciliationEngine;
 import com.conciliacion.bancaria.domain.service.CsvValidatorService;
 import com.conciliacion.bancaria.domain.service.MovimientoReversionService;
-import com.conciliacion.bancaria.domain.service.SiesaXlsParserService;
 import com.conciliacion.bancaria.domain.port.out.SugerenciaRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.PartidaRepositoryPort;
 import com.conciliacion.bancaria.application.usecase.event.MotorCompletoRequestedEvent;
@@ -52,7 +51,6 @@ import java.util.stream.Collectors;
 public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
 
     private final CsvValidatorService csvValidator;
-    private final SiesaXlsParserService siesaParser;
     private final BankStatementParserPort bankStatementParserPort;
     private final ConfiguracionExtractoCodec configuracionExtractoCodec;
     private final ConciliationEngine conciliationEngine;
@@ -212,11 +210,12 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
     public ResumenCargaAuxiliar cargarLibroAuxiliar(Long idConciliacion, MultipartFile archivo) {
         try {
             eventLog.csvUpload(idConciliacion, null, archivo.getOriginalFilename());
-            byte[] contenido = archivo.getBytes();
+            if (!esArchivoCsv(archivo.getOriginalFilename())) {
+                throw new CsvValidationException("Esta forma de carga solo acepta el CSV estándar. "
+                        + "Para otros formatos use la carga sin configurar");
+            }
 
-            List<Movimiento> delArchivo = esArchivoXls(archivo.getOriginalFilename())
-                    ? siesaParser.parsear(contenido)
-                    : csvValidator.parsear(contenido, MAPEO_ESTANDAR);
+            List<Movimiento> delArchivo = csvValidator.parsear(archivo.getBytes(), MAPEO_ESTANDAR);
 
             return procesarRecargaAuxiliar(idConciliacion, delArchivo);
         } catch (CsvValidationException e) {
@@ -409,13 +408,13 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
 
     /**
      * Identidad de un movimiento contable entre recargas del auxiliar. Cuando el archivo
-     * trae número de comprobante (ej. auxiliar SIESA, columna "Documento") se usa junto
+     * trae número de comprobante se usa junto
      * con monto y tipo — nunca el comprobante solo. Un mismo número de comprobante puede
      * reaparecer en una recarga real con un monto distinto (anulación + reingreso por otro
-     * valor, reutilizando el mismo Documento en SIESA); si la huella ignorara el monto, ese
+     * valor, reutilizando el mismo número); si la huella ignorara el monto, ese
      * caso colapsaría con el registro viejo en el diff por multiconjunto y la reversión
      * nunca se dispararía (bug real encontrado en producción). El monto de
-     * {@link SiesaXlsParserService} siempre es positivo — la dirección va en {@code tipo},
+     * un movimiento siempre es positivo — la dirección va en {@code tipo},
      * no en el signo — así que no hace falta un monto con signo aparte, basta con incluir
      * ambos. El caso feliz (mismo comprobante + mismo monto + mismo tipo en una
      * re-exportación sin cambios) sigue tratándose como "ya existe", no como nuevo.
@@ -568,10 +567,8 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
                 .forEach(id -> partidaRepo.eliminarPendientePorMovimiento(id, "CONTABLE"));
     }
 
-    private boolean esArchivoXls(String nombre) {
-        if (nombre == null) return false;
-        String lower = nombre.toLowerCase();
-        return lower.endsWith(".xls") || lower.endsWith(".xlsx");
+    private boolean esArchivoCsv(String nombre) {
+        return nombre != null && nombre.toLowerCase().endsWith(".csv");
     }
 
     /**

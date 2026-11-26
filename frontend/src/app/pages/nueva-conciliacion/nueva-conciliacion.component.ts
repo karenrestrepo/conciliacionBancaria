@@ -293,7 +293,7 @@ interface GrupoTarjetas {
                 </button>
                 <button mat-stroked-button type="button" [class.activo]="modoAuxiliar === 'archivo'"
                         (click)="modoAuxiliar = 'archivo'" [disabled]="loadingAuxiliar">
-                  <mat-icon>upload_file</mat-icon> Formato fijo (CSV estándar o SIESA)
+                  <mat-icon>upload_file</mat-icon> CSV estándar (respaldo sin IA)
                 </button>
               </div>
 
@@ -308,8 +308,7 @@ interface GrupoTarjetas {
               <div class="csv-format-info">
                 <mat-icon>info_outline</mat-icon>
                 <span>
-                  <strong>CSV estándar:</strong> columnas fecha, descripcion, monto, tipo_movimiento &nbsp;|&nbsp;
-                  <strong>SIESA XLS:</strong> archivo exportado directamente desde SIESA (auxiliar de movimientos)
+                  <strong>CSV estándar:</strong> columnas fecha, descripcion, monto, tipo_movimiento
                 </span>
               </div>
 
@@ -319,7 +318,7 @@ interface GrupoTarjetas {
                 <span *ngIf="!auxiliarFile">Haga clic para seleccionar el archivo</span>
                 <span *ngIf="auxiliarFile">{{ auxiliarFile.name }}</span>
               </div>
-              <input #auxiliarInput type="file" accept=".csv,.xls,.xlsx"
+              <input #auxiliarInput type="file" accept=".csv"
                      (change)="onAuxiliarSelected($event)" hidden>
               </ng-container>
 

@@ -93,7 +93,7 @@
             <version>5.9</version>
         </dependency>
 
-        <!-- Apache POI — lectura de XLS/XLSX (formato SIESA) -->
+        <!-- Apache POI — lectura de XLS/XLSX -->
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi</artifactId>

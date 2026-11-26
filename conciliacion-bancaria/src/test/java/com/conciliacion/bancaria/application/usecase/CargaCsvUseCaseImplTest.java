@@ -13,10 +13,11 @@ import com.conciliacion.bancaria.domain.port.out.*;
 import com.conciliacion.bancaria.domain.service.ConciliationEngine;
 import com.conciliacion.bancaria.domain.service.CsvValidatorService;
 import com.conciliacion.bancaria.domain.service.MovimientoReversionService;
-import com.conciliacion.bancaria.domain.service.SiesaXlsParserService;
 import com.conciliacion.bancaria.shared.EstadoConciliacion;
 import com.conciliacion.bancaria.shared.EstadoMovimiento;
 import com.conciliacion.bancaria.shared.EstadoSugerencia;
+import com.conciliacion.bancaria.domain.exception.CsvValidationException;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.mock.web.MockMultipartFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,6 +49,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * Solo mockea los puertos (interfaces) — mockear clases concretas
@@ -80,7 +83,6 @@ class CargaCsvUseCaseImplTest {
                 new MovimientoReversionService(movimientoRepo, partidaRepo);
         useCase = new CargaCsvUseCaseImpl(
                 new CsvValidatorService(),
-                new SiesaXlsParserService(),
                 bankStatementParserPort,
                 configuracionExtractoCodec,
                 new ConciliationEngine(),
@@ -92,6 +94,17 @@ class CargaCsvUseCaseImplTest {
         // "self" (necesarias para que @Async no se auto-invoque sin pasar por el proxy
         // en producción) sigan funcionando en el test.
         useCase.self = useCase;
+    }
+
+    @Test
+    @DisplayName("el CSV estándar de respaldo rechaza otros tipos de archivo sin tocar los movimientos")
+    void respaldoSoloCsv() {
+        MultipartFile archivo = new MockMultipartFile("archivo", "auxiliar.xlsx", null, new byte[]{1});
+
+        assertThatThrownBy(() -> useCase.cargarLibroAuxiliar(CONCILIACION_ID, archivo))
+                .isInstanceOf(CsvValidationException.class)
+                .hasMessageContaining("sin configurar");
+        verifyNoInteractions(movimientoRepo);
     }
 
     private Movimiento contable(Long id, LocalDate fecha, String monto, String tipo,
@@ -106,7 +119,7 @@ class CargaCsvUseCaseImplTest {
                                                EstadoMovimiento estado) {
         return Movimiento.builder()
                 .id(id).fecha(LocalDate.of(2026, 6, 1)).monto(new BigDecimal(monto)).tipo(tipo)
-                .descripcion("Nota SIESA").estado(estado).numeroComprobante(numeroComprobante)
+                .descripcion("Nota contable").estado(estado).numeroComprobante(numeroComprobante)
                 .build();
     }
 
