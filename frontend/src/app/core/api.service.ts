@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
-import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, ResumenCargaAuxiliar, MetricasResumen, ConfiguracionExtracto, ConfiguracionExtractoDetalle, PruebaConfiguracionResultado, GastoBancario, MovimientoAgrupado, UsuarioResponse, UsuarioCreateRequest, UsuarioUpdateRequest, Permiso, RolUsuario, LecturaExtracto, ResultadoLectura } from './models';
+import { ApiResponse, Banco, Cuenta, TipoCuenta, Conciliacion, Sugerencia, JobStatus, ResumenCargaAuxiliar, MetricasResumen, ConfiguracionExtracto, ConfiguracionExtractoDetalle, PruebaConfiguracionResultado, GastoBancario, MovimientoAgrupado, UsuarioResponse, UsuarioCreateRequest, UsuarioUpdateRequest, Permiso, RolUsuario, LecturaExtracto, ResultadoLectura, ResultadoAuxiliar } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -101,6 +101,26 @@ export class ApiService {
     form.append('archivo', archivo);
     return this.http.post<ApiResponse<ResumenCargaAuxiliar>>(
       `${this.API}/conciliaciones/${id}/auxiliar`, form, { headers: new HttpHeaders({ Authorization: `Bearer ${this.auth.getToken()}` }) });
+  }
+
+  /** La IA interpreta el auxiliar; si el backend puede verificarlo, lo carga. */
+  procesarAuxiliarIa(id: number, archivo: File): Observable<ApiResponse<ResultadoAuxiliar>> {
+    const form = new FormData();
+    form.append('archivo', archivo);
+    return this.http.post<ApiResponse<ResultadoAuxiliar>>(
+      `${this.API}/conciliaciones/${id}/auxiliar-ia/procesar`, form,
+      { headers: new HttpHeaders({ Authorization: `Bearer ${this.auth.getToken()}` }) });
+  }
+
+  /** Carga un auxiliar que el usuario aprobó, sin volver a usar la IA. */
+  confirmarAuxiliarIa(id: number, archivo: File, mapeo: unknown, lectura: unknown): Observable<ApiResponse<ResumenCargaAuxiliar>> {
+    const form = new FormData();
+    form.append('archivo', archivo);
+    if (mapeo) form.append('mapeo', JSON.stringify(mapeo));
+    if (lectura) form.append('lectura', JSON.stringify(lectura));
+    return this.http.post<ApiResponse<ResumenCargaAuxiliar>>(
+      `${this.API}/conciliaciones/${id}/auxiliar-ia/confirmar`, form,
+      { headers: new HttpHeaders({ Authorization: `Bearer ${this.auth.getToken()}` }) });
   }
 
   jobStatus(jobId: string): Observable<ApiResponse<JobStatus>> {

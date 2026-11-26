@@ -17,6 +17,7 @@ import { Banco, Cuenta, Conciliacion, ConfiguracionExtracto, ResumenCargaAuxilia
 import { interval, Subscription } from 'rxjs';
 import { switchMap, takeWhile } from 'rxjs/operators';
 import { LecturaIaComponent } from './lectura-ia.component';
+import { LecturaAuxiliarIaComponent } from './lectura-auxiliar-ia.component';
 
 interface GrupoTarjetas {
   idRepresentante: number;
@@ -30,7 +31,7 @@ interface GrupoTarjetas {
     CommonModule, RouterModule, ReactiveFormsModule, MatCardModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatIconModule,
     MatProgressBarModule, MatProgressSpinnerModule, MatStepperModule,
-    MatDividerModule, LecturaIaComponent
+    MatDividerModule, LecturaIaComponent, LecturaAuxiliarIaComponent
   ],
   template: `
     <div class="page-container">
@@ -282,9 +283,28 @@ interface GrupoTarjetas {
           <mat-card class="step-card">
             <mat-card-header>
               <mat-card-title>Cargar libro auxiliar contable</mat-card-title>
-              <mat-card-subtitle>Archivo CSV estándar o exportación SIESA (.xls/.xlsx)</mat-card-subtitle>
+              <mat-card-subtitle>Archivo con los movimientos contables de la cuenta</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
+              <div class="modo-extracto">
+                <button mat-stroked-button type="button" [class.activo]="modoAuxiliar === 'ia'"
+                        (click)="modoAuxiliar = 'ia'" [disabled]="loadingAuxiliar || !conciliacion">
+                  <mat-icon>auto_awesome</mat-icon> Subir archivo (sin configurar)
+                </button>
+                <button mat-stroked-button type="button" [class.activo]="modoAuxiliar === 'archivo'"
+                        (click)="modoAuxiliar = 'archivo'" [disabled]="loadingAuxiliar">
+                  <mat-icon>upload_file</mat-icon> Formato fijo (CSV estándar o SIESA)
+                </button>
+              </div>
+
+              <!-- [hidden] y no *ngIf: cambiar de modo no debe cancelar una lectura en curso -->
+              <app-lectura-auxiliar-ia *ngIf="conciliacion" [hidden]="modoAuxiliar !== 'ia'"
+                  [idConciliacion]="conciliacion.id"
+                  [bloqueado]="loadingAuxiliar || auxiliarCargado"
+                  (cargado)="onAuxiliarCargado($event)">
+              </app-lectura-auxiliar-ia>
+
+              <ng-container *ngIf="modoAuxiliar === 'archivo'">
               <div class="csv-format-info">
                 <mat-icon>info_outline</mat-icon>
                 <span>
@@ -301,6 +321,7 @@ interface GrupoTarjetas {
               </div>
               <input #auxiliarInput type="file" accept=".csv,.xls,.xlsx"
                      (change)="onAuxiliarSelected($event)" hidden>
+              </ng-container>
 
               <div class="job-progress" *ngIf="auxiliarJobProgreso > 0 || auxiliarJobEstado === 'IN_PROGRESS'">
                 <div class="job-header">
@@ -325,6 +346,7 @@ interface GrupoTarjetas {
 
               <div class="step-actions">
                 <button mat-flat-button class="primary-btn"
+                        *ngIf="modoAuxiliar === 'archivo'"
                         (click)="cargarAuxiliar()"
                         [disabled]="!auxiliarFile || loadingAuxiliar || auxiliarCargado">
                   <mat-spinner diameter="18" *ngIf="loadingAuxiliar"></mat-spinner>
@@ -581,6 +603,7 @@ export class NuevaConciliacionComponent implements OnInit, OnDestroy {
   jobEstado = '';
   modoExtracto: 'archivo' | 'ia' = 'ia';
   motorOcupado = false;
+  modoAuxiliar: 'archivo' | 'ia' = 'ia';
   private pollSub?: Subscription;
   auxiliarJobProgreso = 0;
   auxiliarJobEstado = '';
@@ -806,26 +829,30 @@ export class NuevaConciliacionComponent implements OnInit, OnDestroy {
     this.loadingAuxiliar = true;
     this.errorAuxiliar = '';
     this.api.cargarAuxiliar(this.conciliacion.id, this.auxiliarFile).subscribe({
-      next: res => {
-        this.resumenAuxiliar = res.data;
-        if (res.data.jobId) {
-          // Hay movimientos nuevos: el motor incremental sigue corriendo en segundo plano.
-          // Esperar a que termine (igual que cargarExtracto/iniciarPolling) antes de marcar
-          // el paso como completado — si no, el usuario podría avanzar o revisar sugerencias
-          // mientras el cruce todavía se está calculando.
-          this.iniciarPollingAuxiliar(res.data.jobId);
-        } else {
-          // Sin nuevos contables (solo anulados/revertidos, o recarga sin cambios): no se
-          // disparó ningún job, no hay nada que esperar.
-          this.loadingAuxiliar = false;
-          this.auxiliarCargado = true;
-        }
-      },
+      next: res => this.onAuxiliarCargado(res.data),
       error: err => {
         this.loadingAuxiliar = false;
         this.errorAuxiliar = err.error?.message ?? 'Error al cargar el libro auxiliar';
       }
     });
+  }
+
+  /** El backend ya guardó el auxiliar, por cualquiera de las dos formas de carga. */
+  onAuxiliarCargado(resumen: ResumenCargaAuxiliar): void {
+    this.errorAuxiliar = '';
+    this.resumenAuxiliar = resumen;
+    if (resumen.jobId) {
+      // Hay movimientos nuevos: el motor incremental sigue corriendo en segundo plano. Esperar a
+      // que termine antes de marcar el paso como completado, para que no se revisen sugerencias
+      // mientras el cruce todavía se está calculando.
+      this.loadingAuxiliar = true;
+      this.auxiliarJobProgreso = 0;
+      this.iniciarPollingAuxiliar(resumen.jobId);
+    } else {
+      // Sin nuevos contables (solo anulados o recarga sin cambios): no hay job que esperar.
+      this.loadingAuxiliar = false;
+      this.auxiliarCargado = true;
+    }
   }
 
   iniciarPollingAuxiliar(jobId: string): void {

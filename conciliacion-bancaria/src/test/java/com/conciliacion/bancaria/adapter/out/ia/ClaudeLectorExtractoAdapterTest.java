@@ -99,29 +99,39 @@ class ClaudeLectorExtractoAdapterTest {
                 .hasMessageContaining("ANTHROPIC_API_KEY");
     }
 
-    @Test
-    @DisplayName("un extracto de varias páginas se lee por bloques y se une en orden")
-    void variasPaginas() throws Exception {
-        String primero = """
-                {"tipoProducto":"CUENTA","ultimosDigitosTarjeta":null,"saldoAnterior":100,"saldoFinal":null,
+    private static String parte(String descripcion, String saldoAnterior, String saldoFinal) {
+        return """
+                {"tipoProducto":"CUENTA","ultimosDigitosTarjeta":null,"saldoAnterior":%s,"saldoFinal":%s,
                  "totalCreditos":null,"totalDebitos":null,
-                 "movimientos":[{"fecha":"2026-12-01","descripcion":"UNO","monto":10,"tipo":"CREDITO"}]}""";
-        String segundo = """
-                {"tipoProducto":"CUENTA","ultimosDigitosTarjeta":null,"saldoAnterior":null,"saldoFinal":130,
-                 "totalCreditos":null,"totalDebitos":null,
-                 "movimientos":[{"fecha":"2026-12-02","descripcion":"DOS","monto":20,"tipo":"CREDITO"}]}""";
-        servidor.expect(requestTo("https://api.ejemplo.test/v1/messages"))
-                .andRespond(withSuccess(respuesta("end_turn", primero), MediaType.APPLICATION_JSON));
-        servidor.expect(requestTo("https://api.ejemplo.test/v1/messages"))
-                .andRespond(withSuccess(respuesta("end_turn", segundo), MediaType.APPLICATION_JSON));
+                 "movimientos":[{"fecha":"2026-12-01","descripcion":"%s","monto":10,"tipo":"CREDITO"}]}"""
+                .formatted(saldoAnterior, saldoFinal, descripcion);
+    }
 
-        LecturaExtracto lectura = adapter.leer(pdf(5), "2026-12");
+    @Test
+    @DisplayName("un extracto de varias páginas se lee por bloques en paralelo y se une en orden")
+    void variasPaginas() throws Exception {
+        RestClient.Builder propio = RestClient.builder().baseUrl("https://api.ejemplo.test");
+        // Los bloques se piden al tiempo: cada respuesta se elige por las páginas pedidas.
+        MockRestServiceServer paralelo = MockRestServiceServer.bindTo(propio).ignoreExpectOrder(true).build();
+        Map<String, String> porPaginas = Map.of(
+                "páginas 1 a 2 de 5", parte("UNO", "100", "null"),
+                "páginas 3 a 4 de 5", parte("DOS", "null", "null"),
+                "páginas 5 a 5 de 5", parte("TRES", "null", "130"));
+        for (var entrada : porPaginas.entrySet()) {
+            paralelo.expect(requestTo("https://api.ejemplo.test/v1/messages"))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString(entrada.getKey())))
+                    .andRespond(withSuccess(respuesta("end_turn", entrada.getValue()), MediaType.APPLICATION_JSON));
+        }
+        var lector = new ClaudeLectorExtractoAdapter(
+                propio.build(), mapper, "clave-de-prueba", "modelo-prueba", "");
+
+        LecturaExtracto lectura = lector.leer(pdf(5), "2026-12");
 
         assertThat(lectura.getMovimientos()).extracting(LecturaExtracto.MovimientoLeido::getDescripcion)
-                .containsExactly("UNO", "DOS");
+                .containsExactly("UNO", "DOS", "TRES");
         assertThat(lectura.getSaldoAnterior()).isEqualByComparingTo("100");
         assertThat(lectura.getSaldoFinal()).isEqualByComparingTo("130");
-        servidor.verify();
+        paralelo.verify();
     }
 
     @Test

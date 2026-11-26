@@ -229,6 +229,13 @@ public class CargaCsvUseCaseImpl implements CargaCsvUseCase {
         }
     }
 
+    @Override
+    @Transactional
+    public ResumenCargaAuxiliar cargarAuxiliarLeido(Long idConciliacion, List<Movimiento> contables) {
+        eventLog.csvUpload(idConciliacion, null, "auxiliar-leido-con-ia");
+        return procesarRecargaAuxiliar(idConciliacion, contables);
+    }
+
     /**
      * Diff + reversión + persistencia de una recarga del auxiliar, separado del parseo
      * del archivo para poder testearse con listas de {@link Movimiento} construidas a

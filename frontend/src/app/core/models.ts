@@ -370,3 +370,28 @@ export interface ResultadoLectura {
   revision: RevisionLectura;
   jobId: string | null;
 }
+
+export interface RevisionAuxiliar {
+  /** Columnas identificadas por la IA (solo archivos en tabla); se devuelve al confirmar. */
+  mapeo: unknown;
+  /** Tal como se guardan: el débito contable llega como CREDITO. */
+  movimientos: MovimientoLeido[];
+  sumaDebitos: number | null;
+  sumaCreditos: number | null;
+  totalDebitosArchivo: number | null;
+  totalCreditosArchivo: number | null;
+  saldoInicial: number | null;
+  saldoFinal: number | null;
+  estadoCuadre: 'CUADRA' | 'NO_CUADRA' | 'NO_VERIFICABLE';
+  errores: string[];
+  advertencias: string[];
+}
+
+export interface ResultadoAuxiliar {
+  estado: 'CARGADO' | 'REQUIERE_CONFIRMACION' | 'RECHAZADO';
+  mensaje: string;
+  revision: RevisionAuxiliar;
+  /** Solo en documentos (PDF, foto, texto): se devuelve al confirmar para no leerlos otra vez. */
+  lectura: unknown;
+  resumen: ResumenCargaAuxiliar | null;
+}

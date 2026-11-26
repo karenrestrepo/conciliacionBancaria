@@ -17,5 +17,8 @@ public interface CargaCsvUseCase {
 
     ResumenCargaAuxiliar cargarLibroAuxiliar(Long idConciliacion, MultipartFile archivo);
 
+    /** Recarga el auxiliar con movimientos ya leídos y verificados. */
+    ResumenCargaAuxiliar cargarAuxiliarLeido(Long idConciliacion, List<Movimiento> contables);
+
     String reprocesarMotor(Long idConciliacion);
-}
+}
