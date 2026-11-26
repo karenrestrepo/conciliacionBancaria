@@ -301,6 +301,7 @@ import { Conciliacion, Sugerencia, MovimientoAgrupado, GrupoGastoBancario } from
                 <div class="mov-info">
                   <span class="mov-fecha">{{ row.fechaBancario | date:'dd/MM/yyyy' }}</span>
                   <span class="mov-desc" [title]="row.descripcionBancario">{{ row.descripcionBancario }}</span>
+                  <span class="tarjeta-tag" *ngIf="row.ultimosDigitosTarjeta">•••• {{ row.ultimosDigitosTarjeta }}</span>
                   <span class="mov-monto" [ngClass]="getTipoClass(row.tipoBancario)">
                     {{ row.tipoBancario === 'DEBITO' ? '−' : '+' }}
                     {{ row.montoBancario | currency:'COP':'symbol':'1.0-2' }}
@@ -476,6 +477,10 @@ import { Conciliacion, Sugerencia, MovimientoAgrupado, GrupoGastoBancario } from
     .mov-info { display: flex; flex-direction: column; gap: 2px; }
     .mov-fecha { font-size: 11px; color: #9ca3af; }
     .mov-desc { font-size: 13px; color: #1a2332; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tarjeta-tag {
+      align-self: flex-start; background: #f3f4f6; color: #4b5563; font-size: 10px;
+      font-weight: 600; padding: 1px 7px; border-radius: 9px; letter-spacing: 0.5px;
+    }
     .mov-monto { font-size: 13px; font-weight: 600; }
     .tipo-debito { color: #e53935; } .tipo-credito { color: #22c55e; }
 
@@ -760,8 +765,22 @@ export class SugerenciasComponent implements OnInit {
     this.api.cargarAuxiliar(this.idConciliacion, file).subscribe({
       next: res => {
         this.subiendoAuxiliar = false;
-        this.snackBar.open('Auxiliar cargado. Regenerando sugerencias...', 'Cerrar', { duration: 4000 });
-        this.pollJobAndReload(res.data);
+        const resumen = res.data;
+        const partes = [`${resumen.nuevos} movimiento(s) nuevo(s)`];
+        if (resumen.anulados > 0) {
+          partes.push(`${resumen.anulados} anulado(s)` +
+            (resumen.revertidos > 0 ? ` (${resumen.revertidos} conciliación(es) revertida(s))` : ''));
+        }
+        this.snackBar.open(`Auxiliar cargado: ${partes.join(', ')}.`, 'Cerrar', { duration: 5000 });
+
+        if (resumen.jobId) {
+          this.pollJobAndReload(resumen.jobId);
+        } else {
+          // Sin renglones nuevos que enviar al motor — igual puede haber anulados
+          // que cambiaron el estado de sugerencias/movimientos; refrescar la vista.
+          this.api.obtenerConciliacion(this.idConciliacion).subscribe(r => { this.conciliacion = r.data; });
+          this.cargarSugerencias();
+        }
       },
       error: err => {
         this.subiendoAuxiliar = false;
