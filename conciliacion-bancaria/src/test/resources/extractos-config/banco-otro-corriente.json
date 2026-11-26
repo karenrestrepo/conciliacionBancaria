@@ -1,0 +1,25 @@
+{
+  "tipoOrigen": "EXCEL",
+  "factorMonto": 1,
+  "separadorMiles": ",",
+  "separadorDecimales": ".",
+  "excel": {
+    "numeroHoja": 0,
+    "filasASaltar": 15,
+    "columnaFecha": 0,
+    "formatoFecha": "d/MM",
+    "columnaDescripcion": 1,
+    "columnaReferencia": -1,
+    "debitoYCreditoSeparados": false,
+    "columnaMonto": 4
+  },
+  "continuacion": { "habilitada": false },
+  "cuadre": {
+    "habilitada": true,
+    "etiquetaSaldoAnterior": "SALDO ANTERIOR",
+    "etiquetaCreditos": "TOTAL ABONOS",
+    "etiquetaDebitos": "TOTAL CARGOS",
+    "etiquetaSaldoFinal": "SALDO ACTUAL",
+    "tolerancia": 0.01
+  }
+}

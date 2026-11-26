@@ -1,10 +1,12 @@
 package com.conciliacion.bancaria.application.usecase;
 
+import com.conciliacion.bancaria.domain.exception.RecursoNoEncontradoException;
 import com.conciliacion.bancaria.domain.model.Sugerencia;
 import com.conciliacion.bancaria.domain.port.in.RevisionUseCase;
 import com.conciliacion.bancaria.domain.port.out.EventLogPort;
 import com.conciliacion.bancaria.domain.port.out.MovimientoRepositoryPort;
 import com.conciliacion.bancaria.domain.port.out.SugerenciaRepositoryPort;
+import com.conciliacion.bancaria.domain.service.MovimientoReversionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +21,7 @@ public class RevisionUseCaseImpl implements RevisionUseCase {
     private final SugerenciaRepositoryPort sugerenciaRepo;
     private final MovimientoRepositoryPort movimientoRepo;
     private final EventLogPort eventLog;
+    private final MovimientoReversionService reversionService;
 
     @Override
     @Transactional(readOnly = true)
@@ -30,7 +33,7 @@ public class RevisionUseCaseImpl implements RevisionUseCase {
     @Transactional
     public Sugerencia aceptarSugerencia(Long idSugerencia, Long idUsuario) {
         Sugerencia sugerencia = sugerenciaRepo.buscarPorId(idSugerencia)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Sugerencia no encontrada: " + idSugerencia));
 
         Sugerencia aceptada = sugerencia.aceptar();
@@ -66,11 +69,19 @@ public class RevisionUseCaseImpl implements RevisionUseCase {
     @Transactional
     public Sugerencia rechazarSugerencia(Long idSugerencia, Long idUsuario) {
         Sugerencia sugerencia = sugerenciaRepo.buscarPorId(idSugerencia)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Sugerencia no encontrada: " + idSugerencia));
 
         Sugerencia rechazada = sugerencia.rechazar();
         Sugerencia guardada = sugerenciaRepo.actualizar(rechazada);
+
+        // Se mantiene el registro RECHAZADA como histórico, pero ambos movimientos
+        // deben volver a estar disponibles para el motor — antes se quedaban atascados
+        // como si la sugerencia siguiera vigente.
+        reversionService.revertirAPendiente(sugerencia.getIdConciliacion(),
+                sugerencia.getMovimientoBancario().getId(), "BANCARIO");
+        reversionService.revertirAPendiente(sugerencia.getIdConciliacion(),
+                sugerencia.getMovimientoContable().getId(), "CONTABLE");
 
         eventLog.actionReject(sugerencia.getIdConciliacion(), idSugerencia, idUsuario);
         return guardada;

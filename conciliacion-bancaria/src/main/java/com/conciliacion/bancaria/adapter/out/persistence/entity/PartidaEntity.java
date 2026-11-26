@@ -39,6 +39,9 @@ public class PartidaEntity {
     @Column(name = "periodo_arrastre", length = 7)
     private String periodoArrastre;
 
+    @Column(name = "grupo_cruce", length = 36)
+    private String grupoCruce;
+
     @PrePersist
     public void prePersist() {
         if (estado == null) estado = "PENDIENTE";

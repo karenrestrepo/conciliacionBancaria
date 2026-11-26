@@ -11,9 +11,10 @@ describe('ShellComponent', () => {
   let authSpy: jasmine.SpyObj<AuthService>;
 
   beforeEach(async () => {
-    authSpy = jasmine.createSpyObj('AuthService', ['getEmail', 'getRol', 'hasRole', 'logout']);
+    authSpy = jasmine.createSpyObj('AuthService', ['getEmail', 'getRol', 'hasRole', 'isAdmin', 'logout']);
     authSpy.getEmail.and.returnValue('usuario@empresa.com');
     authSpy.getRol.and.returnValue('CONTADOR');
+    authSpy.isAdmin.and.returnValue(false);
 
     await TestBed.configureTestingModule({
       imports: [ShellComponent, NoopAnimationsModule, RouterTestingModule],

@@ -84,6 +84,22 @@ public class LoggingAdapter implements EventLogPort {
         ));
     }
 
+    @Override
+    public void contableRevertido(Long idConciliacion, Long idMovContable, java.time.LocalDate fechaContable,
+                                  java.math.BigDecimal montoContable, String tipoContable,
+                                  String descripcionContable, Long idMovBancario,
+                                  String estadoSugerenciaAnterior) {
+        Map<String, Object> datos = new LinkedHashMap<>();
+        datos.put("idMovContable", idMovContable);
+        datos.put("fechaContable", fechaContable != null ? fechaContable.toString() : null);
+        datos.put("montoContable", montoContable);
+        datos.put("tipoContable", tipoContable);
+        datos.put("descripcionContable", descripcionContable);
+        datos.put("idMovBancario", idMovBancario);
+        datos.put("estadoSugerenciaAnterior", estadoSugerenciaAnterior);
+        log("CONTABLE_REVERTIDO", idConciliacion, datos);
+    }
+
     // ── Utilidad: genera JSON estructurado ───────────────────────────────────
 
     private void log(String evento, Long idConciliacion, Map<String, Object> datos) {

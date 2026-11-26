@@ -15,7 +15,7 @@ describe('LoginComponent', () => {
   const mockLoginOk = {
     success: true,
     message: 'OK',
-    data: { token: 'tok', rol: 'CONTADOR', email: 'u@test.com', expiresIn: 3600 },
+    data: { token: 'tok', rol: 'CONTADOR', email: 'u@test.com', expiresIn: 3600, empresaId: 1, nombreEmpresa: 'Empresa Test', permisos: [] },
     timestamp: ''
   };
 

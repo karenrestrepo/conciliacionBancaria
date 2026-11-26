@@ -1,5 +1,6 @@
 package com.conciliacion.bancaria.domain.port.in;
 
+import com.conciliacion.bancaria.domain.model.ResumenCargaAuxiliar;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface CargaCsvUseCase {
@@ -8,7 +9,7 @@ public interface CargaCsvUseCase {
     String cargarExtractoBancario(Long idConciliacion, MultipartFile archivo,
                                   String nombreBanco);
 
-    String cargarLibroAuxiliar(Long idConciliacion, MultipartFile archivo);
+    ResumenCargaAuxiliar cargarLibroAuxiliar(Long idConciliacion, MultipartFile archivo);
 
     String reprocesarMotor(Long idConciliacion);
 }

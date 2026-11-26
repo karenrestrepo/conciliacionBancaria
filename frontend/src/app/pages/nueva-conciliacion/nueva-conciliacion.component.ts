@@ -13,7 +13,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatStepperModule } from '@angular/material/stepper';
 import { MatDividerModule } from '@angular/material/divider';
 import { ApiService } from '../../core/api.service';
-import { Banco, Cuenta, Conciliacion, ConfiguracionExtracto } from '../../core/models';
+import { Banco, Cuenta, Conciliacion, ConfiguracionExtracto, ResumenCargaAuxiliar } from '../../core/models';
 import { interval, Subscription } from 'rxjs';
 import { switchMap, takeWhile } from 'rxjs/operators';
 
@@ -280,9 +280,21 @@ interface GrupoTarjetas {
               <input #auxiliarInput type="file" accept=".csv,.xls,.xlsx"
                      (change)="onAuxiliarSelected($event)" hidden>
 
+              <div class="job-progress" *ngIf="auxiliarJobProgreso > 0 || auxiliarJobEstado === 'IN_PROGRESS'">
+                <div class="job-header">
+                  <span>Motor de conciliación</span>
+                  <span>{{ auxiliarJobProgreso }}%</span>
+                </div>
+                <mat-progress-bar mode="determinate" [value]="auxiliarJobProgreso"
+                                  [color]="auxiliarJobEstado === 'FAILED' ? 'warn' : 'primary'">
+                </mat-progress-bar>
+                <span class="job-status" [ngClass]="getJobClass(auxiliarJobEstado)">{{ getJobLabel(auxiliarJobEstado) }}</span>
+              </div>
+
               <div class="success-info" *ngIf="auxiliarCargado">
                 <mat-icon>check_circle</mat-icon>
-                Libro auxiliar cargado correctamente
+                <span *ngIf="!resumenAuxiliar">Libro auxiliar cargado correctamente</span>
+                <span *ngIf="resumenAuxiliar">{{ resumenAuxiliarTexto() }}</span>
               </div>
 
               <div class="error-message" *ngIf="errorAuxiliar">
@@ -533,6 +545,7 @@ export class NuevaConciliacionComponent implements OnInit, OnDestroy {
   extractoCargado = false;
   extractosAgregados = 0;
   auxiliarCargado = false;
+  resumenAuxiliar: ResumenCargaAuxiliar | null = null;
   loadingPeriodo = false;
   loadingExtracto = false;
   loadingAuxiliar = false;
@@ -542,6 +555,9 @@ export class NuevaConciliacionComponent implements OnInit, OnDestroy {
   jobProgreso = 0;
   jobEstado = '';
   private pollSub?: Subscription;
+  auxiliarJobProgreso = 0;
+  auxiliarJobEstado = '';
+  private auxiliarPollSub?: Subscription;
   private extractoInputEl: HTMLInputElement | null = null;
 
   get acceptExtracto(): string {
@@ -747,9 +763,20 @@ export class NuevaConciliacionComponent implements OnInit, OnDestroy {
     this.loadingAuxiliar = true;
     this.errorAuxiliar = '';
     this.api.cargarAuxiliar(this.conciliacion.id, this.auxiliarFile).subscribe({
-      next: () => {
-        this.loadingAuxiliar = false;
-        this.auxiliarCargado = true;
+      next: res => {
+        this.resumenAuxiliar = res.data;
+        if (res.data.jobId) {
+          // Hay movimientos nuevos: el motor incremental sigue corriendo en segundo plano.
+          // Esperar a que termine (igual que cargarExtracto/iniciarPolling) antes de marcar
+          // el paso como completado — si no, el usuario podría avanzar o revisar sugerencias
+          // mientras el cruce todavía se está calculando.
+          this.iniciarPollingAuxiliar(res.data.jobId);
+        } else {
+          // Sin nuevos contables (solo anulados/revertidos, o recarga sin cambios): no se
+          // disparó ningún job, no hay nada que esperar.
+          this.loadingAuxiliar = false;
+          this.auxiliarCargado = true;
+        }
       },
       error: err => {
         this.loadingAuxiliar = false;
@@ -758,27 +785,61 @@ export class NuevaConciliacionComponent implements OnInit, OnDestroy {
     });
   }
 
-  getJobClass(): string {
+  iniciarPollingAuxiliar(jobId: string): void {
+    this.auxiliarJobEstado = 'PENDING';
+    this.auxiliarPollSub = interval(2000).pipe(
+      switchMap(() => this.api.jobStatus(jobId)),
+      takeWhile(res => res.data.estado !== 'COMPLETED' && res.data.estado !== 'FAILED', true)
+    ).subscribe({
+      next: res => {
+        this.auxiliarJobProgreso = res.data.progreso;
+        this.auxiliarJobEstado = res.data.estado;
+        if (res.data.estado === 'COMPLETED') {
+          this.loadingAuxiliar = false;
+          this.auxiliarCargado = true;
+          this.auxiliarPollSub?.unsubscribe();
+        }
+        if (res.data.estado === 'FAILED') {
+          this.loadingAuxiliar = false;
+          this.errorAuxiliar = res.data.mensajeError ?? 'Error en el motor de conciliación';
+          this.auxiliarPollSub?.unsubscribe();
+        }
+      }
+    });
+  }
+
+  resumenAuxiliarTexto(): string {
+    const r = this.resumenAuxiliar;
+    if (!r) return 'Libro auxiliar cargado correctamente';
+    const partes = [`${r.nuevos} movimiento(s) nuevo(s)`];
+    if (r.anulados > 0) {
+      partes.push(`${r.anulados} anulado(s)` + (r.revertidos > 0 ? ` (${r.revertidos} conciliación(es) revertida(s))` : ''));
+    }
+    return partes.join(', ');
+  }
+
+  getJobClass(estado: string = this.jobEstado): string {
     const map: Record<string, string> = {
       'PENDING': 'job-pending',
       'IN_PROGRESS': 'job-progress-status',
       'COMPLETED': 'job-completed',
       'FAILED': 'job-failed'
     };
-    return map[this.jobEstado] ?? '';
+    return map[estado] ?? '';
   }
 
-  getJobLabel(): string {
+  getJobLabel(estado: string = this.jobEstado): string {
     const map: Record<string, string> = {
       'PENDING': 'En espera...',
       'IN_PROGRESS': 'Procesando movimientos...',
       'COMPLETED': 'Motor completado',
       'FAILED': 'Error en el procesamiento'
     };
-    return map[this.jobEstado] ?? '';
+    return map[estado] ?? '';
   }
 
   ngOnDestroy(): void {
     this.pollSub?.unsubscribe();
+    this.auxiliarPollSub?.unsubscribe();
   }
 }

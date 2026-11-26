@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { of } from 'rxjs';
 import { CommonModule, CurrencyPipe } from '@angular/common';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
@@ -12,7 +13,12 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { ApiService } from '../../core/api.service';
+import { Conciliacion, Partida } from '../../core/models';
+import { ReportePendientesDialogComponent } from './reporte-pendientes-dialog.component';
+import { FiltrosReportePendientes, filtrarPartidasParaReporte } from './reporte-pendientes.util';
+import { generarPdfPendientes } from './reporte-pendientes-pdf';
 
 @Component({
   selector: 'app-partidas',
@@ -22,7 +28,7 @@ import { ApiService } from '../../core/api.service';
     MatIconModule, MatButtonModule, MatCheckboxModule,
     MatFormFieldModule, MatInputModule,
     MatSnackBarModule, MatProgressSpinnerModule, MatDividerModule,
-    MatTooltipModule, CurrencyPipe
+    MatTooltipModule, MatDialogModule, CurrencyPipe
   ],
   template: `
     <div class="page-container">
@@ -31,10 +37,19 @@ import { ApiService } from '../../core/api.service';
           <h1 class="page-title">Movimientos Pendientes</h1>
           <p class="page-subtitle">Conciliación #{{ idConciliacion }} — Cruce manual o dejar para el próximo mes</p>
         </div>
-        <button mat-stroked-button [routerLink]="['/sugerencias', idConciliacion]" class="back-btn">
-          <mat-icon>arrow_back</mat-icon>
-          Volver a Sugerencias
-        </button>
+        <div class="header-actions">
+          <button mat-stroked-button class="reporte-btn"
+                  [disabled]="generandoReporte"
+                  (click)="abrirReporte()">
+            <mat-spinner diameter="16" *ngIf="generandoReporte"></mat-spinner>
+            <mat-icon *ngIf="!generandoReporte">picture_as_pdf</mat-icon>
+            {{ generandoReporte ? 'Generando…' : 'Generar reporte' }}
+          </button>
+          <button mat-stroked-button [routerLink]="['/sugerencias', idConciliacion]" class="back-btn">
+            <mat-icon>arrow_back</mat-icon>
+            Volver a Sugerencias
+          </button>
+        </div>
       </div>
 
       <div *ngIf="loading" class="loading-container">
@@ -101,6 +116,10 @@ import { ApiService } from '../../core/api.service';
                   <div class="mov-detalle-item" *ngIf="p.descripcionMovimiento">
                     <mat-icon>description</mat-icon>
                     <span class="mov-desc-text" [title]="p.descripcionMovimiento">{{ p.descripcionMovimiento }}</span>
+                  </div>
+                  <div class="mov-detalle-item" *ngIf="p.ultimosDigitosTarjeta">
+                    <mat-icon>credit_card</mat-icon>
+                    <span class="tarjeta-tag">•••• {{ p.ultimosDigitosTarjeta }}</span>
                   </div>
                   <div class="mov-detalle-item">
                     <mat-icon>attach_money</mat-icon>
@@ -189,7 +208,10 @@ import { ApiService } from '../../core/api.service';
                                                [class.contable]="otra.tipoOrigen === 'CONTABLE'">
                         {{ otra.tipoOrigen === 'BANCARIO' ? 'Bancario' : 'Contable' }}
                       </span>
-                      <span class="otra-desc">{{ otra.descripcionMovimiento || ('Partida #' + otra.id) }}</span>
+                      <span class="otra-desc">
+                        {{ otra.descripcionMovimiento || ('Partida #' + otra.id) }}
+                        <span *ngIf="otra.ultimosDigitosTarjeta" class="tarjeta-tag-inline">•••• {{ otra.ultimosDigitosTarjeta }}</span>
+                      </span>
                       <span class="otra-monto" [class.debito]="otra.tipoMovimiento === 'DEBITO'"
                                                [class.credito]="otra.tipoMovimiento === 'CREDITO'">
                         {{ otra.tipoMovimiento === 'DEBITO' ? '−' : '+' }}{{ otra.montoMovimiento | currency:'COP':'symbol':'1.0-0' }}
@@ -263,6 +285,10 @@ import { ApiService } from '../../core/api.service';
                     <mat-icon>description</mat-icon>
                     <span class="mov-desc-text">{{ p.descripcionMovimiento }}</span>
                   </div>
+                  <div class="mov-detalle-item" *ngIf="p.ultimosDigitosTarjeta">
+                    <mat-icon>credit_card</mat-icon>
+                    <span class="tarjeta-tag">•••• {{ p.ultimosDigitosTarjeta }}</span>
+                  </div>
                   <div class="mov-detalle-item">
                     <mat-icon>attach_money</mat-icon>
                     <span class="mov-monto"
@@ -286,15 +312,18 @@ import { ApiService } from '../../core/api.service';
     .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
     .page-title { font-size: 24px; font-weight: 600; color: #1a2332; margin: 0 0 4px; }
     .page-subtitle { font-size: 13px; color: #6b7a8d; margin: 0; }
+    .header-actions { display: flex; align-items: center; gap: 10px; }
     .back-btn { color: #6b7a8d; }
+    .reporte-btn { display: flex; align-items: center; gap: 6px; color: #5b21b6; border-color: #c4b5fd; }
+    .reporte-btn mat-spinner { display: inline-block; }
     .loading-container { display: flex; justify-content: center; padding: 40px; }
 
     .summary-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
     .count-badge { padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; }
     .count-badge.pending    { background: #fef3c7; color: #92400e; }
-    .count-badge.incomplete { background: #fee2e2; color: #991b1b; }
-.count-badge.dragged    { background: #e0e7ff; color: #3730a3; }
-    .count-badge.historical { background: #f3f4f6; color: #374151; }
+    .count-badge.incomplete, .estado-badge.incompleto { background: #fee2e2; color: #991b1b; }
+    .count-badge.dragged, .estado-badge.arrastrada { background: #e0e7ff; color: #3730a3; }
+    .count-badge.historical, .hist-badge { background: #f3f4f6; color: #374151; }
 
     .gastos-card { margin-bottom: 20px; border-left: 4px solid #f59e0b !important; border-radius: 10px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important; }
     .gastos-row { display: flex; align-items: center; gap: 16px; }
@@ -313,15 +342,13 @@ import { ApiService } from '../../core/api.service';
 
     .origen-badge { display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; }
     .origen-badge mat-icon { font-size: 15px; width: 15px; height: 15px; }
-    .origen-badge.bancario { background: #dbeafe; color: #1e40af; }
-    .origen-badge.contable { background: #ede9fe; color: #5b21b6; }
+    .origen-badge.bancario, .otra-badge.bancario { background: #dbeafe; color: #1e40af; }
+    .origen-badge.contable, .otra-badge.contable { background: #ede9fe; color: #5b21b6; }
     .partida-id { font-size: 12px; color: #9ca3af; }
-    .hist-badge { background: #f3f4f6; color: #374151; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; }
+    .hist-badge { padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; }
 
     .estado-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; margin-left: auto; }
     .estado-badge.pendiente  { background: #fef3c7; color: #b45309; }
-    .estado-badge.incompleto { background: #fee2e2; color: #991b1b; }
-    .estado-badge.arrastrada { background: #e0e7ff; color: #3730a3; }
 
     .mov-detalle {
       display: flex; gap: 20px; flex-wrap: wrap; align-items: center;
@@ -331,9 +358,16 @@ import { ApiService } from '../../core/api.service';
     .mov-detalle-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #374151; }
     .mov-detalle-item mat-icon { font-size: 15px; width: 15px; height: 15px; color: #9ca3af; }
     .mov-desc-text { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tarjeta-tag {
+      background: #f3f4f6; color: #4b5563; font-size: 11px; font-weight: 600;
+      padding: 2px 8px; border-radius: 10px; letter-spacing: 0.5px;
+    }
+    .tarjeta-tag-inline {
+      font-size: 11px; color: #9ca3af; margin-left: 6px; white-space: nowrap;
+    }
     .mov-monto { font-weight: 600; }
-    .mov-monto.debito  { color: #dc2626; }
-    .mov-monto.credito { color: #16a34a; }
+    .mov-monto.debito,  .otra-monto.debito  { color: #dc2626; }
+    .mov-monto.credito, .otra-monto.credito { color: #16a34a; }
 
     .nota-incompleto {
       display: flex; align-items: center; gap: 8px;
@@ -388,12 +422,8 @@ import { ApiService } from '../../core/api.service';
     .otra-partida:hover { border-color: #93c5fd; background: #f0f7ff; }
     .otra-partida.seleccionada { border-color: #2563eb; background: #eff6ff; }
     .otra-badge { padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; flex-shrink: 0; }
-    .otra-badge.bancario { background: #dbeafe; color: #1e40af; }
-    .otra-badge.contable { background: #ede9fe; color: #5b21b6; }
     .otra-desc { flex: 1; font-size: 13px; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .otra-monto { font-size: 13px; font-weight: 600; flex-shrink: 0; }
-    .otra-monto.debito  { color: #dc2626; }
-    .otra-monto.credito { color: #16a34a; }
 
     .cruzar-resumen {
       margin-top: 12px; padding: 12px; background: #fff;
@@ -417,6 +447,9 @@ import { ApiService } from '../../core/api.service';
 })
 export class PartidasComponent implements OnInit {
   idConciliacion!: number;
+  periodoConciliacion: string | null = null;
+  /** Conciliación completa (banco + período) -- la necesita el reporte de pendientes en PDF. */
+  conciliacion: Conciliacion | null = null;
   partidas: any[] = [];
   partidasHistoricas: any[] = [];
   loading = true;
@@ -424,6 +457,7 @@ export class PartidasComponent implements OnInit {
   guardandoOrigen: number | null = null;
   guardandoTipo: string | null = null;
   totalGastosBancarios = 0;
+  generandoReporte = false;
 
   saving: Record<number, boolean> = {};
   mostrandoProximo: Record<number, boolean> = {};
@@ -435,12 +469,22 @@ private arrastrarForms: Record<number, FormGroup> = {};
     private route: ActivatedRoute,
     private api: ApiService,
     private fb: FormBuilder,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
     this.idConciliacion = +this.route.snapshot.paramMap.get('id')!;
-    this.cargar();
+    // El período debe estar disponible ANTES de cargar() -- ese método arma los
+    // formularios de "próximo mes" usando siguienteMes(), que depende de él.
+    this.api.obtenerConciliacion(this.idConciliacion).subscribe({
+      next: res => {
+        this.conciliacion = res.data;
+        this.periodoConciliacion = res.data.periodo;
+        this.cargar();
+      },
+      error: () => this.cargar()  // periodoConciliacion/conciliacion quedan null; siguienteMes() cae al fallback de hoy
+    });
   }
 
   cargar(): void {
@@ -596,6 +640,10 @@ private arrastrarForms: Record<number, FormGroup> = {};
       p.estado = updated.estado;
       p.justificacion = updated.justificacion;
       p.periodoArrastre = updated.periodoArrastre;
+    } else {
+      // Partida nueva que no existía localmente -- p.ej. el "resto" de un cruce
+      // incompleto, que el backend crea y devuelve en la misma respuesta.
+      this.partidas.push(updated);
     }
   }
 
@@ -636,7 +684,21 @@ private arrastrarForms: Record<number, FormGroup> = {};
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
+  /**
+   * Mes siguiente al PERÍODO DE LA CONCILIACIÓN, no a la fecha real de hoy -- si el
+   * usuario está conciliando julio en agosto (o en cualquier otro momento posterior),
+   * "próximo mes" debe proponer agosto (el mes después de julio), no el mes después de
+   * la fecha en que efectivamente hace clic.
+   */
   siguienteMes(): string {
+    if (this.periodoConciliacion && /^\d{4}-\d{2}$/.test(this.periodoConciliacion)) {
+      const [anioStr, mesStr] = this.periodoConciliacion.split('-');
+      let anio = parseInt(anioStr, 10);
+      let mes = parseInt(mesStr, 10) + 1;
+      if (mes > 12) { mes = 1; anio += 1; }
+      return `${anio}-${String(mes).padStart(2, '0')}`;
+    }
+    // Fallback si por algún motivo no se pudo cargar el período de la conciliación.
     const d = new Date();
     d.setMonth(d.getMonth() + 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -656,4 +718,63 @@ private arrastrarForms: Record<number, FormGroup> = {};
   getPendientes(): number  { return this.partidas.filter(p => p.estado === 'PENDIENTE').length; }
   getIncompletos(): number { return this.partidas.filter(p => this.esIncompleto(p)).length; }
   getArrastradas(): number { return this.partidas.filter(p => p.estado === 'ARRASTRADA').length; }
+
+  // ── Reporte de pendientes en PDF ─────────────────────────────────────────────
+
+  /**
+   * Abre el diálogo de filtros. Valida ANTES de abrirlo que la conciliación tenga banco y
+   * período cargados (los necesita el título/nombre del PDF) -- así el usuario no llena el
+   * diálogo para terminar en un error. Si cancela, afterClosed() emite undefined y no se
+   * genera nada.
+   */
+  abrirReporte(): void {
+    if (!this.conciliacion?.nombreBanco || !this.conciliacion?.periodo) {
+      this.snackBar.open('No se pudo generar el reporte: falta el banco o el período de la conciliación', 'Cerrar', { duration: 4000 });
+      return;
+    }
+
+    const dialogRef = this.dialog.open(ReportePendientesDialogComponent, { width: '380px' });
+    dialogRef.afterClosed().subscribe(filtros => {
+      if (filtros) this.generarReporte(filtros);
+    });
+  }
+
+  /**
+   * El diálogo solo captura los filtros; armar el arreglo filtrado y generar el PDF ocurre
+   * aquí, después de cerrado -- así ambos pasos quedan testeables por separado (ver
+   * reporte-pendientes.util.ts y reporte-pendientes-pdf.ts). El spinner "generando" se
+   * muestra en el botón "Generar reporte" de la página, no en uno del diálogo -- el
+   * diálogo ya se cerró para cuando arranca el trabajo async.
+   *
+   * Las partidas del período actual reusan partidasVisibles() (mismo criterio que ya
+   * define "pendiente visible" en esta pantalla). Las históricas se piden frescas al
+   * backend en vez de reusar partidasHistoricas -- ese arreglo se carga en paralelo en
+   * cargar() y podría no haber llegado todavía cuando el usuario abre el diálogo
+   * (loading=false no espera a listarPartidasHistoricas), así que confiar en el caché en
+   * memoria del componente sería una condición de carrera.
+   */
+  generarReporte(filtros: FiltrosReportePendientes): void {
+    if (this.generandoReporte) return;
+    this.generandoReporte = true;
+
+    const historicas$ = filtros.incluirHistoricas
+      ? this.api.listarPartidasHistoricas(this.idConciliacion)
+      : of({ success: true, message: '', timestamp: '', data: [] as Partida[] });
+
+    historicas$.subscribe({
+      next: res => {
+        this.generandoReporte = false;
+        try {
+          const filtradas = filtrarPartidasParaReporte(this.partidasVisibles(), res.data, filtros);
+          generarPdfPendientes(this.conciliacion!, filtradas);
+        } catch (e: any) {
+          this.snackBar.open(e?.message ?? 'No se pudo generar el reporte', 'Cerrar', { duration: 4000 });
+        }
+      },
+      error: () => {
+        this.generandoReporte = false;
+        this.snackBar.open('Error al cargar los pendientes de meses anteriores', 'Cerrar', { duration: 4000 });
+      }
+    });
+  }
 }

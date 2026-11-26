@@ -83,12 +83,18 @@ public class ConciliacionController {
 
     @PostMapping("/{id}/auxiliar")
     @PreAuthorize("hasAnyRole('AUXILIAR','CONTADOR','ADMIN')")
-    public ResponseEntity<ApiResponse<String>> cargarAuxiliar(
+    public ResponseEntity<ApiResponse<ResumenCargaAuxiliarResponse>> cargarAuxiliar(
             @PathVariable Long id,
             @RequestParam("archivo") MultipartFile archivo) {
 
-        cargaCsvUseCase.cargarLibroAuxiliar(id, archivo);
-        return ResponseEntity.ok(ApiResponse.ok("Libro auxiliar cargado", null));
+        var resumen = cargaCsvUseCase.cargarLibroAuxiliar(id, archivo);
+        var response = ResumenCargaAuxiliarResponse.builder()
+                .jobId(resumen.getJobId())
+                .nuevos(resumen.getNuevos())
+                .anulados(resumen.getAnulados())
+                .revertidos(resumen.getRevertidos())
+                .build();
+        return ResponseEntity.ok(ApiResponse.ok("Libro auxiliar cargado", response));
     }
 
     // ── Re-procesar motor (sin re-subir archivos) ─────────────────────────────
@@ -307,6 +313,7 @@ public class ConciliacionController {
                 .descripcionMovimiento(p.getDescripcionMovimiento())
                 .montoMovimiento(p.getMontoMovimiento())
                 .tipoMovimiento(p.getTipoMovimiento())
+                .ultimosDigitosTarjeta(p.getUltimosDigitosTarjeta())
                 .esHistorica(p.isEsHistorica())
                 .build();
     }
@@ -324,6 +331,7 @@ public class ConciliacionController {
                 .descripcionBancario(s.getMovimientoBancario().getDescripcion())
                 .montoBancario(s.getMovimientoBancario().getMonto())
                 .tipoBancario(s.getMovimientoBancario().getTipo())
+                .ultimosDigitosTarjeta(s.getMovimientoBancario().getUltimosDigitosTarjeta())
                 .idMovContable(s.getMovimientoContable().getId())
                 .fechaContable(s.getMovimientoContable().getFecha())
                 .descripcionContable(s.getMovimientoContable().getDescripcion())

@@ -17,14 +17,16 @@ public class PartidaConciliatoria {
     private final String tipoOrigen;          // "BANCARIO" o "CONTABLE"
     private final LocalDate fechaJustificacion;
     private final String justificacion;
-    private final String estado;              // "PENDIENTE", "JUSTIFICADA", "ARRASTRADA"
+    private final String estado;              // "PENDIENTE", "JUSTIFICADA", "ARRASTRADA", "CRUZADA"
     private final String periodoArrastre;     // formato YYYY-MM, si fue arrastrada
+    private final String grupoCruce;          // UUID compartido por las partidas de un mismo cruce manual (null si no es cruce)
 
     // Detalles del movimiento asociado (cargados al listar)
     private final java.time.LocalDate fechaMovimiento;
     private final String descripcionMovimiento;
     private final java.math.BigDecimal montoMovimiento;
     private final String tipoMovimiento;      // "DEBITO" o "CREDITO"
+    private final String ultimosDigitosTarjeta; // sólo si el movimiento bancario viene de un extracto de tarjeta
     private final boolean esHistorica;        // partida de conciliación anterior
 
     public boolean estaJustificada() {
